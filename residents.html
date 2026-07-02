@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anti Rabies Dashboard</title>
+
+  <!-- FONT AWESOME -->
+  <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+
+  <link rel="stylesheet" href="resident.css">
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="top-header">
+    <div class="logo-section">
+      <div class="logo-icon">
+        <i class="fa-solid fa-shield-dog"></i>
+      </div>
+      <div>
+        <h2>Anti-Rabies Locator</h2>
+        <p>Cabuyao, Laguna</p>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <h3>John Cruz</h3>
+      <!-- HAMBURGER -->
+      <button class="menu-btn" id="menuBtn">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+      <!-- SIGN OUT -->
+      <a href="index.html" style="text-decoration: none;">
+        <button class="signout-btn">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+          Sign Out
+        </button>
+      </a>
+    </div>
+  </header>
+
+  <!-- PAGE CONTENT -->
+  <div class="page-wrapper" id="pageWrapper">
+
+    <!-- LEFT SLOT (First Aid ↔ Sidebar) -->
+    <div class="left-slot">
+      <!-- FIRST AID -->
+      <section class="firstaid-section" id="firstAid">
+        <div class="first-aid-card">
+          <div class="card-header">Emergency First Aid for Animal Bites</div>
+
+          <div class="step">
+            <div class="step-number">1</div>
+            <div>
+              <h4>Wash the wound immediately</h4>
+              <p>Use soap and running water for at least 15 minutes</p>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-number">2</div>
+            <div>
+              <h4>Apply antiseptic solution</h4>
+              <p>Use povidone-iodine or alcohol</p>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-number">3</div>
+            <div>
+              <h4>Do NOT cover the wound</h4>
+              <p>Leave it open to prevent infection</p>
+            </div>
+          </div>
+
+          <div class="warning-box">
+            <h4>CRITICAL WARNING</h4>
+            <p>Rabies is 100% fatal once symptoms appear.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SIDEBAR -->
+      <aside class="sidebar" id="sidebar">
+        <a href="#"><i class="fa-regular fa-user"></i> ACCOUNT</a>
+        <a href="#"><i class="fa-regular fa-bell"></i> NOTIFICATION</a>
+        <a href="#"><i class="fa-solid fa-clock-rotate-left"></i> HISTORY</a>
+        <a href="#"><i class="fa-regular fa-calendar"></i> APPOINTMENT</a>
+        <a href="#"><i class="fa-solid fa-syringe"></i> FIRST-AID GUIDE</a>
+      </aside>
+    </div>
+
+    <!-- RIGHT SLOT (Map + Clinics) -->
+    <main class="main-container">
+      <!-- MAP -->
+      <div class="map-card">
+        <div class="map-top">
+          <h3>Find Nearby Clinics</h3>
+          <div class="map-filter">
+            <button class="active-btn">All</button>
+            <button>Public</button>
+            <button>Private</button>
+          </div>
+        </div>
+
+        <div class="map-box">
+          <div class="map-label">CABUYAO MAP</div>
+
+          <!-- MARKERS -->
+          <div class="marker green" style="top:25%; left:18%;"></div>
+          <div class="marker yellow" style="top:38%; left:35%;"></div>
+          <div class="marker green" style="top:50%; left:50%;"></div>
+          <div class="marker red" style="top:62%; left:66%;"></div>
+
+          <!-- LEGEND -->
+          <div class="legend-box">
+            <h4>Legend</h4>
+            <p><span class="legend green-bg"></span> Vaccines Available</p>
+            <p><span class="legend yellow-bg"></span> Low Stock</p>
+            <p><span class="legend red-bg"></span> Out of Stock</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- AVAILABLE CLINICS -->
+      <div class="clinic-card">
+        <h2>Available Clinics</h2>
+        <div class="clinic-box">
+          <div class="clinic-top">
+            <h3>Cabuyao City Health Center</h3>
+            <span class="available">Available</span>
+          </div>
+          <p>Brgy. Poblacion Uno, Cabuyao City</p>
+          <p>(049) 531-2345</p>
+          <p>8:00 AM - 5:00 PM</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- JAVASCRIPT -->
+  <script>
+    const menuBtn = document.getElementById("menuBtn");
+    const sidebar = document.getElementById("sidebar");
+    const firstAid = document.getElementById("firstAid");
+
+    menuBtn.addEventListener("click", () => {
+      sidebar.classList.toggle("showSidebar");
+      firstAid.classList.toggle("hideFirstAid");
+    });
+  </script>
+
+</body>
+</html>

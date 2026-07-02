@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+    <title>Administrator Dashboard</title>
+
+    <!-- FONT AWESOME -->
+    <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+
+    <link rel="stylesheet" href="staff.css"/>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <header class="top-header">
+
+        <div class="logo-section">
+
+            <div class="logo-icon">
+                <i class="fa-solid fa-location-dot"></i>
+            </div>
+
+            <div>
+                <h2>Anti-Rabies Locator</h2>
+                <p>Cabuyao, Laguna</p>
+            </div>
+
+        </div>
+
+        <div class="header-right">
+
+            <a href="#">
+                <i class="fa-solid fa-gauge-high"></i>
+                Admin Dashboard
+            </a>
+
+            <a href="index.html">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                Sign Out
+            </a>
+
+        </div>
+
+    </header>
+
+    <!-- MAIN -->
+    <main class="main-container">
+
+        <!-- TITLE -->
+        <div class="page-title">
+
+            <h1>Administrator Dashboard</h1>
+
+            <p>
+                Monitor clinic performance, analytics, and system use.
+            </p>
+
+        </div>
+
+        <!-- STATS -->
+        <section class="stats-grid">
+
+            <div class="stat-card">
+
+                <div>
+                    <span>Total Clinics</span>
+                    <h2>4</h2>
+                </div>
+
+                <i class="fa-solid fa-clinic-medical blue"></i>
+
+            </div>
+
+            <div class="stat-card">
+
+                <div>
+                    <span>Active Staff</span>
+                    <h2>12</h2>
+                </div>
+
+                <i class="fa-solid fa-user-group green"></i>
+
+            </div>
+
+            <div class="stat-card">
+
+                <div>
+                    <span>Monthly Visits</span>
+                    <h2>462</h2>
+                </div>
+
+                <i class="fa-solid fa-chart-line purple"></i>
+
+            </div>
+
+            <div class="stat-card">
+
+                <div>
+                    <span>Critical Alerts</span>
+                    <h2 class="red-text">3</h2>
+                </div>
+
+                <i class="fa-solid fa-triangle-exclamation red"></i>
+
+            </div>
+
+        </section>
+
+        <section class="content-box">
+
+            <div class="tabs">
+
+                <button class="active-tab">Analytics</button>
+                <button>Users</button>
+                <button>Reports</button>
+
+            </div>
+
+            <div class="inventory-content">
+
+                <div class="inventory-top">
+
+                    <h2>Administrator Overview</h2>
+
+                    <button class="add-btn">
+                        <i class="fa-solid fa-file-chart-column"></i>
+                        View Reports
+                    </button>
+
+                </div>
+
+                <div class="alert-box">
+
+                    <div class="alert-title">
+
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+
+                        <h3>Attention</h3>
+
+                    </div>
+
+                    <p>
+                        Pending approvals and data reconciliation items need review.
+                    </p>
+
+                </div>
+
+                <div class="table-container">
+
+                    <table>
+
+                        <thead>
+
+                            <tr>
+                                <th>METRIC</th>
+                                <th>VALUE</th>
+                                <th>STATUS</th>
+                                <th>ACTION</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            <tr>
+                                <td><strong>Clinic uptime</strong></td>
+                                <td>99.8%</td>
+                                <td><span class="status adequate">good</span></td>
+                                <td><a href="#" class="update-link">Review</a></td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Staff approvals</strong></td>
+                                <td>2 pending</td>
+                                <td><span class="status low">pending</span></td>
+                                <td><a href="#" class="update-link">Approve</a></td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Inventory checks</strong></td>
+                                <td>4 overdue</td>
+                                <td><span class="status critical">critical</span></td>
+                                <td><a href="#" class="update-link">Inspect</a></td>
+                            </tr>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</body>
+</html>

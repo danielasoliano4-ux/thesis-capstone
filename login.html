@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Anti-Rabies Login</title>
+
+    <!-- FONT AWESOME -->
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+
+    <link rel="stylesheet" href="login.css">
+</head>
+<body>
+
+    <!-- HEADER -->
+    <header class="top-header">
+
+        <div class="logo-section">
+
+            <div class="logo-icon">
+                <i class="fa-solid fa-location-dot"></i>
+            </div>
+
+            <div>
+                <h2>Anti-Rabies Locator</h2>
+                <p>Cabuyao, Laguna</p>
+            </div>
+
+        </div>
+
+        <button class="signin-btn">Sign In</button>
+
+    </header>
+
+    <!-- MAIN -->
+    <main class="main-container">
+
+        <!-- CENTER LOGO -->
+        <div class="main-logo">
+
+            <div class="big-logo">
+                <i class="fa-solid fa-location-dot"></i>
+            </div>
+
+            <h1>Anti-Rabies Locator System</h1>
+            <p>Cabuyao, Laguna</p>
+
+        </div>
+
+        <!-- LOGIN CARD -->
+        <section class="login-card">
+
+            <!-- LEFT SIDE -->
+            <div class="role-section">
+
+                <h2>Select Your Role</h2>
+
+                <!-- RESIDENT -->
+                <div class="role-box active-role" data-role="resident">
+
+                    <div class="role-icon red">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+
+                    <div>
+                        <h3>Resident</h3>
+                        <p>Book appointments & track vaccinations</p>
+                    </div>
+
+                </div>
+
+                <!-- CLINIC -->
+                <div class="role-box" data-role="staff">
+
+                    <div class="role-icon gray">
+                        <i class="fa-solid fa-hospital"></i>
+                    </div>
+
+                    <div>
+                        <h3>Clinic Staff</h3>
+                        <p>Manage inventory & patient dosage</p>
+                    </div>
+
+                </div>
+
+                <!-- ADMIN -->
+                <div class="role-box" data-role="admin">
+
+                    <div class="role-icon gray">
+                        <i class="fa-solid fa-chart-column"></i>
+                    </div>
+
+                    <div>
+                        <h3>Administrator</h3>
+                        <p>Monitor trends & analytics</p>
+                    </div>
+
+                </div>
+
+                <!-- DEMO BOX -->
+                <div class="demo-box">
+                    <strong>Demo Mode:</strong>
+                    Select a role above and click "Sign In"
+                    to explore the system.
+                </div>
+
+            </div>
+
+            <!-- RIGHT SIDE -->
+            <div class="signin-section">
+
+                <h2>Sign In</h2>
+
+                <form>
+
+                    <label>Email or Username</label>
+                    <input type="text" value="resident@demo.com">
+
+                    <label>Password</label>
+                    <input type="password" value="123456">
+
+                    <!-- OPTIONS -->
+                    <div class="form-options">
+
+                        <label class="remember">
+                            <input type="checkbox">
+                            Remember me
+                        </label>
+
+                        <a href="#">Forgot password?</a>
+
+                    </div>
+
+                    <!-- BUTTON -->
+                    <button type="button" class="login-btn" id="loginBtn">Sign In as Resident</button>
+
+                </form>
+
+                <!-- BACK -->
+                <div class="auth-navigation">
+                    <p class="register-text">
+                        No account? <a href="register.html" class="red-link">Register here</a>
+                    </p>
+                    
+                    <a href="index.html" class="back-link">
+                        <span class="arrow"></span> Back to Vaccine Locator
+                    </a>
+                </div>
+
+                <hr>
+
+                <!-- FEATURES -->
+                <div class="features">
+
+                    <h4 id="featuresHeading">Resident Features:</h4>
+
+                    <ul id="featuresList">
+                        <li>Book and manage appointments</li>
+                        <li>Receive vaccination reminders</li>
+                        <li>Access first-aid guidelines</li>
+                        <li>View vaccination schedule</li>
+                    </ul>
+
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="footer">
+
+            <p>
+                ISO 25010 Compliant •
+                Role-Based Access Control (RBAC)
+            </p>
+
+            <p>
+                © 2026 City of Cabuyao -
+                Real-Time Anti-Rabies Availability Locator System
+            </p>
+
+        </footer>
+
+    </main>
+
+    <script>
+        const roles = {
+            resident: {
+                label: 'Resident',
+                buttonText: 'Sign In as Resident',
+                email: 'resident@demo.com',
+                password: 'demo123',
+                features: [
+                    'Book and manage appointments',
+                    'Receive vaccination reminders',
+                    'Access first-aid guidelines',
+                    'View vaccination schedule'
+                ],
+                page: 'residents.html'
+            },
+            staff: {
+                label: 'Clinic Staff',
+                buttonText: 'Sign In as Clinic Staff',
+                email: 'staff@demo.com',
+                password: 'demo123',
+                features: [
+                    'Manage vaccine inventory',
+                    'Update patient dosage records',
+                    'Track stock levels',
+                    'Generate clinic reports'
+                ],
+                page: 'staff.html'
+            },
+            admin: {
+                label: 'Administrator',
+                buttonText: 'Sign In as Administrator',
+                email: 'admin@demo.com',
+                password: 'demo123',
+                features: [
+                    'Monitor system analytics',
+                    'Review clinic performance',
+                    'Approve user access',
+                    'Manage reports'
+                ],
+                page: 'admin.html'
+            }
+        };
+
+        const roleBoxes = document.querySelectorAll('.role-box');
+        const loginBtn = document.getElementById('loginBtn');
+        const emailInput = document.querySelector('input[type="text"]');
+        const passwordInput = document.querySelector('input[type="password"]');
+        const featuresHeading = document.getElementById('featuresHeading');
+        const featuresList = document.getElementById('featuresList');
+
+        let currentRole = 'resident';
+
+        function updateFeatures(role) {
+            const roleData = roles[role];
+
+            featuresHeading.textContent = `${roleData.label} Features:`;
+            featuresList.innerHTML = roleData.features.map(item => `<li>${item}</li>`).join('');
+            loginBtn.textContent = roleData.buttonText;
+            emailInput.value = roleData.email;
+            passwordInput.value = roleData.password;
+            currentRole = role;
+
+            roleBoxes.forEach(box => {
+                const icon = box.querySelector('.role-icon');
+                const isActive = box.dataset.role === role;
+
+                box.classList.toggle('active-role', isActive);
+                icon.classList.toggle('red', isActive);
+                icon.classList.toggle('gray', !isActive);
+            });
+        }
+
+        roleBoxes.forEach(box => {
+            box.addEventListener('click', () => updateFeatures(box.dataset.role));
+        });
+
+        loginBtn.addEventListener('click', () => {
+            window.location.href = roles[currentRole].page;
+        });
+
+        updateFeatures('resident');
+    </script>
+
+</body>
+</html>

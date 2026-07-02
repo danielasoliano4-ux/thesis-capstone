@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Patient Tracking</title>
+    <!-- FONT AWESOME -->
+    <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+    <link rel="stylesheet" href="staff.css"/>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <header class="top-header">
+        <div class="logo-section">
+            <div class="logo-icon">
+                <i class="fa-solid fa-location-dot"></i>
+            </div>
+            <div>
+                <h2>Anti-Rabies Locator</h2>
+                <p>Cabuyao, Laguna</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <a href="staff.html" class="sidebar-link">
+                <i class="fa-regular fa-hospital"></i>
+                Clinic Dashboard
+            </a>
+            <a href="index.html" style="text-decoration: none;">
+                <button class="signout-btn">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                    Sign Out
+                </button>
+            </a>
+        </div>
+    </header>
+
+    <!-- MAIN -->
+    <main class="main-container">
+
+        <!-- TITLE -->
+        <div class="page-title">
+            <h1>Patient Tracking</h1>
+            <p>Monitor active patients and their treatment progress</p>
+        </div>
+
+        <!-- CONTENT BOX -->
+        <section class="content-box">
+
+            <!-- TABS -->
+            <div class="tabs">
+                <a href="staff.html" class="tab-link">
+                    <button>Vaccine Inventory</button>
+                </a>
+                <a href="patient-tracking.html" class="tab-link">
+                    <button class="active-tab">Patient Tracking</button>
+                </a>
+                <a href="clinic-profile.html" class="tab-link">
+                    <button>Clinic Profile</button>
+                </a>
+            </div>
+
+            <!-- PATIENT TRACKING CONTENT -->
+            <div class="patient-tracking-content">
+
+                <h2 style="margin-bottom: 30px;">Active Patient Monitoring</h2>
+
+                <!-- PATIENTS GRID -->
+                <div class="patients-grid">
+
+                    <!-- PATIENT 1 -->
+                    <div class="patient-card blue-tint">
+                        <div class="patient-header">
+                            <h3>Juan Dela Cruz</h3>
+                            <p class="patient-id">RES-2026-001234</p>
+                        </div>
+
+                        <div class="treatment-section">
+                            <label>Treatment Progress</label>
+                            <div class="doses-info">
+                                <span class="doses-badge">3/5 doses</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar" style="width: 60%;"></div>
+                            </div>
+                            <p class="progress-text">60% Complete</p>
+                        </div>
+
+                        <div class="appointment-info">
+                            <i class="fa-regular fa-calendar"></i>
+                            <span><strong>Next Appointment:</strong> May 22, 2026</span>
+                        </div>
+
+                        <button class="view-record-btn">View Full Record</button>
+                    </div>
+
+                    <!-- PATIENT 2 -->
+                    <div class="patient-card yellow-tint">
+                        <div class="patient-header">
+                            <h3>Maria Santos</h3>
+                            <p class="patient-id">RES-2026-001235</p>
+                        </div>
+
+                        <div class="treatment-section">
+                            <label>Treatment Progress</label>
+                            <div class="doses-info">
+                                <span class="doses-badge">2/5 doses</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar" style="width: 40%;"></div>
+                            </div>
+                            <p class="progress-text">40% Complete</p>
+                        </div>
+
+                        <div class="appointment-info">
+                            <i class="fa-regular fa-calendar"></i>
+                            <span><strong>Next Appointment:</strong> May 20, 2026</span>
+                        </div>
+
+                        <button class="view-record-btn">View Full Record</button>
+                    </div>
+
+                    <!-- PATIENT 3 -->
+                    <div class="patient-card green-tint">
+                        <div class="patient-header">
+                            <div class="header-with-badge">
+                                <h3>Pedro Reyes</h3>
+                                <span class="completed-badge">Completed</span>
+                            </div>
+                            <p class="patient-id">RES-2026-001236</p>
+                        </div>
+
+                        <div class="treatment-section">
+                            <label>Treatment Progress</label>
+                            <div class="doses-info">
+                                <span class="doses-badge">5/5 doses</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar" style="width: 100%;"></div>
+                            </div>
+                            <p class="progress-text">100% Complete</p>
+                        </div>
+
+                        <button class="view-record-btn">View Full Record</button>
+                    </div>
+
+                    <!-- PATIENT 4 -->
+                    <div class="patient-card yellow-tint">
+                        <div class="patient-header">
+                            <h3>Ana Garcia</h3>
+                            <p class="patient-id">RES-2026-001237</p>
+                        </div>
+
+                        <div class="treatment-section">
+                            <label>Treatment Progress</label>
+                            <div class="doses-info">
+                                <span class="doses-badge">1/5 doses</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar" style="width: 20%;"></div>
+                            </div>
+                            <p class="progress-text">20% Complete</p>
+                        </div>
+
+                        <div class="appointment-info">
+                            <i class="fa-regular fa-calendar"></i>
+                            <span><strong>Next Appointment:</strong> May 19, 2026</span>
+                        </div>
+
+                        <button class="view-record-btn">View Full Record</button>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+    <style>
+        .patient-tracking-content {
+            padding: 20px;
+        }
+
+        .patients-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .patient-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .patient-card.blue-tint {
+            background-color: #f0f8ff;
+            border-left: 4px solid #4a90e2;
+        }
+
+        .patient-card.yellow-tint {
+            background-color: #fffaf0;
+            border-left: 4px solid #ffa500;
+        }
+
+        .patient-card.green-tint {
+            background-color: #f0fdf4;
+            border-left: 4px solid #4caf50;
+        }
+
+        .patient-header {
+            margin-bottom: 15px;
+        }
+
+        .patient-header h3 {
+            margin: 0 0 5px 0;
+            font-size: 18px;
+            color: #333;
+        }
+
+        .header-with-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-with-badge h3 {
+            margin: 0;
+        }
+
+        .completed-badge {
+            background-color: #4caf50;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .patient-id {
+            margin: 0;
+            color: #666;
+            font-size: 13px;
+        }
+
+        .treatment-section {
+            margin: 15px 0;
+        }
+
+        .treatment-section label {
+            font-weight: 600;
+            color: #333;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .doses-info {
+            margin-bottom: 8px;
+        }
+
+        .doses-badge {
+            background-color: rgba(0,0,0,0.08);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 10px;
+            background-color: rgba(0,0,0,0.1);
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #333;
+            transition: width 0.3s ease;
+        }
+
+        .patient-card.blue-tint .progress-bar {
+            background-color: #4a90e2;
+        }
+
+        .patient-card.yellow-tint .progress-bar {
+            background-color: #ffa500;
+        }
+
+        .patient-card.green-tint .progress-bar {
+            background-color: #4caf50;
+        }
+
+        .progress-text {
+            font-size: 12px;
+            color: #666;
+            margin: 0;
+        }
+
+        .appointment-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 15px 0;
+            padding: 10px;
+            background-color: rgba(0,0,0,0.02);
+            border-radius: 4px;
+            font-size: 13px;
+            color: #333;
+        }
+
+        .appointment-info i {
+            color: #4a90e2;
+        }
+
+        .view-record-btn {
+            width: 100%;
+            padding: 10px;
+            background-color: rgba(0,0,0,0.05);
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #333;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .view-record-btn:hover {
+            background-color: rgba(0,0,0,0.1);
+            border-color: #999;
+        }
+
+        .tab-link {
+            text-decoration: none;
+        }
+
+        .tab-link button {
+            background: none;
+            border: none;
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-link button:hover {
+            color: #333;
+        }
+
+        .tab-link button.active-tab {
+            color: #4a90e2;
+            border-bottom-color: #4a90e2;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .patients-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+
+</body>
+</html>

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+    <title>Clinic Staff Dashboard</title>
+
+    <!-- FONT AWESOME -->
+    <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+
+    <link rel="stylesheet" href="staff.css"/>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <header class="top-header">
+
+        <div class="logo-section">
+
+            <div class="logo-icon">
+                <i class="fa-solid fa-location-dot"></i>
+            </div>
+
+            <div>
+                <h2>Anti-Rabies Locator</h2>
+                <p>Cabuyao, Laguna</p>
+            </div>
+
+        </div>
+
+        <div class="header-right">
+
+        <a href="#" class="sidebar-link">
+            <i class="fa-regular fa-hospital"></i>
+            Clinic Dashboard
+        </a>
+
+        <a href="index.html" style="text-decoration: none;">
+            <button class="signout-btn">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            Sign Out
+        </button>
+        </a>
+
+        </div>
+
+    </header>
+
+    <!-- MAIN -->
+    <main class="main-container">
+
+        <!-- TITLE -->
+        <div class="page-title">
+
+            <h1>Clinic Management Dashboard</h1>
+
+            <p>
+                Manage vaccine inventory and patient dosage preparations
+            </p>
+
+        </div>
+
+        <!-- STATS -->
+        <section class="stats-grid">
+
+            <!-- CARD -->
+            <div class="stat-card">
+
+                <div>
+                    <span>Total Stock</span>
+                    <h2>55</h2>
+                </div>
+
+                <i class="fa-solid fa-cube blue"></i>
+
+            </div>
+
+            <!-- CARD -->
+            <div class="stat-card">
+
+                <div>
+                    <span>Active Patients</span>
+                    <h2>2</h2>
+                </div>
+
+                <i class="fa-solid fa-user-group green"></i>
+
+            </div>
+
+            <!-- CARD -->
+            <div class="stat-card">
+
+                <div>
+                    <span>This Month</span>
+                    <h2>127</h2>
+                </div>
+
+                <i class="fa-solid fa-arrow-trend-up purple"></i>
+
+            </div>
+
+            <!-- CARD -->
+            <div class="stat-card">
+
+                <div>
+                    <span>Low Stock Items</span>
+                    <h2 class="red-text">2</h2>
+                </div>
+
+                <i class="fa-solid fa-triangle-exclamation red"></i>
+
+            </div>
+
+        </section>
+
+        <!-- CONTENT BOX -->
+        <section class="content-box">
+
+            <!-- TABS -->
+            <div class="tabs">
+
+                <a href="staff.html" class="tab-link">
+                    <button class="active-tab">
+                        Vaccine Inventory
+                    </button>
+                </a>
+
+                <a href="patient-tracking.html" class="tab-link">
+                    <button>
+                        Patient Tracking
+                    </button>
+                </a>
+
+                <a href="clinic-profile.html" class="tab-link">
+                    <button>
+                        Clinic Profile
+                    </button>
+                </a>
+
+            </div>
+
+            <!-- CONTENT -->
+            <div class="inventory-content">
+
+                <!-- TOP -->
+                <div class="inventory-top">
+
+                    <h2>Vaccine Inventory Management</h2>
+
+                    <button class="add-btn">
+                        <i class="fa-solid fa-plus"></i>
+                        Add New Stock
+                    </button>
+
+                </div>
+
+                <!-- ALERT -->
+                <div class="alert-box">
+
+                    <div class="alert-title">
+
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+
+                        <h3>Stock Alert</h3>
+
+                    </div>
+
+                    <p>
+                        1 critical and 1 low stock items require immediate attention.
+                    </p>
+
+                </div>
+
+                <!-- TABLE -->
+                <div class="table-container">
+
+                    <table>
+
+                        <thead>
+
+                            <tr>
+                                <th>VACCINE TYPE</th>
+                                <th>MANUFACTURER</th>
+                                <th>BATCH NUMBER</th>
+                                <th>QUANTITY</th>
+                                <th>EXPIRY DATE</th>
+                                <th>STATUS</th>
+                                <th>ACTIONS</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            <tr>
+                                <td><strong>Verorab</strong></td>
+                                <td>Sanofi Pasteur</td>
+                                <td>VR2026-A123</td>
+                                <td><strong>45 doses</strong></td>
+                                <td>12/31/2026</td>
+
+                                <td>
+                                    <span class="status adequate">
+                                        adequate
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <a href="#" class="update-link">
+                                        <i class="fa-regular fa-pen-to-square"></i>
+                                        Update
+                                    </a>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Rabipur</strong></td>
+                                <td>GSK</td>
+                                <td>RP2026-B456</td>
+                                <td><strong>8 doses</strong></td>
+                                <td>10/15/2026</td>
+
+                                <td>
+                                    <span class="status low">
+                                        low
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <a href="#" class="update-link">
+                                        <i class="fa-regular fa-pen-to-square"></i>
+                                        Update
+                                    </a>
+                                </td>
+                            </tr>
+
+                            <tr>
+                                <td><strong>Speeda</strong></td>
+                                <td>MassBiologics</td>
+                                <td>SD2026-C789</td>
+                                <td><strong>2 doses</strong></td>
+                                <td>8/20/2026</td>
+
+                                <td>
+                                    <span class="status critical">
+                                        critical
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <a href="#" class="update-link">
+                                        <i class="fa-regular fa-pen-to-square"></i>
+                                        Update
+                                    </a>
+                                </td>
+                            </tr>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</body>
+</html>
