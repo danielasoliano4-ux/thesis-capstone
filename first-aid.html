@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>First Aid Guide - Anti-Rabies Locator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+    <link rel="stylesheet" href="resident.css">
+    <style>
+        .guide-container {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 0 20px 60px;
+        }
+        .guide-hero {
+            background: linear-gradient(135deg, #c62828, #ef0000);
+            color: white;
+            border-radius: 12px;
+            padding: 36px 40px;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+        .guide-hero-icon {
+            font-size: 52px;
+            opacity: 0.9;
+        }
+        .guide-hero h1 { font-size: 26px; margin-bottom: 6px; }
+        .guide-hero p { font-size: 14px; opacity: 0.9; }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #111;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-title i { color: #ef0000; }
+
+        .steps-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 30px; }
+
+        .step-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px 24px;
+            display: flex;
+            align-items: flex-start;
+            gap: 18px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+            border-left: 4px solid #ef0000;
+        }
+        .step-num {
+            width: 36px;
+            height: 36px;
+            min-width: 36px;
+            border-radius: 50%;
+            background: #ef0000;
+            color: white;
+            font-weight: 700;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .step-card h4 { font-size: 16px; margin-bottom: 4px; color: #111; }
+        .step-card p { font-size: 13px; color: #4b5563; line-height: 1.6; }
+
+        .warning-banner {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 10px;
+            padding: 20px 24px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+        .warning-banner i { color: #d97706; font-size: 22px; margin-top: 2px; }
+        .warning-banner h4 { font-size: 15px; font-weight: 700; color: #92400e; margin-bottom: 4px; }
+        .warning-banner p { font-size: 13px; color: #78350f; line-height: 1.6; }
+
+        .critical-banner {
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
+            border-radius: 10px;
+            padding: 20px 24px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+        .critical-banner i { color: #ef0000; font-size: 22px; margin-top: 2px; }
+        .critical-banner h4 { font-size: 15px; font-weight: 700; color: #991b1b; margin-bottom: 4px; }
+        .critical-banner p { font-size: 13px; color: #7f1d1d; line-height: 1.6; }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+        .info-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+        }
+        .info-card h4 {
+            font-size: 14px;
+            font-weight: 700;
+            color: #111;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .info-card h4 i { color: #ef0000; }
+        .info-card ul { padding-left: 16px; }
+        .info-card ul li { font-size: 13px; color: #4b5563; margin-bottom: 6px; line-height: 1.5; }
+
+        .category-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+        .badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .badge.cat1 { background: #fee2e2; color: #991b1b; }
+        .badge.cat2 { background: #fef3c7; color: #92400e; }
+        .badge.cat3 { background: #dcfce7; color: #166534; }
+
+        .symptoms-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+            margin-bottom: 30px;
+        }
+        .symptoms-table th {
+            background: #1f2937;
+            color: white;
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 13px;
+        }
+        .symptoms-table td {
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #374151;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .symptoms-table tr:last-child td { border-bottom: none; }
+        .symptoms-table tr:nth-child(even) td { background: #f9fafb; }
+
+        .cta-box {
+            background: linear-gradient(135deg, #1f2937, #374151);
+            color: white;
+            border-radius: 12px;
+            padding: 30px 36px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+        }
+        .cta-box h3 { font-size: 18px; margin-bottom: 6px; }
+        .cta-box p { font-size: 13px; opacity: 0.8; }
+        .cta-btn {
+            background: #ef0000;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            text-decoration: none;
+            display: inline-block;
+            transition: background 0.2s;
+        }
+        .cta-btn:hover { background: #cc0000; }
+
+        @media (max-width: 640px) {
+            .guide-hero { flex-direction: column; padding: 24px; }
+            .info-grid { grid-template-columns: 1fr; }
+            .cta-box { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="top-header">
+        <div class="logo-section">
+            <div class="logo-icon">
+                <i class="fa-solid fa-shield-dog"></i>
+            </div>
+            <div>
+                <h2>Anti-Rabies Locator</h2>
+                <p>Cabuyao, Laguna</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <a href="residents.html"><i class="fa-solid fa-house"></i> Dashboard</a>
+            <a href="index.html" style="text-decoration:none;">
+                <button class="signout-btn">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
+                </button>
+            </a>
+        </div>
+    </header>
+
+    <div class="guide-container">
+
+        <!-- HERO -->
+        <div class="guide-hero">
+            <div class="guide-hero-icon">
+                <i class="fa-solid fa-kit-medical"></i>
+            </div>
+            <div>
+                <h1>Rabies First Aid &amp; Emergency Guide</h1>
+                <p>Immediate steps to take after an animal bite. Act fast — every minute matters in rabies prevention.</p>
+            </div>
+        </div>
+
+        <!-- CRITICAL WARNING -->
+        <div class="critical-banner">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <div>
+                <h4>CRITICAL WARNING</h4>
+                <p>Rabies is 100% fatal once symptoms appear. However, it is 100% preventable when treated promptly after exposure.
+                   Do not wait — seek medical attention at an Animal Bite Treatment Center (ABTC) immediately after any animal bite.</p>
+            </div>
+        </div>
+
+        <!-- IMMEDIATE STEPS -->
+        <div class="section-title">
+            <i class="fa-solid fa-list-ol"></i> Immediate First Aid Steps
+        </div>
+        <div class="steps-list">
+            <div class="step-card">
+                <div class="step-num">1</div>
+                <div>
+                    <h4>Wash the wound immediately</h4>
+                    <p>Use soap and running water vigorously for at least <strong>15 minutes</strong>.
+                       This is the single most effective step in reducing the risk of rabies infection.
+                       Wash all scratches, licks on broken skin, and bites thoroughly.</p>
+                </div>
+            </div>
+            <div class="step-card">
+                <div class="step-num">2</div>
+                <div>
+                    <h4>Apply an antiseptic solution</h4>
+                    <p>After washing, apply <strong>povidone-iodine (Betadine)</strong>, 70% alcohol, or hydrogen peroxide to the wound.
+                       These disinfectants help kill the rabies virus on the wound surface.</p>
+                </div>
+            </div>
+            <div class="step-card">
+                <div class="step-num">3</div>
+                <div>
+                    <h4>Do NOT cover or suture the wound</h4>
+                    <p>Leave the wound open to air whenever possible. Covering or suturing the wound
+                       traps the virus and increases the risk of infection. Only use loose dressing if necessary to control bleeding.</p>
+                </div>
+            </div>
+            <div class="step-card">
+                <div class="step-num">4</div>
+                <div>
+                    <h4>Go to the nearest ABTC immediately</h4>
+                    <p>Proceed to an <strong>Animal Bite Treatment Center (ABTC)</strong> or clinic within
+                       <strong>24 hours</strong> of the bite. Do not wait for symptoms to appear — by then it is too late.
+                       Use this app to find the nearest clinic with anti-rabies vaccines available.</p>
+                </div>
+            </div>
+            <div class="step-card">
+                <div class="step-num">5</div>
+                <div>
+                    <h4>Complete the full vaccination schedule</h4>
+                    <p>Post-Exposure Prophylaxis (PEP) requires <strong>multiple doses</strong> over several days.
+                       Complete ALL scheduled doses even if you feel fine. Missing doses significantly reduces protection.</p>
+                </div>
+            </div>
+            <div class="step-card">
+                <div class="step-num">6</div>
+                <div>
+                    <h4>Report the animal</h4>
+                    <p>Report the animal that bit you to your local barangay or the City Veterinary Office.
+                       If possible, observe the animal for 10 days. A healthy animal after 10 days generally means you were not exposed to rabies.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- EXPOSURE CATEGORIES -->
+        <div class="section-title">
+            <i class="fa-solid fa-layer-group"></i> WHO Exposure Categories
+        </div>
+        <div class="warning-banner">
+            <i class="fa-solid fa-circle-info"></i>
+            <div>
+                <h4>Understanding Your Exposure Level</h4>
+                <p>The World Health Organization classifies animal bite exposures into three categories.
+                   Your doctor will use this classification to determine the appropriate treatment.</p>
+            </div>
+        </div>
+
+        <table class="symptoms-table">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Type of Contact</th>
+                    <th>Required Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="badge cat3">Category I</span></td>
+                    <td>Touching or feeding of animals; licks on intact skin</td>
+                    <td>Wash exposed skin; no vaccination required if history is reliable</td>
+                </tr>
+                <tr>
+                    <td><span class="badge cat2">Category II</span></td>
+                    <td>Minor scratches or abrasions without bleeding; nibbling of uncovered skin; licks on broken skin</td>
+                    <td>Wound washing + immediate vaccination</td>
+                </tr>
+                <tr>
+                    <td><span class="badge cat1">Category III</span></td>
+                    <td>Single or multiple transdermal bites or scratches; contamination of mucous membranes; contact with bats</td>
+                    <td>Wound washing + rabies immunoglobulin (RIG) + immediate vaccination</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- INFO CARDS -->
+        <div class="section-title">
+            <i class="fa-solid fa-circle-info"></i> Important Information
+        </div>
+        <div class="info-grid">
+            <div class="info-card">
+                <h4><i class="fa-solid fa-syringe"></i> Available Anti-Rabies Vaccines</h4>
+                <ul>
+                    <li><strong>Verorab</strong> — Vero cell rabies vaccine (Sanofi)</li>
+                    <li><strong>Rabipur</strong> — Purified chick embryo cell vaccine (GSK)</li>
+                    <li><strong>Speeda</strong> — MassBiologics vaccine</li>
+                    <li>All vaccines are safe and highly effective when given promptly</li>
+                </ul>
+            </div>
+            <div class="info-card">
+                <h4><i class="fa-solid fa-calendar-days"></i> Vaccination Schedule (PEP)</h4>
+                <ul>
+                    <li><strong>Day 0</strong> — First dose (as soon as possible after bite)</li>
+                    <li><strong>Day 3</strong> — Second dose</li>
+                    <li><strong>Day 7</strong> — Third dose</li>
+                    <li><strong>Day 14</strong> — Fourth dose</li>
+                    <li><strong>Day 28</strong> — Fifth (final) dose</li>
+                </ul>
+            </div>
+            <div class="info-card">
+                <h4><i class="fa-solid fa-ban"></i> What NOT to Do</h4>
+                <ul>
+                    <li>Do NOT apply herbs, mud, or leaves to the wound</li>
+                    <li>Do NOT suck out the wound</li>
+                    <li>Do NOT delay seeking medical attention</li>
+                    <li>Do NOT skip vaccination doses</li>
+                    <li>Do NOT ignore minor scratches from animals</li>
+                </ul>
+            </div>
+            <div class="info-card">
+                <h4><i class="fa-solid fa-triangle-exclamation"></i> Symptoms of Rabies</h4>
+                <ul>
+                    <li>Fever, headache, general weakness (early)</li>
+                    <li>Anxiety, confusion, agitation</li>
+                    <li>Fear of water (hydrophobia)</li>
+                    <li>Fear of air (aerophobia)</li>
+                    <li>Hallucinations and paralysis (late — fatal)</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- CTA -->
+        <div class="cta-box">
+            <div>
+                <h3>Find a Clinic Near You</h3>
+                <p>Locate the nearest ABTC with anti-rabies vaccines available right now.</p>
+            </div>
+            <a href="index.html" class="cta-btn">
+                <i class="fa-solid fa-location-dot"></i> Find Clinic
+            </a>
+        </div>
+
+    </div>
+
+</body>
+</html>

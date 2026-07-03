@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Register - Anti-Rabies Locator</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+    <link rel="stylesheet" href="login.css">
+    <style>
+        .register-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            padding: 40px;
+            width: 100%;
+            max-width: 560px;
+            margin: 0 auto;
+        }
+        .register-card h2 {
+            font-size: 22px;
+            margin-bottom: 6px;
+            color: #111;
+        }
+        .register-card .subtitle {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 28px;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 18px;
+        }
+        .form-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 6px;
+        }
+        .form-group input, .form-group select {
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #111;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #ef0000;
+        }
+        .role-select-group {
+            margin-bottom: 20px;
+        }
+        .role-select-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #374151;
+            display: block;
+            margin-bottom: 10px;
+        }
+        .role-options {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .role-option {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .role-option:hover { border-color: #ef0000; }
+        .role-option.selected {
+            border-color: #ef0000;
+            background: #fff5f5;
+        }
+        .role-option i {
+            font-size: 20px;
+            color: #6b7280;
+            margin-bottom: 6px;
+            display: block;
+        }
+        .role-option.selected i { color: #ef0000; }
+        .role-option span {
+            font-size: 12px;
+            font-weight: 600;
+            color: #374151;
+        }
+        .register-btn {
+            width: 100%;
+            padding: 12px;
+            background: #ef0000;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: background 0.2s;
+        }
+        .register-btn:hover { background: #cc0000; }
+        .divider {
+            text-align: center;
+            color: #9ca3af;
+            font-size: 13px;
+            margin: 20px 0;
+            position: relative;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 42%;
+            height: 1px;
+            background: #e5e7eb;
+        }
+        .divider::before { left: 0; }
+        .divider::after { right: 0; }
+        .login-link {
+            text-align: center;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .login-link a {
+            color: #ef0000;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .terms-text {
+            font-size: 12px;
+            color: #9ca3af;
+            text-align: center;
+            margin-top: 12px;
+        }
+        .terms-text a { color: #ef0000; text-decoration: none; }
+        .password-wrapper {
+            position: relative;
+        }
+        .password-wrapper input {
+            padding-right: 40px;
+        }
+        .toggle-pw {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #9ca3af;
+            background: none;
+            border: none;
+            font-size: 14px;
+        }
+        @media (max-width: 600px) {
+            .form-row { grid-template-columns: 1fr; }
+            .role-options { grid-template-columns: 1fr; }
+            .register-card { padding: 24px 16px; }
+        }
+    </style>
+</head>
+<body>
+    <header class="top-header">
+        <div class="logo-section">
+            <div class="logo-icon">
+                <i class="fa-solid fa-location-dot"></i>
+            </div>
+            <div>
+                <h2>Anti-Rabies Locator</h2>
+                <p>Cabuyao, Laguna</p>
+            </div>
+        </div>
+        <a href="login.html" class="signin-btn" style="text-decoration:none;">Sign In</a>
+    </header>
+
+    <main class="main-container" style="padding: 40px 20px;">
+
+        <div class="main-logo" style="margin-bottom: 24px;">
+            <div class="big-logo">
+                <i class="fa-solid fa-location-dot"></i>
+            </div>
+            <h1>Create Your Account</h1>
+            <p>Join the Anti-Rabies Locator System for Cabuyao</p>
+        </div>
+
+        <div class="register-card">
+            <h2>Register</h2>
+            <p class="subtitle">Fill in your details to create an account</p>
+
+            <div class="role-select-group">
+                <label>Select Your Role</label>
+                <div class="role-options">
+                    <div class="role-option selected" data-role="resident" onclick="selectRole(this)">
+                        <i class="fa-solid fa-user"></i>
+                        <span>Resident</span>
+                    </div>
+                    <div class="role-option" data-role="staff" onclick="selectRole(this)">
+                        <i class="fa-solid fa-hospital"></i>
+                        <span>Clinic Staff</span>
+                    </div>
+                    <div class="role-option" data-role="admin" onclick="selectRole(this)">
+                        <i class="fa-solid fa-chart-column"></i>
+                        <span>Administrator</span>
+                    </div>
+                </div>
+            </div>
+
+            <form onsubmit="handleRegister(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>First Name</label>
+                        <input type="text" placeholder="Juan" required />
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name</label>
+                        <input type="text" placeholder="Dela Cruz" required />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" placeholder="you@example.com" required />
+                </div>
+
+                <div class="form-group">
+                    <label>Contact Number</label>
+                    <input type="tel" placeholder="09XX-XXX-XXXX" />
+                </div>
+
+                <div class="form-group" id="barangayGroup">
+                    <label>Barangay</label>
+                    <select>
+                        <option value="">Select your barangay</option>
+                        <option>Baclaran</option>
+                        <option>Banlic</option>
+                        <option>Bigaa</option>
+                        <option>Butong</option>
+                        <option>Casile</option>
+                        <option>Diezmo</option>
+                        <option>Gulod</option>
+                        <option>Mamatid</option>
+                        <option>Marinig</option>
+                        <option>Niugan</option>
+                        <option>Pittland</option>
+                        <option>Poblacion Dos</option>
+                        <option>Poblacion Tres</option>
+                        <option>Poblacion Uno</option>
+                        <option>Pulo</option>
+                        <option>Sala</option>
+                        <option>San Isidro</option>
+                        <option>Sucol</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="clinicGroup" style="display:none;">
+                    <label>Clinic / Health Center Name</label>
+                    <input type="text" placeholder="e.g. Cabuyao City Health Center" />
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Password</label>
+                        <div class="password-wrapper">
+                            <input type="password" id="pw" placeholder="Min. 8 characters" required />
+                            <button type="button" class="toggle-pw" onclick="togglePw('pw')">
+                                <i class="fa-regular fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm Password</label>
+                        <div class="password-wrapper">
+                            <input type="password" id="pw2" placeholder="Repeat password" required />
+                            <button type="button" class="toggle-pw" onclick="togglePw('pw2')">
+                                <i class="fa-regular fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="register-btn">
+                    <i class="fa-solid fa-user-plus"></i> Create Account
+                </button>
+            </form>
+
+            <p class="terms-text">
+                By registering you agree to the
+                <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+            </p>
+
+            <div class="divider">or</div>
+
+            <p class="login-link">
+                Already have an account? <a href="login.html">Sign in here</a>
+            </p>
+        </div>
+
+        <footer class="footer" style="margin-top: 40px;">
+            <p>ISO 25010 Compliant • Role-Based Access Control (RBAC)</p>
+            <p>© 2026 City of Cabuyao - Real-Time Anti-Rabies Availability Locator System</p>
+        </footer>
+    </main>
+
+    <script>
+        let currentRole = 'resident';
+
+        function selectRole(el) {
+            document.querySelectorAll('.role-option').forEach(o => o.classList.remove('selected'));
+            el.classList.add('selected');
+            currentRole = el.dataset.role;
+
+            const barangayGroup = document.getElementById('barangayGroup');
+            const clinicGroup = document.getElementById('clinicGroup');
+
+            if (currentRole === 'staff') {
+                barangayGroup.style.display = 'none';
+                clinicGroup.style.display = 'flex';
+            } else {
+                barangayGroup.style.display = 'flex';
+                clinicGroup.style.display = 'none';
+            }
+        }
+
+        function togglePw(id) {
+            const input = document.getElementById(id);
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+
+        function handleRegister(e) {
+            e.preventDefault();
+            const pages = { resident: 'residents.html', staff: 'staff.html', admin: 'admin.html' };
+            alert('Account created successfully! (Demo mode)');
+            window.location.href = pages[currentRole];
+        }
+    </script>
+</body>
+</html>
