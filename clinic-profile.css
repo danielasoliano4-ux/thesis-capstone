@@ -1,0 +1,451 @@
+/* ==========================================
+   1. GLOBAL & CORE LAYOUT
+   ========================================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    background: #f4f5f7;
+    color: #111827;
+}
+
+.main-container {
+    padding: 30px 20px;
+}
+
+.page-title h1 {
+    font-size: 42px;
+    margin-bottom: 10px;
+}
+
+.page-title p {
+    color: #4b5563;
+    margin-bottom: 30px;
+}
+
+/* ==========================================
+   2. HEADER & LOGO CONTROLS
+   ========================================== */
+.top-header {
+    background: white;
+    border-bottom: 1px solid #dcdcdc;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 25px;
+}
+
+.logo-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo-icon {
+    width: 36px;
+    height: 36px;
+    background: #ef0000;
+    border-radius: 10px;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.logo-section h2 {
+    font-size: 18px;
+}
+
+.logo-section p {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.header-right {
+    display: flex;
+    gap: 30px;
+}
+
+.header-right a {
+    text-decoration: none;
+    color: #374151;
+    font-size: 14px;
+}
+
+.header-right i {
+    margin-right: 8px;
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #374151;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+/* ==========================================
+   3. TABS CONTROLS
+   ========================================== */
+.tabs {
+    display: flex;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.tab-link {
+    text-decoration: none;
+}
+
+.tabs button,
+.tab-link button {
+    background: none;
+    border: none;
+    padding: 14px 22px;
+    cursor: pointer;
+    font-size: 15px;
+    color: #374151;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.tabs button:hover,
+.tab-link button:hover {
+    color: #000;
+}
+
+/* Unified Active States */
+.active-tab,
+.tab-link button.active-tab {
+    color: #ef0000 !important;
+    border-bottom: 3px solid #ef0000 !important;
+    font-weight: 600;
+}
+
+/* Blue Accent Variant if needed for specific tab pages */
+.tab-blue.active-tab,
+.tab-link button.active-tab-blue {
+    color: #4a90e2 !important;
+    border-bottom-color: #4a90e2 !important;
+}
+
+/* ==========================================
+   4. DASHBOARD CARDS & METRICS
+   ========================================== */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.stat-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.stat-card span {
+    color: #6b7280;
+    font-size: 15px;
+}
+
+.stat-card h2 {
+    margin-top: 10px;
+    font-size: 35px;
+}
+
+.stat-card i {
+    font-size: 38px;
+}
+
+/* ==========================================
+   5. SURFACE CONTAINERS & CLINIC PROFILE
+   ========================================== */
+.content-box {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.inventory-content {
+    padding: 25px;
+}
+
+.clinic-profile-content {
+    padding: 20px;
+}
+
+/* Profile Form Elements */
+.profile-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.profile-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.profile-field.full-width {
+    grid-column: 1 / -1;
+}
+
+.profile-field label {
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.profile-field input,
+.profile-field textarea {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background-color: #f5f5f5;
+}
+
+.profile-field input:focus,
+.profile-field textarea:focus {
+    outline: none;
+    background-color: #fff;
+    border-color: #4a90e2;
+}
+
+.hours-box {
+    border: 1px solid #ddd;
+    padding: 15px;
+    border-radius: 4px;
+    background-color: #f9f9f9;
+}
+
+.services-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+}
+
+.service-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid #e8f5e9;
+    border-radius: 4px;
+    background-color: #f1f8f5;
+}
+
+.service-item i {
+    font-size: 16px;
+}
+
+/* ==========================================
+   6. ALERTS SYSTEM
+   ========================================== */
+.alert-box {
+    background: #fff8e6;
+    border-left: 4px solid #f59e0b;
+    padding: 18px;
+    margin-bottom: 25px;
+}
+
+.alert-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.alert-title i {
+    color: #f59e0b;
+}
+
+.alert-box p {
+    color: #92400e;
+}
+
+/* ==========================================
+   7. DATA TABLES
+   ========================================== */
+.table-container {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+thead {
+    background: #f9fafb;
+}
+
+thead th {
+    text-align: left;
+    padding: 16px;
+    font-size: 13px;
+    color: #374151;
+}
+
+tbody td {
+    padding: 20px 16px;
+    border-top: 1px solid #e5e7eb;
+    font-size: 15px;
+}
+
+/* Status Labels */
+.status {
+    padding: 6px 14px;
+    border-radius: 30px;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: lowercase;
+}
+
+.adequate { background: #dcfce7; color: #15803d; }
+.low { background: #fef3c7; color: #b45309; }
+.critical { background: #fee2e2; color: #dc2626; }
+
+.update-link {
+    color: red;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.update-link i {
+    margin-right: 5px;
+}
+
+/* ==========================================
+   8. BUTTONS & INTERACTIVES
+   ========================================== */
+.inventory-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+.inventory-top h2 {
+    font-size: 32px;
+}
+
+.add-btn {
+    background: #ef0000;
+    color: white;
+    border: none;
+    padding: 14px 22px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.add-btn i {
+    margin-right: 8px;
+}
+
+.signout-btn {
+    background: white;
+    color: #e60000;
+    border: 1px solid #e60000;
+    padding: 10px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+.signout-btn:hover {
+    background: #e60000;
+    color: white;
+}
+
+.save-btn {
+    background-color: #4caf50;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.save-btn:hover {
+    background-color: #45a049;
+}
+
+.cancel-btn {
+    background-color: #f0f0f0;
+    color: #333;
+    padding: 10px 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.cancel-btn:hover {
+    background-color: #e0e0e0;
+}
+
+/* UI Accent Helpers */
+.blue { color: #2563eb; }
+.green { color: #16a34a; }
+.purple { color: #9333ea; }
+.red, .red-text { color: #ef0000; }
+
+/* ==========================================
+   9. MEDIA QUERIES (RESPONSIVE RESPONSES)
+   ========================================== */
+@media (max-width: 1100px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .inventory-top {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .profile-row {
+        grid-template-columns: 1fr;
+    }
+    .services-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 700px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    .page-title h1 {
+        font-size: 28px;
+    }
+    .tabs {
+        overflow-x: auto;
+    }
+    .top-header {
+        flex-direction: column;
+        gap: 15px;
+    }
+    .header-right {
+        gap: 15px;
+    }
+}

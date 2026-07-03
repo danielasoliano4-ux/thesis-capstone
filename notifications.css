@@ -1,0 +1,558 @@
+/* ==========================================================================
+   1. GLOBAL & BASE STYLES
+   ========================================================================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    background: #f5f5f5;
+    overflow-x: hidden;
+    margin-top: 80px; /* Offset to prevent fixed header from hiding content */
+}
+
+/* ==========================================================================
+   2. APP HEADER & USER MODULE
+   ========================================================================== */
+.top-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: white;
+    padding: 14px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    z-index: 1000;
+}
+
+.logo-section {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.logo-icon {
+    width: 40px;
+    height: 40px;
+    background: #e60000;
+    color: white;
+    border-radius: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 18px;
+}
+
+.logo-section h2 {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.logo-section p {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 4px;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    z-index: 1000;
+}
+
+.header-right h3 {
+    font-size: 16px;
+}
+
+.menu-btn {
+    width: 42px;
+    height: 42px;
+    border: none;
+    background: white;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 20px;
+    transition: 0.3s;
+}
+
+.menu-btn:hover {
+    background: #f3f4f6;
+}
+
+.signout-btn {
+    background: white;
+    color: #e60000;
+    border: 1px solid #e60000;
+    padding: 10px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+.signout-btn:hover {
+    background: #e60000;
+    color: white;
+}
+
+/* ==========================================================================
+   3. LAYOUT STRUCTURE & GRID CONTAINERS
+   ========================================================================== */
+.page-wrapper {
+    display: flex;
+    gap: 25px;
+    padding: 30px;
+    transition: 0.3s;
+}
+
+.left-slot {
+    width: 320px; /* Consistently constrains structural layouts */
+    flex: none;
+    position: relative;
+}
+
+.main-container {
+    flex: 1;
+    transition: 0.3s;
+}
+
+.expanded .main-container {
+    width: 100%;
+}
+
+/* ==========================================================================
+   4. NAVIGATION SIDEBAR PANEL
+   ========================================================================== */
+.sidebar {
+    width: 100%;
+    height: auto;
+    background: #ff000d;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    z-index: 1000;
+    overflow-y: auto;
+    display: none;
+    transform: translateX(-8px);
+    opacity: 0;
+    border-radius: 12px;
+}
+
+.sidebar.showSidebar {
+    display: block;
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.sidebar a {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: white;
+    text-decoration: none;
+    padding: 22px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+.sidebar a:hover {
+    background: #d9000c;
+}
+
+/* ==========================================================================
+   5. MAP ENGINE UI PATTERNS
+   ========================================================================== */
+.map-card {
+    background: white;
+    border-radius: 18px;
+    padding: 22px;
+    border: 1px solid #ddd;
+}
+
+.map-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.map-top h3 {
+    font-size: 22px;
+}
+
+.map-filter {
+    background: #f3f4f6;
+    padding: 5px;
+    border-radius: 20px;
+}
+
+.map-filter button {
+    border: none;
+    background: none;
+    padding: 8px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.active-btn {
+    background: white !important;
+    font-weight: bold;
+}
+
+.map-box {
+    height: 500px;
+    background:
+        linear-gradient(#d5e6e6 1px, transparent 1px),
+        linear-gradient(90deg,#d5e6e6 1px, transparent 1px);
+    background-size: 80px 80px;
+    background-color: #dff1f7;
+    border-radius: 14px;
+    position: relative;
+    overflow: hidden;
+}
+
+.map-label {
+    position: absolute;
+    top: 45%;
+    left: 40%;
+    transform: translate(-50%,-50%);
+    font-size: 70px;
+    font-weight: bold;
+    color: rgba(0,0,0,0.05);
+    text-align: center;
+}
+
+.marker {
+    width: 22px;
+    height: 22px;
+    border-radius: 50% 50% 50% 0;
+    position: absolute;
+    transform: rotate(-45deg);
+}
+
+.marker.green { background: #00b140; }
+.marker.yellow { background: #d98a00; }
+.marker.red { background: #e60000; }
+
+/* Map Legend Tools */
+.legend-box {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    background: white;
+    padding: 14px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.legend-box h4 { margin-bottom: 10px; }
+.legend-box p { margin-bottom: 6px; font-size: 13px; }
+.legend { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+
+.green-bg { background: #00b140; }
+.yellow-bg { background: #d98a00; }
+.red-bg { background: #e60000; }
+
+/* ==========================================================================
+   6. CLINIC LISTS & DISPENSARY STATUS
+   ========================================================================== */
+.clinic-card {
+    margin-top: 25px;
+    background: white;
+    border-radius: 18px;
+    padding: 22px;
+    border: 1px solid #ddd;
+}
+
+.clinic-card h2 { margin-bottom: 20px; }
+.clinic-scroll { max-height: 500px; overflow-y: auto; padding-right: 10px; }
+
+.clinic-box {
+    background: #eefcf3;
+    border: 1px solid #9be5b3;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.clinic-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.clinic-top h3 { font-size: 22px; }
+
+.available {
+    background: #00b140;
+    color: white;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.clinic-box p { margin-bottom: 12px; color: #374151; font-size: 15px; }
+
+.stock-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.stock-box {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 14px;
+    padding: 18px;
+    text-align: center;
+}
+
+.stock-box span { color: #6b7280; font-size: 13px; }
+.stock-box h3 { margin-top: 10px; font-size: 30px; color: #00b140; }
+
+/* ==========================================================================
+   7. EMERGENCY FIRST AID INFORMATION NODES
+   ========================================================================== */
+.firstaid-section {
+    width: 100%;
+    transition: 0.3s;
+}
+
+.hideFirstAid { display: none; }
+
+.first-aid-card {
+    background: #fff5f5;
+    border: 1px solid #f4b4b4;
+    border-radius: 18px;
+    overflow: hidden;
+}
+
+.card-header {
+    background: #e60000;
+    color: white;
+    padding: 18px;
+    font-weight: bold;
+}
+
+.step { display: flex; gap: 15px; padding: 20px; }
+
+.step-number {
+    width: 38px;
+    height: 38px;
+    background: #e60000;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.step h4 { margin-bottom: 6px; font-size: 15px; }
+.step p { font-size: 13px; color: #4b5563; line-height: 1.5; }
+
+.warning-box {
+    margin: 20px;
+    border: 1px solid red;
+    border-radius: 14px;
+    padding: 18px;
+    background: white;
+}
+
+.warning-box h4 { color: red; margin-bottom: 10px; }
+.warning-box p { color: #374151; line-height: 1.6; font-size: 14px; }
+
+/* ==========================================================================
+   8. REAL-TIME NOTIFICATION SYSTEM (NEW INCLUSIONS)
+   ========================================================================== */
+.notif-container {
+    max-width: 760px;
+    margin: 30px auto;
+    padding: 0 20px 60px;
+}
+
+.notif-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.notif-header-row h1 { font-size: 22px; color: #111; }
+
+.mark-all-btn {
+    background: none;
+    border: 1px solid #d1d5db;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.mark-all-btn:hover { border-color: #ef0000; color: #ef0000; }
+
+/* Filter Tabs System */
+.filter-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.filter-tab {
+    padding: 7px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid #e5e7eb;
+    background: white;
+    color: #6b7280;
+    transition: all 0.2s;
+}
+
+.filter-tab.active {
+    background: #ef0000;
+    color: white;
+    border-color: #ef0000;
+}
+
+.notif-group-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #9ca3af;
+    letter-spacing: 0.05em;
+    margin: 24px 0 10px;
+}
+
+/* Individual Alert Card Components */
+.notif-item {
+    background: white;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    cursor: pointer;
+    border: 1px solid transparent;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    transition: all 0.2s;
+    position: relative;
+}
+.notif-item:hover { border-color: #e5e7eb; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.notif-item.unread { border-left: 3px solid #ef0000; background: #fffafa; }
+
+/* Context Color States for Notification Badges */
+.notif-icon {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+.icon-red { background: #fee2e2; color: #ef0000; }
+.icon-blue { background: #dbeafe; color: #2563eb; }
+.icon-green { background: #dcfce7; color: #16a34a; }
+.icon-yellow { background: #fef3c7; color: #d97706; }
+.icon-gray { background: #f3f4f6; color: #6b7280; }
+
+.notif-body { flex: 1; }
+.notif-body h4 { font-size: 14px; font-weight: 600; color: #111; margin-bottom: 4px; }
+.notif-body p { font-size: 13px; color: #4b5563; line-height: 1.5; }
+
+.notif-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+}
+.notif-time { font-size: 12px; color: #9ca3af; }
+
+/* Category Tags */
+.notif-tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 10px;
+}
+.tag-appointment { background: #dbeafe; color: #1d4ed8; }
+.tag-vaccine { background: #fee2e2; color: #991b1b; }
+.tag-stock { background: #fef3c7; color: #92400e; }
+.tag-system { background: #f3f4f6; color: #374151; }
+
+.unread-dot {
+    width: 8px;
+    height: 8px;
+    background: #ef0000;
+    border-radius: 50%;
+    position: absolute;
+    top: 20px;
+    right: 16px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #9ca3af;
+    display: none;
+}
+.empty-state i { font-size: 48px; margin-bottom: 16px; }
+.empty-state p { font-size: 15px; }
+
+.settings-link {
+    text-align: center;
+    margin-top: 30px;
+    font-size: 13px;
+    color: #6b7280;
+}
+.settings-link a { color: #ef0000; text-decoration: none; font-weight: 600; }
+
+/* ==========================================================================
+   9. DEVICE BREAKPOINTS & RESPONSIVE DESIGN
+   ========================================================================== */
+@media (max-width: 1000px) {
+    .page-wrapper {
+        flex-direction: column;
+    }
+    .left-slot {
+        width: 100%;
+    }
+    .firstaid-section, .sidebar {
+        width: 100%;
+    }
+    .map-box {
+        height: 400px;
+    }
+}
+
+@media (max-width: 768px) {
+    .top-header { padding: 15px; }
+    .header-right h3 { display: none; }
+    
+    .map-top {
+        flex-direction: column;
+        gap: 15px;
+        align-items: flex-start;
+    }
+    .map-label { font-size: 45px; }
+    .stock-grid { grid-template-columns: 1fr; }
+    
+    .clinic-top {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .page-wrapper { padding: 15px; }
+    .sidebar { position: relative; }
+}
