@@ -364,63 +364,79 @@
 
             </div>
 
-            <!-- MAP CARD -->
-            <div class="map-card">
+      <!-- MAP CARD -->
+      <div class="map-card">
 
-                <!-- MAP TOP -->
-                <div class="map-top">
+          <!-- MAP TOP -->
+          <div class="map-top">
+              <div>
+                  <h3>Find Nearby Clinics</h3>
+                  <p style="font-size:13px;color:#6b7280;margin-top:2px;">
+                      Cabuyao, Laguna · Real-time vaccine availability
+                  </p>
+              </div>
+              <div class="map-filter">
+                  <button class="active-btn" onclick="filterMarkers('all', this)">All</button>
+                  <button onclick="filterMarkers('available', this)">Available</button>
+                  <button onclick="filterMarkers('low', this)">Low Stock</button>
+                  <button onclick="filterMarkers('out', this)">Out of Stock</button>
+              </div>
+          </div>
 
-                    <h3>Find Nearby Clinics</h3>
+          <!-- ── GOOGLE MAP CONTAINER ─────────────────────────────── -->
+          <!--
+              The map renders inside this div.
+              Height is fixed at 450px to match the existing UI.
+              Do NOT set display:none or the map will not initialize correctly.
+          -->
+          <div id="googleMap" style="
+              width: 100%;
+              height: 450px;
+              border-radius: 14px;
+              overflow: hidden;
+              border: 1px solid #ddd;
+          "></div>
 
-                    <div class="map-filter">
+          <!-- ── CLINIC STATUS SIDEBAR ────────────────────────────── -->
+          <!--
+              A scrollable list below the map showing each clinic's
+              name, status badge, and address. Clicking a row opens
+              the marker's info window on the map.
+          -->
+          <div style="margin-top:18px;">
+              <h4 style="font-size:14px;color:#374151;margin-bottom:10px;">
+                  <i class="fa-solid fa-list"></i> Clinic Status Overview
+              </h4>
+              <div id="clinicSidebar" style="display:flex;flex-direction:column;gap:8px;"></div>
+          </div>
 
-                        <button class="active-btn">All</button>
-                        <button>Public</button>
-                        <button>Private</button>
+          <!-- ── MAP LEGEND ────────────────────────────────────────── -->
+          <div style="
+              display:flex;gap:18px;margin-top:14px;
+              padding:12px 16px;background:#f9fafb;
+              border-radius:12px;border:1px solid #ddd;
+              flex-wrap:wrap;
+          ">
+              <span style="font-size:13px;font-weight:bold;color:#374151;align-self:center;">Legend:</span>
+              <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+                  <span style="width:14px;height:14px;background:#00b140;border-radius:50%;display:inline-block;"></span>
+                  Vaccines Available
+              </span>
+              <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+                  <span style="width:14px;height:14px;background:#d98a00;border-radius:50%;display:inline-block;"></span>
+                  Low Stock
+              </span>
+              <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+                  <span style="width:14px;height:14px;background:#e60000;border-radius:50%;display:inline-block;"></span>
+                  Out of Stock
+              </span>
+              <span style="font-size:13px;color:#6b7280;margin-left:auto;align-self:center;">
+                  <i class="fa-brands fa-google" style="color:#4285F4;"></i>
+                  Map data © Google
+              </span>
+          </div>
 
-                    </div>
-
-                </div>
-
-                <!-- MAP -->
-                <div class="map-box">
-
-                    <!-- MARKERS -->
-                    <div class="marker green" style="top:25%; left:18%;"></div>
-                    <div class="marker yellow" style="top:38%; left:35%;"></div>
-                    <div class="marker green" style="top:50%; left:50%;"></div>
-                    <div class="marker red" style="top:62%; left:66%;"></div>
-
-                    <!-- LEGEND -->
-                    <div class="legend-box">
-
-                        <h4>Legend</h4>
-
-                        <p>
-                            <span class="legend green-bg"></span>
-                            Vaccines Available
-                        </p>
-
-                        <p>
-                            <span class="legend yellow-bg"></span>
-                            Low Stock
-                        </p>
-
-                        <p>
-                            <span class="legend red-bg"></span>
-                            Out of Stock
-                        </p>
-
-                    </div>
-
-                    <!-- MAP TEXT -->
-                    <div class="map-label">
-                        CABUYAO MAP
-                    </div>
-
-                </div>
-
-            </div>
+      </div>
 
         </section>
 
@@ -642,8 +658,8 @@
     </main>
 
     <!-- ════════════════════════════════════════════════
-         PUBLIC HEALTH DATA HUB
-         Module 2.4 + Module 2.5
+        PUBLIC HEALTH DATA HUB
+        Module 2.4 + Module 2.5
     ═══════════════════════════════════════════════ -->
     <section class="public-hub">
 
@@ -1139,6 +1155,289 @@
         </div>
 
     </footer>
+
+
+    <!-- ══════════════════════════════════════════════════════════
+     GOOGLE MAPS INTEGRATION
+     Source: Google Maps JavaScript API
+     https://developers.google.com/maps/documentation/javascript/
+     For academic citation:
+       Google LLC. (2024). Google Maps JavaScript API.
+       Retrieved from https://developers.google.com/maps/
+     ══════════════════════════════════════════════════════════ -->
+
+<script>
+// ── CLINIC DATA ─────────────────────────────────────────────────────────────
+//
+// Each clinic object contains:
+//   name        — display name
+//   lat / lng   — GPS coordinates (Cabuyao, Laguna)
+//   status      — 'available' | 'low' | 'out'
+//   address     — street address for the info window
+//   hours       — operating hours
+//   phone       — contact number
+//   stock       — brief vaccine stock summary
+//
+const CLINICS = [
+    {
+        name: 'Cabuyao City Health Center',
+        lat: 14.2718,
+        lng: 121.1246,
+        status: 'available',
+        address: 'Brgy. Poblacion Uno, Cabuyao City, Laguna',
+        hours: '8:00 AM – 5:00 PM',
+        phone: '(049) 531-2345',
+        stock: 'Verorab: 45 · Rabipur: 30 · Speeda: 12'
+    },
+    {
+        name: "St. Mary's Medical Clinic",
+        lat: 14.2655,
+        lng: 121.1189,
+        status: 'low',
+        address: 'Brgy. Mamatid, Cabuyao City, Laguna',
+        hours: '24/7',
+        phone: '(049) 531-5678',
+        stock: 'Verorab: 5 · Rabipur: 3 · Speeda: 0'
+    },
+    {
+        name: 'South City Animal Bite Center',
+        lat: 14.2592,
+        lng: 121.1310,
+        status: 'out',
+        address: 'Brgy. Banlic, Cabuyao City, Laguna',
+        hours: '7:00 AM – 10:00 PM',
+        phone: '(049) 555-8877',
+        stock: 'No vaccines in stock'
+    },
+    {
+        name: 'Pulo Barangay Health Station',
+        lat: 14.2780,
+        lng: 121.1350,
+        status: 'available',
+        address: 'Brgy. Pulo, Cabuyao City, Laguna',
+        hours: '8:00 AM – 5:00 PM',
+        phone: '(049) 531-9901',
+        stock: 'Verorab: 20 · Rabipur: 18'
+    },
+    {
+        name: 'Marinig Health Center',
+        lat: 14.2840,
+        lng: 121.1200,
+        status: 'low',
+        address: 'Brgy. Marinig, Cabuyao City, Laguna',
+        hours: '8:00 AM – 5:00 PM',
+        phone: '(049) 531-7712',
+        stock: 'Verorab: 4 · Rabipur: 2'
+    }
+];
+
+// ── COLOR MAP ────────────────────────────────────────────────────────────────
+// Maps each status to a hex color matching style.css
+const STATUS_COLOR = {
+    available: '#00b140',   // green  — matches .green in style.css
+    low:       '#d98a00',   // amber  — matches .yellow in style.css
+    out:       '#e60000'    // red    — matches .red in style.css
+};
+
+const STATUS_LABEL = {
+    available: 'Available',
+    low:       'Low Stock',
+    out:       'Out of Stock'
+};
+
+// ── GLOBAL STATE ─────────────────────────────────────────────────────────────
+let map;
+let markers = [];          // { marker, infoWindow, clinic } tuples
+let activeFilter = 'all';
+
+// ── initMap ──────────────────────────────────────────────────────────────────
+// Called automatically by the Google Maps script (see callback= below).
+// Initializes the map centered on Cabuyao City and plots all clinic markers.
+function initMap() {
+
+    // Center the map on Cabuyao City Hall area
+    const CABUYAO_CENTER = { lat: 14.2718, lng: 121.1246 };
+
+    map = new google.maps.Map(document.getElementById('googleMap'), {
+        center: CABUYAO_CENTER,
+        zoom: 14,
+
+        // ── Map style: clean, low-saturation to match the UI ──
+        styles: [
+            { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+            { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+            { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
+            { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#dff1f7' }] },
+            { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#f9f9f9' }] }
+        ],
+
+        // ── Disable clutter ──
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+
+        // Keep the Google Maps logo (required by Terms of Service)
+        mapTypeId: 'roadmap'
+    });
+
+    // Plot each clinic and build the sidebar
+    CLINICS.forEach((clinic, index) => {
+        plotClinic(clinic, index);
+    });
+
+    buildSidebar();
+}
+
+// ── plotClinic ───────────────────────────────────────────────────────────────
+// Creates a colored circular SVG marker and an info window for one clinic.
+function plotClinic(clinic, index) {
+
+    const color = STATUS_COLOR[clinic.status];
+
+    // SVG pin icon — filled circle with white border, matching legend dots
+    const svgMarker = {
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: color,
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: 2.5,
+        scale: 12   // radius in pixels
+    };
+
+    const marker = new google.maps.Marker({
+        position: { lat: clinic.lat, lng: clinic.lng },
+        map: map,
+        title: clinic.name,
+        icon: svgMarker,
+        // zIndex so available markers appear on top of out-of-stock ones
+        zIndex: clinic.status === 'available' ? 10 : clinic.status === 'low' ? 5 : 1
+    });
+
+    // ── Info window HTML ─────────────────────────────────────────────────────
+    // Shown when the user clicks a marker.
+    const badgeBg = clinic.status === 'available' ? '#eefcf3'
+                  : clinic.status === 'low'       ? '#fffbe9' : '#fff1f1';
+    const badgeColor = color;
+
+    const infoContent = `
+        <div style="font-family:Arial,sans-serif;padding:4px;min-width:220px;">
+            <div style="font-weight:bold;font-size:14px;color:#111827;margin-bottom:6px;">
+                ${clinic.name}
+            </div>
+            <span style="
+                background:${badgeBg};color:${badgeColor};
+                padding:3px 10px;border-radius:20px;
+                font-size:11px;font-weight:bold;display:inline-block;margin-bottom:10px;
+            ">${STATUS_LABEL[clinic.status]}</span>
+            <div style="font-size:12px;color:#374151;line-height:1.8;">
+                <div><b>Address:</b> ${clinic.address}</div>
+                <div><b>Hours:</b> ${clinic.hours}</div>
+                <div><b>Phone:</b> ${clinic.phone}</div>
+                <div style="margin-top:6px;padding:8px;background:#f9fafb;border-radius:8px;">
+                    <b>Stock:</b> ${clinic.stock}
+                </div>
+            </div>
+            <div style="font-size:11px;color:#9ca3af;margin-top:8px;">
+                © Google Maps
+            </div>
+        </div>
+    `;
+
+    const infoWindow = new google.maps.InfoWindow({ content: infoContent });
+
+    // Open info window on marker click; close any previously open one
+    marker.addListener('click', () => {
+        markers.forEach(m => m.infoWindow.close());
+        infoWindow.open(map, marker);
+        map.panTo(marker.getPosition());
+    });
+
+    // Store reference for filtering later
+    markers.push({ marker, infoWindow, clinic });
+}
+
+// ── buildSidebar ─────────────────────────────────────────────────────────────
+// Renders the clinic list below the map. Clicking a row focuses that marker.
+function buildSidebar() {
+    const sidebar = document.getElementById('clinicSidebar');
+    sidebar.innerHTML = '';
+
+    CLINICS.forEach((clinic, index) => {
+        const color = STATUS_COLOR[clinic.status];
+        const row = document.createElement('div');
+        row.id = 'sidebar-row-' + index;
+        row.style.cssText = `
+            display:flex;justify-content:space-between;align-items:center;
+            background:white;border:1px solid #ddd;border-radius:12px;
+            padding:10px 14px;cursor:pointer;transition:border-color 0.2s;
+        `;
+        row.innerHTML = `
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="
+                    width:12px;height:12px;background:${color};
+                    border-radius:50%;flex-shrink:0;display:inline-block;
+                "></span>
+                <span style="font-size:13px;font-weight:bold;color:#111827;">${clinic.name}</span>
+            </div>
+            <span style="font-size:12px;color:${color};font-weight:bold;">
+                ${STATUS_LABEL[clinic.status]}
+            </span>
+        `;
+
+        // Clicking the sidebar row focuses the map marker
+        row.addEventListener('click', () => {
+            markers.forEach(m => m.infoWindow.close());
+            const target = markers[index];
+            map.panTo(target.marker.getPosition());
+            map.setZoom(16);
+            target.infoWindow.open(map, target.marker);
+            // Highlight the clicked row
+            document.querySelectorAll('#clinicSidebar > div').forEach(r => {
+                r.style.borderColor = '#ddd';
+                r.style.background = 'white';
+            });
+            row.style.borderColor = color;
+            row.style.background = color === '#00b140' ? '#eefcf3'
+                                  : color === '#d98a00' ? '#fffbe9' : '#fff1f1';
+        });
+
+        sidebar.appendChild(row);
+    });
+}
+
+// ── filterMarkers ────────────────────────────────────────────────────────────
+// Shows/hides markers based on the selected filter button.
+// Called by the filter buttons in the map card header.
+function filterMarkers(filter, btn) {
+    activeFilter = filter;
+
+    // Update active button style
+    document.querySelectorAll('.map-filter button').forEach(b => {
+        b.classList.remove('active-btn');
+        b.style.fontWeight = '';
+    });
+    btn.classList.add('active-btn');
+
+    // Show/hide markers and sidebar rows
+    markers.forEach((m, i) => {
+        const show = filter === 'all' || m.clinic.status === filter;
+        m.marker.setVisible(show);
+        m.infoWindow.close();
+        document.getElementById('sidebar-row-' + i).style.display = show ? 'flex' : 'none';
+    });
+}
+</script>
+
+<!-- ── LOAD GOOGLE MAPS API ──────────────────────────────────────────────────
+     Replace YOUR_API_KEY with your actual key from Google Cloud Console.
+     callback=initMap tells the API to call our initMap() function once loaded.
+     loading=async improves page performance (non-blocking load).
+     ──────────────────────────────────────────────────────────────────────── -->
+<script
+    src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap&loading=async"
+    defer>
+</script>
+
 
 </body>
 </html>
