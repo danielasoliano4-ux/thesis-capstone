@@ -244,22 +244,6 @@ body {
 /* ==========================================================================
    6. GRID MECHANICS & LAYOUT CARDS
    ========================================================================== */
-.stat-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 24px;
-}
-
-.stat-box {
-    background: white;
-    border-radius: 10px;
-    padding: 18px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-}
 
 .stat-box span { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
 .stat-box h2 { font-size: 26px; font-weight: 700; color: #111; margin-top: 4px; }
@@ -913,3 +897,244 @@ body {
     .page-wrapper { padding: 15px; }
     .sidebar { position: relative; }
 }
+
+      .public-hub {
+        padding: 0 40px 50px;
+      }
+      .hub-section-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+      .hub-section-title h2 {
+        font-size: 28px;
+        color: #111827;
+      }
+      .hub-section-title .module-tag {
+        font-size: 11px;
+        font-weight: bold;
+        background: #ef0000;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+      }
+      .hub-section-subtitle {
+        font-size: 14px;
+        color: #6b7280;
+        margin-bottom: 24px;
+      }
+      .hub-divider {
+        border: none;
+        border-top: 1px solid #ddd;
+        margin: 40px 0;
+      }
+
+      /* ── MODULE 2.4: RECORDS TABLE ──────────────────────────── */
+      .records-summary-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        margin-bottom: 24px;
+      }
+      .rec-stat {
+        background: white;
+        border-radius: 18px;
+        padding: 22px;
+        border: 1px solid #ddd;
+        text-align: center;
+      }
+      .rec-stat i { font-size: 32px; color: #e60000; margin-bottom: 12px; display: block; }
+      .rec-stat h3 { font-size: 36px; color: #111827; margin-bottom: 6px; }
+      .rec-stat p { font-size: 13px; color: #6b7280; }
+
+      .records-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 18px;
+        flex-wrap: wrap;
+      }
+      .records-search {
+        flex: 1;
+        min-width: 200px;
+        padding: 10px 14px;
+        border: 1px solid #ddd;
+        border-radius: 20px;
+        font-size: 13px;
+        color: #111827;
+        background: white;
+        outline: none;
+      }
+      .records-search:focus { border-color: #ef0000; }
+      .records-filter-btn {
+        padding: 8px 18px;
+        border: 1px solid #ddd;
+        border-radius: 20px;
+        background: white;
+        font-size: 13px;
+        color: #374151;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.2s;
+      }
+      .records-filter-btn.active-filter { background: #ef0000; color: white; border-color: #ef0000; }
+      .records-filter-btn:hover:not(.active-filter) { border-color: #ef0000; color: #ef0000; }
+
+      .records-table-wrap {
+        background: white;
+        border-radius: 18px;
+        border: 1px solid #ddd;
+        overflow: hidden;
+      }
+      .records-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+      .records-table thead { background: #fff1f1; }
+      .records-table th {
+        padding: 14px 18px;
+        text-align: left;
+        font-size: 12px;
+        font-weight: bold;
+        color: #b00000;
+        text-transform: uppercase;
+        border-bottom: 1px solid #f4b4b4;
+      }
+      .records-table td {
+        padding: 14px 18px;
+        color: #374151;
+        border-bottom: 1px solid #f3f4f6;
+        vertical-align: middle;
+      }
+      .records-table tbody tr:last-child td { border-bottom: none; }
+      .records-table tbody tr:hover { background: #fff5f5; }
+
+      .severity-badge, .outcome-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: bold;
+        display: inline-block;
+      }
+      .sev-high    { background: #fff1f1; color: #b00000; border: 1px solid #f4b4b4; }
+      .sev-medium  { background: #fffbe9; color: #92400e; border: 1px solid #f1d36b; }
+      .sev-low     { background: #eefcf3; color: #008a32; border: 1px solid #9be5b3; }
+      .out-death   { background: #fff1f1; color: #b00000; border: 1px solid #f4b4b4; }
+      .out-recovered { background: #eefcf3; color: #008a32; border: 1px solid #9be5b3; }
+      .out-ongoing { background: #f0f4ff; color: #1e40af; border: 1px solid #bfcfff; }
+
+      .accordion-row td { cursor: pointer; }
+      .accordion-row:hover { background: #fff5f5 !important; }
+      .accordion-detail { display: none; background: #fafafa; border-bottom: 1px solid #ddd; }
+      .accordion-detail td { padding: 16px 22px; }
+      .accordion-detail-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+      }
+      .detail-item label {
+        font-size: 11px; font-weight: bold; color: #9ca3af;
+        text-transform: uppercase; display: block; margin-bottom: 4px;
+      }
+      .detail-item span { font-size: 13px; color: #111827; font-weight: bold; }
+
+      .records-table-footer {
+        padding: 14px 18px;
+        border-top: 1px solid #f3f4f6;
+        font-size: 13px;
+        color: #9ca3af;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      /* ── MODULE 2.5: DATA VISUALIZATION ────────────────────── */
+      .viz-grid {
+        display: grid;
+        grid-template-columns: 3fr 2fr;
+        gap: 22px;
+        margin-bottom: 22px;
+      }
+      .viz-card {
+        background: white;
+        border-radius: 18px;
+        border: 1px solid #ddd;
+        overflow: hidden;
+      }
+      .viz-card-header {
+        padding: 18px 22px;
+        border-bottom: 1px solid #ddd;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+      }
+      .viz-card-header h3 { font-size: 16px; color: #111827; margin-bottom: 4px; }
+      .viz-card-header p  { font-size: 13px; color: #6b7280; }
+      .viz-period-tag {
+        font-size: 12px;
+        font-weight: bold;
+        background: #fff1f1;
+        color: #b00000;
+        padding: 4px 12px;
+        border-radius: 20px;
+        border: 1px solid #f4b4b4;
+        white-space: nowrap;
+      }
+      .viz-card-body { padding: 18px 22px; }
+
+      .bgy-list { display: flex; flex-direction: column; gap: 13px; }
+      .bgy-row-top {
+        display: flex; justify-content: space-between;
+        align-items: center; margin-bottom: 6px; font-size: 14px;
+      }
+      .bgy-name { font-weight: bold; color: #111827; }
+      .bgy-count { font-size: 13px; color: #6b7280; }
+      .bgy-bar-wrap { background: #f3f4f6; border-radius: 20px; height: 10px; }
+      .bgy-bar-fill { height: 100%; border-radius: 20px; }
+      .fill-high   { background: #e60000; }
+      .fill-medium { background: #d98a00; }
+      .fill-low    { background: #00b140; }
+
+      .viz-bottom-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 22px;
+      }
+      .viz-mini-card {
+        background: white;
+        border-radius: 18px;
+        border: 1px solid #ddd;
+        padding: 22px;
+      }
+      .viz-mini-card h4 { font-size: 15px; color: #111827; margin-bottom: 16px; }
+
+      .donut-wrap { display: flex; align-items: center; gap: 18px; }
+      .donut-legend { display: flex; flex-direction: column; gap: 9px; font-size: 13px; color: #374151; }
+      .donut-legend-item { display: flex; align-items: center; gap: 8px; }
+      .donut-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+
+      .trend-bars { display: flex; align-items: flex-end; gap: 6px; height: 64px; }
+      .trend-bar { flex: 1; border-radius: 4px 4px 0 0; min-width: 0; }
+      .trend-labels { display: flex; gap: 6px; margin-top: 6px; }
+      .trend-label { flex: 1; text-align: center; font-size: 11px; color: #9ca3af; }
+
+      .age-list { display: flex; flex-direction: column; gap: 10px; }
+      .age-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+      .age-label { width: 52px; color: #374151; font-weight: bold; flex-shrink: 0; }
+      .age-bar-wrap { flex: 1; background: #f3f4f6; border-radius: 20px; height: 10px; }
+      .age-bar-fill { height: 100%; border-radius: 20px; background: #e60000; }
+      .age-count { width: 26px; text-align: right; color: #6b7280; font-weight: bold; }
+
+      @media (max-width: 1100px) {
+        .records-summary-row { grid-template-columns: repeat(2, 1fr); }
+        .viz-grid { grid-template-columns: 1fr; }
+        .viz-bottom-row { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 700px) {
+        .public-hub { padding: 0 20px 40px; }
+        .accordion-detail-grid { grid-template-columns: 1fr 1fr; }
+      }
+
+      

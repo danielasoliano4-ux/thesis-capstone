@@ -71,25 +71,6 @@
     <!-- ---- STATE A: NEW RESIDENT (no vaccination history) ---- -->
     <div id="view-new" style="display:none;">
 
-      <!-- STAT ROW -->
-      <div class="stat-row">
-        <div class="stat-box">
-          <div><span>Available Clinics</span><h2>3</h2></div>
-          <i class="fa-solid fa-hospital icon-green"></i>
-        </div>
-        <div class="stat-box">
-          <div><span>Total City Stock</span><h2>258</h2></div>
-          <i class="fa-solid fa-syringe icon-blue"></i>
-        </div>
-        <div class="stat-box">
-          <div><span>Cases This Month</span><h2>24</h2></div>
-          <i class="fa-solid fa-triangle-exclamation icon-red"></i>
-        </div>
-        <div class="stat-box">
-          <div><span>Nearest ABTC</span><h2 class="medium">0.8 km</h2></div>
-          <i class="fa-solid fa-location-dot icon-purple"></i>
-        </div>
-      </div>
 
       <!-- MAP + BOOK APPOINTMENT -->
       <div class="three-col">
@@ -131,141 +112,9 @@
 
       </div>
 
-      <!-- RABIES MONITORING (Obj 2.4) -->
-      <div style="margin-bottom:16px;">
-        <div class="section-label"><i class="fa-solid fa-chart-line" style="color:#ef0000;margin-right:6px;"></i> City-Wide Rabies Monitoring</div>
-      </div>
-      <div class="monitoring-grid">
-        <div class="monitoring-box red-top">
-          <i class="fa-solid fa-triangle-exclamation icon-red"></i>
-          <h2>127</h2>
-          <p>Rabies Cases (2026)</p>
-        </div>
-        <div class="monitoring-box blue-top">
-          <i class="fa-solid fa-syringe icon-blue"></i>
-          <h2>462</h2>
-          <p>Vaccinations Administered</p>
-        </div>
-        <div class="monitoring-box yellow-top">
-          <i class="fa-solid fa-map-location-dot icon-yellow"></i>
-          <h2>5</h2>
-          <p>High-Risk Barangays</p>
-        </div>
-        <div class="monitoring-box green-top">
-          <i class="fa-solid fa-user-group icon-green"></i>
-          <h2>38</h2>
-          <p>Active Patients</p>
-        </div>
-      </div>
+     
 
-      <!-- DATA VISUALIZATION (Obj 2.5) -->
-      <div class="two-col">
-
-        <!-- MONTHLY CASES CHART -->
-        <div class="section-card">
-          <div class="section-card-header">
-            <h3><i class="fa-solid fa-chart-bar" style="color:#ef0000;margin-right:6px;"></i> Monthly Cases &amp; Vaccinations (2026)</h3>
-          </div>
-          <div class="section-card-body">
-            <canvas id="casesChart" height="200"></canvas>
-          </div>
-        </div>
-
-        <!-- BARANGAY RISK TABLE -->
-        <div class="section-card">
-          <div class="section-card-header">
-            <h3><i class="fa-solid fa-map-location-dot" style="color:#ef0000;margin-right:6px;"></i> High-Risk Barangays</h3>
-          </div>
-          <div class="section-card-body" style="padding:12px 20px;">
-            <div style="display:flex;flex-direction:column;gap:10px;">
-              <div>
-                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-                  <span style="font-weight:600;">Mamatid</span>
-                  <span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">High</span>
-                </div>
-                <div style="background:#f3f4f6;border-radius:4px;height:8px;"><div style="background:#ef4444;width:92%;height:100%;border-radius:4px;"></div></div>
-              </div>
-              <div>
-                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-                  <span style="font-weight:600;">Banlic</span>
-                  <span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">High</span>
-                </div>
-                <div style="background:#f3f4f6;border-radius:4px;height:8px;"><div style="background:#ef4444;width:76%;height:100%;border-radius:4px;"></div></div>
-              </div>
-              <div>
-                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-                  <span style="font-weight:600;">Pulo</span>
-                  <span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Medium</span>
-                </div>
-                <div style="background:#f3f4f6;border-radius:4px;height:8px;"><div style="background:#f59e0b;width:56%;height:100%;border-radius:4px;"></div></div>
-              </div>
-              <div>
-                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-                  <span style="font-weight:600;">Sala</span>
-                  <span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Medium</span>
-                </div>
-                <div style="background:#f3f4f6;border-radius:4px;height:8px;"><div style="background:#f59e0b;width:44%;height:100%;border-radius:4px;"></div></div>
-              </div>
-              <div>
-                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
-                  <span style="font-weight:600;">Poblacion Uno</span>
-                  <span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">Low</span>
-                </div>
-                <div style="background:#f3f4f6;border-radius:4px;height:8px;"><div style="background:#22c55e;width:24%;height:100%;border-radius:4px;"></div></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- FIRST AID GUIDE BANNER (Obj 1.3) -->
-      <div class="first-aid-banner">
-        <div>
-          <h3><i class="fa-solid fa-kit-medical" style="margin-right:8px;"></i>Rabies First Aid &amp; Emergency Guide</h3>
-          <p>Know what to do immediately after an animal bite. Every minute matters — act fast to prevent rabies.</p>
-        </div>
-        <a href="first-aid.html" class="fa-banner-btn">
-          <i class="fa-solid fa-arrow-right"></i> View Guide
-        </a>
-      </div>
-
-      <!-- AVAILABLE CLINICS (Obj 2.1) -->
-      <div class="section-card">
-        <div class="section-card-header">
-          <h3>Available Clinics — Real-Time Stock</h3>
-          <a href="index.html">View public map</a>
-        </div>
-        <div class="clinic-list">
-          <div class="clinic-row">
-            <div class="clinic-row-icon" style="background:#dcfce7;"><i class="fa-solid fa-hospital" style="color:#16a34a;"></i></div>
-            <div class="clinic-row-info">
-              <h4>Cabuyao City Health Center</h4>
-              <p><i class="fa-solid fa-location-dot"></i> Brgy. Poblacion Uno &nbsp;|&nbsp; 8:00 AM – 5:00 PM &nbsp;|&nbsp; Public &nbsp;|&nbsp; <strong>55 doses</strong></p>
-            </div>
-            <div class="status-dot s-green" title="Available"></div>
-            <button class="book-btn" onclick="openBookingModal('Cabuyao City Health Center')">Book</button>
-          </div>
-          <div class="clinic-row">
-            <div class="clinic-row-icon" style="background:#fef3c7;"><i class="fa-solid fa-building" style="color:#d97706;"></i></div>
-            <div class="clinic-row-info">
-              <h4>St. Mary's Medical Clinic</h4>
-              <p><i class="fa-solid fa-location-dot"></i> Brgy. Mamatid &nbsp;|&nbsp; 24/7 &nbsp;|&nbsp; Private &nbsp;|&nbsp; <strong>8 doses</strong></p>
-            </div>
-            <div class="status-dot s-yellow" title="Low Stock"></div>
-            <button class="book-btn" onclick="openBookingModal('St. Mary\'s Medical Clinic')">Book</button>
-          </div>
-          <div class="clinic-row">
-            <div class="clinic-row-icon" style="background:#fee2e2;"><i class="fa-solid fa-building" style="color:#ef4444;"></i></div>
-            <div class="clinic-row-info">
-              <h4>South City Animal Bite Center</h4>
-              <p><i class="fa-solid fa-location-dot"></i> Brgy. Banlic &nbsp;|&nbsp; 7:00 AM – 10:00 PM &nbsp;|&nbsp; Private &nbsp;|&nbsp; <strong>0 doses</strong></p>
-            </div>
-            <div class="status-dot s-red" title="Out of Stock"></div>
-            <button class="book-btn" disabled>Out of Stock</button>
-          </div>
-        </div>
-      </div>
+     
 
     </div>
     <!-- END STATE A -->
@@ -439,6 +288,381 @@
 
     </div>
     <!-- END STATE B -->
+<!-- ════════════════════════════════════════════════
+         PUBLIC HEALTH DATA HUB
+         Module 2.4 + Module 2.5
+    ═══════════════════════════════════════════════ -->
+    <section class="public-hub">
+
+      <!-- ── MODULE 2.4: RABIES RECORDS & DEATH MONITORING ── -->
+      <div class="hub-section-title">
+        <i class="fa-solid fa-file-medical" style="color:#e60000;font-size:18px;"></i>
+        <h2>Rabies Records &amp; Death Monitoring</h2>
+      </div>
+      <p class="hub-section-subtitle">
+        Public statistical records of confirmed rabies exposures and rabies-related deaths in Cabuyao, Laguna (2024–2026).
+        Data sourced from the City Health Office and DOH Regional Office IV-A.
+      </p>
+
+      <!-- SUMMARY STATS -->
+      <div class="records-summary-row">
+        <div class="rec-stat">
+          <i class="fa-solid fa-virus"></i>
+          <h3>127</h3>
+          <p>Confirmed Cases (2026)</p>
+        </div>
+        <div class="rec-stat">
+          <i class="fa-solid fa-skull-crossbones"></i>
+          <h3>3</h3>
+          <p>Rabies-Related Deaths (2026)</p>
+        </div>
+        <div class="rec-stat">
+          <i class="fa-solid fa-syringe"></i>
+          <h3>462</h3>
+          <p>Vaccinations Administered</p>
+        </div>
+        <div class="rec-stat">
+          <i class="fa-solid fa-map-location-dot"></i>
+          <h3>5</h3>
+          <p>High-Risk Barangays</p>
+        </div>
+      </div>
+
+      <!-- SEARCH & FILTER CONTROLS -->
+      <div class="records-controls">
+        <input class="records-search" type="text" placeholder="Search by barangay, year, or outcome…" oninput="filterRecords(this.value)">
+        <button class="records-filter-btn active-filter" onclick="setFilter('all', this)">All</button>
+        <button class="records-filter-btn" onclick="setFilter('death', this)">Deaths</button>
+        <button class="records-filter-btn" onclick="setFilter('recovered', this)">Recovered</button>
+        <button class="records-filter-btn" onclick="setFilter('ongoing', this)">Ongoing</button>
+      </div>
+
+      <!-- DATA TABLE -->
+      <div class="records-table-wrap">
+        <table class="records-table" id="recordsTable">
+          <thead>
+            <tr>
+              <th>Case ID</th>
+              <th>Year</th>
+              <th>Barangay</th>
+              <th>Animal Source</th>
+              <th>WHO Category</th>
+              <th>Severity</th>
+              <th>Outcome</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="recordsTbody">
+            <!-- Row 1 -->
+            <tr class="accordion-row" onclick="toggleRow(this)" data-outcome="death">
+              <td><strong>CAB-2026-001</strong></td>
+              <td>2026</td>
+              <td>Mamatid</td>
+              <td>Dog</td>
+              <td>Category III</td>
+              <td><span class="severity-badge sev-high">High</span></td>
+              <td><span class="outcome-badge out-death">Death</span></td>
+              <td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td>
+            </tr>
+            <tr class="accordion-detail" id="detail-CAB-2026-001">
+              <td colspan="8">
+                <div class="accordion-detail-grid">
+                  <div class="detail-item"><label>Patient Age</label><span>42 years old</span></div>
+                  <div class="detail-item"><label>Gender</label><span>Male</span></div>
+                  <div class="detail-item"><label>Bite Site</label><span>Left leg</span></div>
+                  <div class="detail-item"><label>Days to Symptom</label><span>18 days</span></div>
+                  <div class="detail-item"><label>PEP Received</label><span>No — delayed consult</span></div>
+                  <div class="detail-item"><label>Date of Death</label><span>March 4, 2026</span></div>
+                  <div class="detail-item"><label>Reporting Facility</label><span>Cabuyao City Health Center</span></div>
+                  <div class="detail-item"><label>Status</label><span style="color:#9d174d;font-weight:700;">Confirmed Fatal</span></div>
+                </div>
+              </td>
+            </tr>
+            <!-- Row 2 -->
+            <tr class="accordion-row" onclick="toggleRow(this)" data-outcome="recovered">
+              <td><strong>CAB-2026-002</strong></td>
+              <td>2026</td>
+              <td>Banlic</td>
+              <td>Dog</td>
+              <td>Category II</td>
+              <td><span class="severity-badge sev-medium">Medium</span></td>
+              <td><span class="outcome-badge out-recovered">Recovered</span></td>
+              <td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td>
+            </tr>
+            <tr class="accordion-detail" id="detail-CAB-2026-002">
+              <td colspan="8">
+                <div class="accordion-detail-grid">
+                  <div class="detail-item"><label>Patient Age</label><span>27 years old</span></div>
+                  <div class="detail-item"><label>Gender</label><span>Female</span></div>
+                  <div class="detail-item"><label>Bite Site</label><span>Right hand</span></div>
+                  <div class="detail-item"><label>PEP Received</label><span>Yes — 5/5 doses complete</span></div>
+                  <div class="detail-item"><label>Vaccine Used</label><span>Verorab</span></div>
+                  <div class="detail-item"><label>Date Cleared</label><span>April 12, 2026</span></div>
+                  <div class="detail-item"><label>Reporting Facility</label><span>St. Mary's Medical Clinic</span></div>
+                  <div class="detail-item"><label>Status</label><span style="color:#166534;font-weight:700;">Fully Recovered</span></div>
+                </div>
+              </td>
+            </tr>
+            <!-- Row 3 -->
+            <tr class="accordion-row" onclick="toggleRow(this)" data-outcome="ongoing">
+              <td><strong>CAB-2026-003</strong></td>
+              <td>2026</td>
+              <td>Pulo</td>
+              <td>Cat</td>
+              <td>Category III</td>
+              <td><span class="severity-badge sev-high">High</span></td>
+              <td><span class="outcome-badge out-ongoing">Ongoing</span></td>
+              <td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td>
+            </tr>
+            <tr class="accordion-detail">
+              <td colspan="8">
+                <div class="accordion-detail-grid">
+                  <div class="detail-item"><label>Patient Age</label><span>9 years old</span></div>
+                  <div class="detail-item"><label>Gender</label><span>Male</span></div>
+                  <div class="detail-item"><label>Bite Site</label><span>Face</span></div>
+                  <div class="detail-item"><label>PEP Status</label><span>Dose 3 of 5 — in progress</span></div>
+                  <div class="detail-item"><label>Vaccine Used</label><span>Rabipur</span></div>
+                  <div class="detail-item"><label>Next Dose</label><span>July 10, 2026</span></div>
+                  <div class="detail-item"><label>Reporting Facility</label><span>Cabuyao City Health Center</span></div>
+                  <div class="detail-item"><label>Status</label><span style="color:#1d4ed8;font-weight:700;">Under Treatment</span></div>
+                </div>
+              </td>
+            </tr>
+            <!-- Row 4 -->
+            <tr class="accordion-row" onclick="toggleRow(this)" data-outcome="death">
+              <td><strong>CAB-2025-047</strong></td>
+              <td>2025</td>
+              <td>Sala</td>
+              <td>Dog</td>
+              <td>Category III</td>
+              <td><span class="severity-badge sev-high">High</span></td>
+              <td><span class="outcome-badge out-death">Death</span></td>
+              <td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td>
+            </tr>
+            <tr class="accordion-detail">
+              <td colspan="8">
+                <div class="accordion-detail-grid">
+                  <div class="detail-item"><label>Patient Age</label><span>61 years old</span></div>
+                  <div class="detail-item"><label>Gender</label><span>Female</span></div>
+                  <div class="detail-item"><label>Bite Site</label><span>Multiple — arms and neck</span></div>
+                  <div class="detail-item"><label>PEP Received</label><span>Partial — 2 doses only</span></div>
+                  <div class="detail-item"><label>Date of Death</label><span>November 22, 2025</span></div>
+                  <div class="detail-item"><label>Days to Symptom</label><span>24 days</span></div>
+                  <div class="detail-item"><label>Reporting Facility</label><span>South City Animal Bite Center</span></div>
+                  <div class="detail-item"><label>Status</label><span style="color:#9d174d;font-weight:700;">Confirmed Fatal</span></div>
+                </div>
+              </td>
+            </tr>
+            <!-- Row 5 -->
+            <tr class="accordion-row" onclick="toggleRow(this)" data-outcome="recovered">
+              <td><strong>CAB-2025-039</strong></td>
+              <td>2025</td>
+              <td>Niugan</td>
+              <td>Bat</td>
+              <td>Category III</td>
+              <td><span class="severity-badge sev-medium">Medium</span></td>
+              <td><span class="outcome-badge out-recovered">Recovered</span></td>
+              <td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td>
+            </tr>
+            <tr class="accordion-detail">
+              <td colspan="8">
+                <div class="accordion-detail-grid">
+                  <div class="detail-item"><label>Patient Age</label><span>34 years old</span></div>
+                  <div class="detail-item"><label>Gender</label><span>Male</span></div>
+                  <div class="detail-item"><label>Bite Site</label><span>Left shoulder</span></div>
+                  <div class="detail-item"><label>PEP Received</label><span>Yes — 5/5 doses complete</span></div>
+                  <div class="detail-item"><label>Vaccine Used</label><span>Speeda</span></div>
+                  <div class="detail-item"><label>Date Cleared</label><span>September 8, 2025</span></div>
+                  <div class="detail-item"><label>Reporting Facility</label><span>Cabuyao City Health Center</span></div>
+                  <div class="detail-item"><label>Status</label><span style="color:#166534;font-weight:700;">Fully Recovered</span></div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="records-table-footer">
+          <span id="recordsCount">Showing 5 of 5 records</span>
+          <span style="color:#e60000;font-weight:600;font-size:12px;">
+            <i class="fa-solid fa-circle-info"></i> Click any row to expand full case details
+          </span>
+        </div>
+      </div>
+
+      <hr class="hub-divider">
+
+      <!-- ── MODULE 2.5: DATA VISUALIZATION DASHBOARD ── -->
+      <div class="hub-section-title">
+        <i class="fa-solid fa-chart-column" style="color:#e60000;font-size:18px;"></i>
+        <h2>Data Visualization Dashboard</h2>
+      </div>
+      <p class="hub-section-subtitle">
+        Statistical analysis of rabies incidence by month, barangay, and demographic group. Updated monthly by the City Health Office.
+      </p>
+
+      <!-- TOP VIZ ROW -->
+      <div class="viz-grid">
+
+        <!-- MONTHLY TREND CHART (Chart.js) -->
+        <div class="viz-card">
+          <div class="viz-card-header">
+            <div>
+              <h3><i class="fa-solid fa-chart-bar" style="color:#e60000;margin-right:6px;"></i>Monthly Rabies Cases &amp; Vaccinations</h3>
+              <p>Comparative trend of exposures vs. PEP vaccinations administered</p>
+            </div>
+            <span class="viz-period-tag">Jan – Jul 2026</span>
+          </div>
+          <div class="viz-card-body">
+            <canvas id="monthlyChart" height="200"></canvas>
+          </div>
+        </div>
+
+        <!-- BARANGAY RISK BARS -->
+        <div class="viz-card">
+          <div class="viz-card-header">
+            <div>
+              <h3><i class="fa-solid fa-map-location-dot" style="color:#e60000;margin-right:6px;"></i>Barangay Incident Rate</h3>
+              <p>Highest-risk barangays by confirmed case count</p>
+            </div>
+            <span class="viz-period-tag">2026 YTD</span>
+          </div>
+          <div class="viz-card-body">
+            <div class="bgy-list">
+              <div class="bgy-row">
+                <div class="bgy-row-top"><span class="bgy-name">Mamatid</span><span class="bgy-count">32 cases</span></div>
+                <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-high" style="width:92%;"></div></div>
+              </div>
+              <div class="bgy-row">
+                <div class="bgy-row-top"><span class="bgy-name">Banlic</span><span class="bgy-count">26 cases</span></div>
+                <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-high" style="width:74%;"></div></div>
+              </div>
+              <div class="bgy-row">
+                <div class="bgy-row-top"><span class="bgy-name">Pulo</span><span class="bgy-count">19 cases</span></div>
+                <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-medium" style="width:54%;"></div></div>
+              </div>
+              <div class="bgy-row">
+                <div class="bgy-row-top"><span class="bgy-name">Sala</span><span class="bgy-count">16 cases</span></div>
+                <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-medium" style="width:46%;"></div></div>
+              </div>
+              <div class="bgy-row">
+                <div class="bgy-row-top"><span class="bgy-name">Marinig</span><span class="bgy-count">11 cases</span></div>
+                <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-low" style="width:32%;"></div></div>
+              </div>
+              <div class="bgy-row">
+                <div class="bgy-row-top"><span class="bgy-name">Niugan</span><span class="bgy-count">9 cases</span></div>
+                <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-low" style="width:26%;"></div></div>
+              </div>
+              <div class="bgy-row">
+                <div class="bgy-row-top"><span class="bgy-name">Butong</span><span class="bgy-count">7 cases</span></div>
+                <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-low" style="width:20%;"></div></div>
+              </div>
+              <div class="bgy-row">
+                <div class="bgy-row-top"><span class="bgy-name">Poblacion Uno</span><span class="bgy-count">7 cases</span></div>
+                <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-low" style="width:20%;"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- BOTTOM VIZ ROW -->
+      <div class="viz-bottom-row">
+
+        <!-- ANIMAL SOURCE DONUT -->
+        <div class="viz-mini-card">
+          <h4><i class="fa-solid fa-paw" style="color:#e60000;margin-right:6px;"></i>Exposure by Animal Source</h4>
+          <div class="donut-wrap">
+            <svg class="donut-svg" width="90" height="90" viewBox="0 0 36 36">
+              <!-- Dog 68% -->
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e2e8f0" stroke-width="3.8"/>
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e60000" stroke-width="3.8"
+                stroke-dasharray="42.7 57.3" stroke-dashoffset="25" />
+              <!-- Cat 20% -->
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#d98a00" stroke-width="3.8"
+                stroke-dasharray="12.6 87.4" stroke-dashoffset="-17.7" />
+              <!-- Bat 8% -->
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#00b140" stroke-width="3.8"
+                stroke-dasharray="5 95" stroke-dashoffset="-30.3" />
+              <!-- Others 4% -->
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#6b7280" stroke-width="3.8"
+                stroke-dasharray="2.5 97.5" stroke-dashoffset="-35.3" />
+              <text x="18" y="19.5" text-anchor="middle" fill="#0f172a" font-size="5.5" font-weight="700">68%</text>
+              <text x="18" y="24" text-anchor="middle" fill="#94a3b8" font-size="3.5">Dog</text>
+            </svg>
+            <div class="donut-legend">
+              <div class="donut-legend-item"><span class="donut-dot" style="background:#e60000;"></span> Dog — 68%</div>
+              <div class="donut-legend-item"><span class="donut-dot" style="background:#d98a00;"></span> Cat — 20%</div>
+              <div class="donut-legend-item"><span class="donut-dot" style="background:#00b140;"></span> Bat — 8%</div>
+              <div class="donut-legend-item"><span class="donut-dot" style="background:#6b7280;"></span> Others — 4%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MONTHLY TREND SPARKLINE -->
+        <div class="viz-mini-card">
+          <h4><i class="fa-solid fa-arrow-trend-up" style="color:#e60000;margin-right:6px;"></i>Case Trend (Jan–Jul 2026)</h4>
+          <div class="trend-bars">
+            <div class="trend-bar" style="height:38%;background:#00b140;" title="Jan: 12"></div>
+            <div class="trend-bar" style="height:57%;background:#d98a00;" title="Feb: 18"></div>
+            <div class="trend-bar" style="height:47%;background:#00b140;" title="Mar: 15"></div>
+            <div class="trend-bar" style="height:69%;background:#d98a00;" title="Apr: 22"></div>
+            <div class="trend-bar" style="height:60%;background:#d98a00;" title="May: 19"></div>
+            <div class="trend-bar" style="height:75%;background:#e60000;" title="Jun: 24"></div>
+            <div class="trend-bar" style="height:53%;background:#d98a00;" title="Jul: 17"></div>
+          </div>
+          <div class="trend-labels">
+            <span class="trend-label">Jan</span>
+            <span class="trend-label">Feb</span>
+            <span class="trend-label">Mar</span>
+            <span class="trend-label">Apr</span>
+            <span class="trend-label">May</span>
+            <span class="trend-label">Jun</span>
+            <span class="trend-label">Jul</span>
+          </div>
+          <p style="font-size:11px;color:#94a3b8;margin-top:8px;">
+            <i class="fa-solid fa-triangle-exclamation" style="color:#e60000;"></i>
+            June peak: 24 cases — highest monthly count in 2026
+          </p>
+        </div>
+
+        <!-- AGE GROUP BREAKDOWN -->
+        <div class="viz-mini-card">
+          <h4><i class="fa-solid fa-users" style="color:#e60000;margin-right:6px;"></i>Cases by Age Group (2026)</h4>
+          <div class="age-list">
+            <div class="age-row">
+              <span class="age-label">0–9</span>
+              <div class="age-bar-wrap"><div class="age-bar-fill" style="width:30%;"></div></div>
+              <span class="age-count">18</span>
+            </div>
+            <div class="age-row">
+              <span class="age-label">10–19</span>
+              <div class="age-bar-wrap"><div class="age-bar-fill" style="width:40%;"></div></div>
+              <span class="age-count">24</span>
+            </div>
+            <div class="age-row">
+              <span class="age-label">20–39</span>
+              <div class="age-bar-wrap"><div class="age-bar-fill" style="width:55%;"></div></div>
+              <span class="age-count">33</span>
+            </div>
+            <div class="age-row">
+              <span class="age-label">40–59</span>
+              <div class="age-bar-wrap"><div class="age-bar-fill" style="width:45%;"></div></div>
+              <span class="age-count">27</span>
+            </div>
+            <div class="age-row">
+              <span class="age-label">60+</span>
+              <div class="age-bar-wrap"><div class="age-bar-fill" style="width:22%;"></div></div>
+              <span class="age-count">13</span>
+            </div>
+          </div>
+          <p style="font-size:11px;color:#94a3b8;margin-top:10px;">
+            Adults 20–39 represent the highest exposure group (26%)
+          </p>
+        </div>
+
+      </div>
+
+    </section>
 
   </div>
   <!-- END OVERVIEW PANEL -->
@@ -856,7 +1080,72 @@
       if (e.key === 'resident_vaccination_status') location.reload();
     });
 
-    document.addEventListener('DOMContentLoaded', initView);
+    function renderResVizChart() {
+      const ctx = document.getElementById('resVizChart');
+      if (!ctx || !window.Chart) return;
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul'],
+          datasets: [
+            { label:'Rabies Cases', data:[12,18,15,22,19,24,17], backgroundColor:'rgba(239,0,0,0.75)', borderRadius:4 },
+            { label:'Vaccinations', data:[45,62,55,80,72,95,53], backgroundColor:'rgba(0,177,64,0.65)', borderRadius:4 }
+          ]
+        },
+        options: {
+          responsive:true,
+          plugins:{ legend:{ position:'top', labels:{ font:{size:11}, padding:10 } } },
+          scales:{
+            y:{ beginAtZero:true, grid:{color:'#f3f4f6'}, ticks:{font:{size:11}} },
+            x:{ grid:{display:false}, ticks:{font:{size:11}} }
+          }
+        }
+      });
+    }
+    function toggleResRow(row) {
+      const next = row.nextElementSibling;
+      const icon = row.querySelector('.fa-chevron-down, .fa-chevron-up');
+      const isOpen = next.style.display === 'table-row';
+      document.querySelectorAll('.res-accordion-detail').forEach(d => d.style.display = 'none');
+      document.querySelectorAll('.res-accordion-row i.fa-chevron-up').forEach(i => {
+        i.className = i.className.replace('fa-chevron-up','fa-chevron-down');
+      });
+      if (!isOpen) {
+        next.style.display = 'table-row';
+        if (icon) icon.className = icon.className.replace('fa-chevron-down','fa-chevron-up');
+      }
+    }
+    let resCurrentFilter = 'all';
+    function resSetFilter(filter, btn) {
+      resCurrentFilter = filter;
+      document.querySelectorAll('.res-filter-btn').forEach(b => b.classList.remove('active-filter'));
+      btn.classList.add('active-filter');
+      resApplyFilter();
+    }
+    function resFilterRecords(q) { resApplyFilter(q.toLowerCase().trim()); }
+    function resApplyFilter(q = '') {
+      const rows = document.querySelectorAll('#resTbody .res-accordion-row');
+      let shown = 0;
+      rows.forEach(row => {
+        const outcome = row.dataset.outcome || '';
+        const text = row.textContent.toLowerCase();
+        const matchFilter = resCurrentFilter === 'all' || outcome === resCurrentFilter;
+        const matchSearch = !q || text.includes(q);
+        const show = matchFilter && matchSearch;
+        row.style.display = show ? '' : 'none';
+        const detail = row.nextElementSibling;
+        if (detail && detail.classList.contains('res-accordion-detail')) {
+          if (!show) detail.style.display = 'none';
+        }
+        if (show) shown++;
+      });
+      document.getElementById('resRecordsCount').textContent = 'Showing ' + shown + ' of 5 records';
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      initView();
+      setTimeout(renderResVizChart, 300);
+    });
   </script>
 
 </body>
