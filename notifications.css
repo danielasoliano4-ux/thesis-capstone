@@ -367,6 +367,59 @@ body {
 .warning-box h4 { color: red; margin-bottom: 10px; }
 .warning-box p { color: #374151; line-height: 1.6; font-size: 14px; }
 
+/* Appointments-style hero and steps for inline First Aid panel */
+.guide-hero {
+    background: linear-gradient(135deg, #c62828, #ef0000);
+    color: white;
+    border-radius: 12px;
+    padding: 20px 22px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+.guide-hero-icon { font-size: 36px; opacity: 0.95; }
+.guide-hero h1 { font-size: 20px; margin: 0 0 4px; }
+.guide-hero p { margin: 0; font-size: 13px; opacity: 0.95; }
+
+.appt-steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+.appt-step {
+    background: white;
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+    border: 1px solid #f3f4f6;
+}
+.step-circle {
+    width: 36px;
+    height: 36px;
+    background: #fff4f4;
+    color: #ef0000;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight:700;
+    margin-bottom:8px;
+}
+.appt-step h4 { margin: 6px 0 4px; font-size:14px; }
+.appt-step .muted { color:#6b7280; font-size:13px; }
+
+.clinic-card { background: white; border-radius: 12px; padding: 16px; border:1px solid #eee; }
+.clinic-list { display:flex; flex-direction:column; gap:10px; }
+.clinic-row { display:flex; justify-content:space-between; align-items:center; padding:10px; border-radius:8px; background:#fff; border:1px solid #f3f4f6; }
+
+@media (max-width: 900px) {
+    .appt-steps { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+    .appt-steps { grid-template-columns: 1fr; }
+}
+
 /* ==========================================================================
    8. REAL-TIME NOTIFICATION SYSTEM (NEW INCLUSIONS)
    ========================================================================== */

@@ -408,17 +408,22 @@ body {
 }
 .section-title i { color: #ef0000; }
 
-.steps-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 30px; }
+.steps-list { 
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 30px;
+}
 
 .step-card {
     background: white;
     border-radius: 10px;
-    padding: 20px 24px;
+    padding: 18px 20px;
     display: flex;
-    align-items: flex-start;
-    gap: 18px;
-    box-shadow: 0 1px 6px rgba(0,0,0,0.07);
-    border-left: 4px solid #ef0000;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+    border: 1px solid #f3f4f6;
 }
 
 .step-card .step-num {
@@ -491,6 +496,15 @@ body {
 .info-card h4 i { color: #ef0000; }
 .info-card ul { padding-left: 16px; }
 .info-card ul li { font-size: 13px; color: #4b5563; margin-bottom: 6px; line-height: 1.5; }
+
+/* Responsive layout for steps-list to match appointments-style horizontal steps */
+@media (max-width: 1000px) {
+    .steps-list { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+    .steps-list { grid-template-columns: 1fr; }
+}
 
 /* Fixed Categories Badges System */
 .category-badges {

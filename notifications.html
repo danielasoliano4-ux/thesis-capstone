@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Notifications - Anti-Rabies Locator</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+    <link rel="stylesheet" href="resident.css">
     <link rel="stylesheet" href="notifications.css">
 </head>
 <body>
@@ -21,10 +22,8 @@
         </div>
         <div class="header-right">
             <h3>John Cruz</h3>
-            <a href="residents.html">
-                <button class="signout-btn" style="background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;">
-                    <i class="fa-solid fa-arrow-left"></i> Back
-                </button>
+            <a href="notifications.html" style="color:#374151;font-size:20px;position:relative;">
+                <i class="fa-regular fa-bell"></i>
             </a>
             <a href="index.html" style="text-decoration:none;">
                 <button class="signout-btn">
@@ -34,7 +33,27 @@
         </div>
     </header>
 
+    <!-- DEMO BANNER -->
+    <div class="demo-banner">
+        <div class="demo-state">
+            <span class="demo-dot new"></span>
+            <span>New Resident State — No vaccination history</span>
+            <span style="opacity:0.5;margin-left:8px;">| Demo Mode — conditional logic based on staff vaccination update</span>
+        </div>
+        <button class="demo-reset-btn" onclick="/* reset */">Reset to New Resident</button>
+    </div>
+
+    <!-- NAV TABS -->
+    <nav class="nav-tabs-bar" id="navTabs" style="margin-bottom:18px;">
+        <a class="nav-tab" href="residents.html"><i class="fa-solid fa-house"></i> Overview</a>
+        <a class="nav-tab" href="residents.html#panel-appointments"><i class="fa-regular fa-calendar"></i> Appointments</a>
+        <a class="nav-tab" href="first-aid.html"><i class="fa-solid fa-kit-medical"></i> First Aid Guide</a>
+        <a class="nav-tab active"><i class="fa-regular fa-bell"></i> Notifications</a>
+    </nav>
+
     <div class="notif-container">
+
+        <!-- (Appointments-style inline panel removed) -->
 
         <div class="notif-header-row">
             <div>
@@ -55,6 +74,20 @@
 
         <!-- TODAY -->
         <div class="notif-group-label" data-group="today">Today</div>
+
+        <!-- FIRST AID QUICK ACCESS -->
+        <div class="notif-item unread" data-type="firstaid" onclick="location.href='first-aid.html'">
+            <div class="notif-icon icon-red"><i class="fa-solid fa-kit-medical"></i></div>
+            <div class="notif-body">
+                <h4>First Aid Guide — Immediate Steps</h4>
+                <p>Open the First Aid guide for bite management and next steps — view it here without leaving the page.</p>
+                <div class="notif-meta">
+                    <span class="notif-time"><i class="fa-regular fa-clock"></i> just now</span>
+                    <span class="notif-tag tag-system">First Aid</span>
+                </div>
+            </div>
+            <div class="unread-dot"></div>
+        </div>
 
         <div class="notif-item unread" data-type="appointment">
             <div class="notif-icon icon-blue"><i class="fa-regular fa-calendar-check"></i></div>
@@ -142,6 +175,8 @@
             <p>No notifications in this category</p>
         </div>
 
+        
+
         <div class="settings-link">
             <p>Want to manage notification preferences? <a href="#">Notification Settings</a></p>
         </div>
@@ -179,6 +214,8 @@
                 g.style.display = type === 'all' ? 'block' : 'none';
             });
         }
+
+            // Inline first-aid panel handlers removed — navigation now opens `first-aid.html`.
     </script>
 </body>
 </html>

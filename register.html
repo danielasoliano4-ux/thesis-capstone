@@ -66,7 +66,7 @@
         }
         .role-options {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 10px;
         }
         .role-option {
@@ -205,10 +205,6 @@
                         <i class="fa-solid fa-hospital"></i>
                         <span>Clinic Staff</span>
                     </div>
-                    <div class="role-option" data-role="admin" onclick="selectRole(this)">
-                        <i class="fa-solid fa-chart-column"></i>
-                        <span>Administrator</span>
-                    </div>
                 </div>
             </div>
 
@@ -335,7 +331,7 @@
 
         function handleRegister(e) {
             e.preventDefault();
-            const pages = { resident: 'residents.html', staff: 'staff.html', admin: 'admin.html' };
+            const pages = { resident: 'residents.html', staff: 'staff.html' };
             alert('Account created successfully! (Demo mode)');
             window.location.href = pages[currentRole];
         }

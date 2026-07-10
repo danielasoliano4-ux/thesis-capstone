@@ -9,8 +9,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
-
-  <!-- HEADER -->
   <header class="top-header">
     <div class="logo-section">
       <div class="logo-icon"><i class="fa-solid fa-shield-dog"></i></div>
@@ -80,23 +78,49 @@
           <div class="map-top">
             <h3><i class="fa-solid fa-location-dot" style="color:#ef0000;margin-right:6px;"></i> Clinic Locator — Cabuyao</h3>
             <div class="map-filter">
-              <button class="active-btn" onclick="filterMap(this)">All</button>
-              <button onclick="filterMap(this)">Public</button>
-              <button onclick="filterMap(this)">Private</button>
+              <button class="active-btn" onclick="filterMarkers('all', this)">All</button>
+              <button onclick="filterMarkers('available', this)">Available</button>
+              <button onclick="filterMarkers('low', this)">Low Stock</button>
+              <button onclick="filterMarkers('out', this)">Out of Stock</button>
             </div>
           </div>
           <div class="map-box">
-            <div class="map-label">CABUYAO MAP</div>
-            <div class="marker green" style="top:25%;left:18%;" title="Cabuyao City Health Center – Available"></div>
-            <div class="marker yellow" style="top:38%;left:35%;" title="St. Mary's Clinic – Low Stock"></div>
-            <div class="marker green" style="top:50%;left:50%;" title="Laguna Medical – Available"></div>
-            <div class="marker red" style="top:62%;left:66%;" title="South City ABTC – Out of Stock"></div>
-            <div class="legend-box">
-              <h4>Legend</h4>
-              <p><span class="legend green-bg"></span> Available</p>
-              <p><span class="legend yellow-bg"></span> Low Stock</p>
-              <p><span class="legend red-bg"></span> Out of Stock</p>
-            </div>
+            <!-- Interactive Google Map container for NEW residents -->
+            <div id="googleMapNew" style="
+                width: 100%;
+                height: 450px;
+                border-radius: 14px;
+                overflow: hidden;
+                border: 1px solid #ddd;
+            "></div>
+          </div>
+          <!-- Clinic Status Overview for NEW resident map (inside map area like index) -->
+          <div style="margin-top:18px;">
+            <h4 style="font-size:14px;color:#374151;margin-bottom:10px;">
+              <i class="fa-solid fa-list"></i> Clinic Status Overview
+            </h4>
+            <div id="clinicSidebarNew" style="display:flex;flex-direction:column;gap:8px;"></div>
+          </div>
+
+          <div style="
+              display:flex;gap:18px;margin-top:14px;
+              padding:12px 16px;background:#f9fafb;
+              border-radius:12px;border:1px solid #ddd;
+              flex-wrap:wrap;
+          ">
+              <span style="font-size:13px;font-weight:bold;color:#374151;align-self:center;">Legend:</span>
+              <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+                  <span style="width:14px;height:14px;background:#00b140;border-radius:50%;display:inline-block;"></span>
+                  Vaccines Available
+              </span>
+              <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+                  <span style="width:14px;height:14px;background:#d98a00;border-radius:50%;display:inline-block;"></span>
+                  Low Stock
+              </span>
+              <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+                  <span style="width:14px;height:14px;background:#e60000;border-radius:50%;display:inline-block;"></span>
+                  Out of Stock
+              </span>
           </div>
         </div>
 
@@ -229,63 +253,55 @@
         <div class="map-top">
           <h3><i class="fa-solid fa-location-dot" style="color:#ef0000;margin-right:6px;"></i> Find Nearby Clinics</h3>
           <div class="map-filter">
-            <button class="active-btn" onclick="filterMap(this)">All</button>
-            <button onclick="filterMap(this)">Public</button>
-            <button onclick="filterMap(this)">Private</button>
+            <button class="active-btn" onclick="filterMarkers('all', this)">All</button>
+            <button onclick="filterMarkers('available', this)">Available</button>
+            <button onclick="filterMarkers('low', this)">Low Stock</button>
+            <button onclick="filterMarkers('out', this)">Out of Stock</button>
           </div>
         </div>
         <div class="map-box">
-          <div class="map-label">CABUYAO MAP</div>
-          <div class="marker green" style="top:25%;left:18%;" title="Cabuyao City Health Center – Available"></div>
-          <div class="marker yellow" style="top:38%;left:35%;" title="St. Mary's Clinic – Low Stock"></div>
-          <div class="marker green" style="top:50%;left:50%;" title="Laguna Medical – Available"></div>
-          <div class="marker red" style="top:62%;left:66%;" title="South City ABTC – Out of Stock"></div>
-          <div class="legend-box">
-            <h4>Legend</h4>
-            <p><span class="legend green-bg"></span> Available</p>
-            <p><span class="legend yellow-bg"></span> Low Stock</p>
-            <p><span class="legend red-bg"></span> Out of Stock</p>
-          </div>
+          <!-- Interactive Google Map container -->
+          <div id="googleMap" style="
+              width: 100%;
+              height: 450px;
+              border-radius: 14px;
+              overflow: hidden;
+              border: 1px solid #ddd;
+          "></div>
         </div>
       </div>
 
-      <!-- CLINIC LIST -->
-      <div class="section-card">
-        <div class="section-card-header">
-          <h3>Available Clinics</h3>
-          <a href="index.html">View public map</a>
-        </div>
-        <div class="clinic-list">
-          <div class="clinic-row">
-            <div class="clinic-row-icon" style="background:#dcfce7;"><i class="fa-solid fa-hospital" style="color:#16a34a;"></i></div>
-            <div class="clinic-row-info">
-              <h4>Cabuyao City Health Center</h4>
-              <p><i class="fa-solid fa-location-dot"></i> Brgy. Poblacion Uno &nbsp;|&nbsp; 8:00 AM – 5:00 PM &nbsp;|&nbsp; Public</p>
-            </div>
-            <div class="status-dot s-green"></div>
-            <button class="book-btn" onclick="openBookingModal('Cabuyao City Health Center')">Book</button>
-          </div>
-          <div class="clinic-row">
-            <div class="clinic-row-icon" style="background:#fef3c7;"><i class="fa-solid fa-building" style="color:#d97706;"></i></div>
-            <div class="clinic-row-info">
-              <h4>St. Mary's Medical Clinic</h4>
-              <p><i class="fa-solid fa-location-dot"></i> Brgy. Mamatid &nbsp;|&nbsp; 24/7 &nbsp;|&nbsp; Private</p>
-            </div>
-            <div class="status-dot s-yellow"></div>
-            <button class="book-btn" onclick="openBookingModal('St. Mary\'s Medical Clinic')">Book</button>
-          </div>
-          <div class="clinic-row">
-            <div class="clinic-row-icon" style="background:#fee2e2;"><i class="fa-solid fa-building" style="color:#ef4444;"></i></div>
-            <div class="clinic-row-info">
-              <h4>South City Animal Bite Center</h4>
-              <p><i class="fa-solid fa-location-dot"></i> Brgy. Banlic &nbsp;|&nbsp; 7:00 AM – 10:00 PM &nbsp;|&nbsp; Private</p>
-            </div>
-            <div class="status-dot s-red"></div>
-            <button class="book-btn" disabled>Out of Stock</button>
-          </div>
-        </div>
+      <!-- Clinic Status Overview (same UI as index) -->
+      <div style="margin-top:18px;">
+        <h4 style="font-size:14px;color:#374151;margin-bottom:10px;">
+          <i class="fa-solid fa-list"></i> Clinic Status Overview
+        </h4>
+        <div id="clinicSidebar" style="display:flex;flex-direction:column;gap:8px;"></div>
       </div>
 
+      <!-- Map Legend -->
+      <div style="
+          display:flex;gap:18px;margin-top:14px;
+          padding:12px 16px;background:#f9fafb;
+          border-radius:12px;border:1px solid #ddd;
+          flex-wrap:wrap;
+      ">
+          <span style="font-size:13px;font-weight:bold;color:#374151;align-self:center;">Legend:</span>
+          <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+              <span style="width:14px;height:14px;background:#00b140;border-radius:50%;display:inline-block;"></span>
+              Vaccines Available
+          </span>
+          <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+              <span style="width:14px;height:14px;background:#d98a00;border-radius:50%;display:inline-block;"></span>
+              Low Stock
+          </span>
+          <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+              <span style="width:14px;height:14px;background:#e60000;border-radius:50%;display:inline-block;"></span>
+              Out of Stock
+          </span>
+      </div>
+
+      
     </div>
     <!-- END STATE B -->
 <!-- ════════════════════════════════════════════════
@@ -1013,7 +1029,7 @@
     }
 
     function renderCasesChart() {
-      const ctx = document.getElementById('casesChart');
+      const ctx = document.getElementById('monthlyChart');
       if (!ctx || !window.Chart) return;
       new Chart(ctx, {
         type: 'bar',
@@ -1021,7 +1037,7 @@
           labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
           datasets: [
             { label: 'Rabies Cases', data: [12, 18, 15, 22, 19, 24, 17], backgroundColor: 'rgba(239,0,0,0.75)', borderRadius: 4, borderSkipped: false },
-            { label: 'Vaccinations', data: [45, 62, 55, 80, 72, 95, 53], backgroundColor: 'rgba(37,99,235,0.65)', borderRadius: 4, borderSkipped: false }
+            { label: 'Vaccinations', data: [45, 62, 55, 80, 72, 95, 53], backgroundColor: 'rgba(52,211,153,0.75)', borderRadius: 4, borderSkipped: false }
           ]
         },
         options: {
@@ -1089,7 +1105,7 @@
           labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul'],
           datasets: [
             { label:'Rabies Cases', data:[12,18,15,22,19,24,17], backgroundColor:'rgba(239,0,0,0.75)', borderRadius:4 },
-            { label:'Vaccinations', data:[45,62,55,80,72,95,53], backgroundColor:'rgba(0,177,64,0.65)', borderRadius:4 }
+            { label:'Vaccinations', data:[45,62,55,80,72,95,53], backgroundColor:'rgba(52,211,153,0.75)', borderRadius:4 }
           ]
         },
         options: {
@@ -1144,9 +1160,202 @@
 
     document.addEventListener('DOMContentLoaded', function() {
       initView();
+      if (location.hash === '#panel-appointments') {
+        const apptTab = document.querySelectorAll('.nav-tab')[1];
+        if (apptTab) showTab('appointments', apptTab);
+      }
+      renderCasesChart();
       setTimeout(renderResVizChart, 300);
     });
   </script>
+</script>
+
+<!-- Google Maps script: clinic data, map initialization and sidebar builder -->
+<script>
+const CLINICS = [
+  { name: 'Cabuyao City Health Center', lat: 14.2718, lng: 121.1246, status: 'available', address: 'Brgy. Poblacion Uno, Cabuyao City, Laguna', hours: '8:00 AM – 5:00 PM', phone: '(049) 531-2345', stock: 'Verorab: 45 · Rabipur: 30 · Speeda: 12' },
+  { name: "St. Mary's Medical Clinic", lat: 14.2655, lng: 121.1189, status: 'low', address: 'Brgy. Mamatid, Cabuyao City, Laguna', hours: '24/7', phone: '(049) 531-5678', stock: 'Verorab: 5 · Rabipur: 3 · Speeda: 0' },
+  { name: 'South City Animal Bite Center', lat: 14.2592, lng: 121.1310, status: 'out', address: 'Brgy. Banlic, Cabuyao City, Laguna', hours: '7:00 AM – 10:00 PM', phone: '(049) 555-8877', stock: 'No vaccines in stock' },
+  { name: 'Pulo Barangay Health Station', lat: 14.2780, lng: 121.1350, status: 'available', address: 'Brgy. Pulo, Cabuyao City, Laguna', hours: '8:00 AM – 5:00 PM', phone: '(049) 531-9901', stock: 'Verorab: 20 · Rabipur: 18' },
+  { name: 'Marinig Health Center', lat: 14.2840, lng: 121.1200, status: 'low', address: 'Brgy. Marinig, Cabuyao City, Laguna', hours: '8:00 AM – 5:00 PM', phone: '(049) 531-7712', stock: 'Verorab: 4 · Rabipur: 2' }
+];
+
+const STATUS_COLOR = { available: '#00b140', low: '#d98a00', out: '#e60000' };
+const STATUS_LABEL = { available: 'Available', low: 'Low Stock', out: 'Out of Stock' };
+
+let map; let markers = []; let activeFilter = 'all';
+
+function initMap() {
+  const CABUYAO_CENTER = { lat: 14.2718, lng: 121.1246 };
+  map = new google.maps.Map(document.getElementById('googleMap'), {
+    center: CABUYAO_CENTER, zoom: 14,
+    styles: [
+      { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+      { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+      { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
+      { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#dff1f7' }] },
+      { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#f9f9f9' }] }
+    ], mapTypeControl: false, streetViewControl: false, fullscreenControl: false, mapTypeId: 'roadmap'
+  });
+  CLINICS.forEach((clinic, index) => plotClinic(clinic, index));
+  buildSidebar();
+}
+
+function plotClinic(clinic, index) {
+  const color = STATUS_COLOR[clinic.status];
+  const svgMarker = { path: google.maps.SymbolPath.CIRCLE, fillColor: color, fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 2.5, scale: 12 };
+  const marker = new google.maps.Marker({ position: { lat: clinic.lat, lng: clinic.lng }, map, title: clinic.name, icon: svgMarker, zIndex: clinic.status === 'available' ? 10 : clinic.status === 'low' ? 5 : 1 });
+  const badgeBg = clinic.status === 'available' ? '#eefcf3' : clinic.status === 'low' ? '#fffbe9' : '#fff1f1';
+  const badgeColor = color;
+  const infoContent = `
+    <div style="font-family:Arial,sans-serif;padding:4px;min-width:220px;">
+      <div style="font-weight:bold;font-size:14px;color:#111827;margin-bottom:6px;">${clinic.name}</div>
+      <span style="background:${badgeBg};color:${badgeColor};padding:3px 10px;border-radius:20px;font-size:11px;font-weight:bold;display:inline-block;margin-bottom:10px;">${STATUS_LABEL[clinic.status]}</span>
+      <div style="font-size:12px;color:#374151;line-height:1.8;">
+        <div><b>Address:</b> ${clinic.address}</div>
+        <div><b>Hours:</b> ${clinic.hours}</div>
+        <div><b>Phone:</b> ${clinic.phone}</div>
+        <div style="margin-top:6px;padding:8px;background:#f9fafb;border-radius:8px;"><b>Stock:</b> ${clinic.stock}</div>
+      </div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:8px;">© Google Maps</div>
+    </div>
+  `;
+  const infoWindow = new google.maps.InfoWindow({ content: infoContent });
+  marker.addListener('click', () => { infoWindow.open(map, marker); map.panTo(marker.getPosition()); });
+  return { marker, infoWindow, clinic };
+}
+
+// ── Multi-map support: initialize maps for both active and new views
+const mapsData = []; // { mapId, sidebarId, map, markers: [ {marker, infoWindow, clinic} ] }
+
+function initMap() {
+  const containers = [
+    { mapId: 'googleMap', sidebarId: 'clinicSidebar' },
+    { mapId: 'googleMapNew', sidebarId: 'clinicSidebarNew' }
+  ];
+  containers.forEach(c => {
+    if (document.getElementById(c.mapId)) createMap(c.mapId, c.sidebarId);
+  });
+}
+
+function createMap(mapId, sidebarId) {
+  const CABUYAO_CENTER = { lat: 14.2718, lng: 121.1246 };
+  const map = new google.maps.Map(document.getElementById(mapId), {
+    center: CABUYAO_CENTER,
+    zoom: 14,
+    styles: [
+      { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+      { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+      { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
+      { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#dff1f7' }] },
+      { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#f9f9f9' }] }
+    ],
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+    mapTypeId: 'roadmap'
+  });
+
+  const entry = { mapId, sidebarId, map, markers: [] };
+  CLINICS.forEach(clinic => {
+    const m = createMarkerForMap(map, clinic);
+    entry.markers.push(m);
+  });
+  mapsData.push(entry);
+  buildSidebarFor(entry);
+}
+
+function createMarkerForMap(map, clinic) {
+  const color = STATUS_COLOR[clinic.status];
+  const svgMarker = { path: google.maps.SymbolPath.CIRCLE, fillColor: color, fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 2.5, scale: 12 };
+  const marker = new google.maps.Marker({ position: { lat: clinic.lat, lng: clinic.lng }, map, title: clinic.name, icon: svgMarker, zIndex: clinic.status === 'available' ? 10 : clinic.status === 'low' ? 5 : 1 });
+  const badgeBg = clinic.status === 'available' ? '#eefcf3' : clinic.status === 'low' ? '#fffbe9' : '#fff1f1';
+  const badgeColor = color;
+  const infoContent = `
+    <div style="font-family:Arial,sans-serif;padding:4px;min-width:220px;">
+      <div style="font-weight:bold;font-size:14px;color:#111827;margin-bottom:6px;">${clinic.name}</div>
+      <span style="background:${badgeBg};color:${badgeColor};padding:3px 10px;border-radius:20px;font-size:11px;font-weight:bold;display:inline-block;margin-bottom:10px;">${STATUS_LABEL[clinic.status]}</span>
+      <div style="font-size:12px;color:#374151;line-height:1.8;">
+        <div><b>Address:</b> ${clinic.address}</div>
+        <div><b>Hours:</b> ${clinic.hours}</div>
+        <div><b>Phone:</b> ${clinic.phone}</div>
+        <div style="margin-top:6px;padding:8px;background:#f9fafb;border-radius:8px;"><b>Stock:</b> ${clinic.stock}</div>
+      </div>
+      <div style="font-size:11px;color:#9ca3af;margin-top:8px;">© Google Maps</div>
+    </div>
+  `;
+  const infoWindow = new google.maps.InfoWindow({ content: infoContent });
+  marker.addListener('click', () => {
+    // close all info windows across all maps
+    mapsData.forEach(d => d.markers.forEach(mm => mm.infoWindow.close()));
+    infoWindow.open(map, marker);
+    map.panTo(marker.getPosition());
+  });
+  return { marker, infoWindow, clinic };
+}
+
+function buildSidebarFor(entry) {
+  const sidebar = document.getElementById(entry.sidebarId);
+  if (!sidebar) return;
+  sidebar.innerHTML = '';
+  entry.markers.forEach((mobj, index) => {
+    const color = STATUS_COLOR[mobj.clinic.status];
+    const row = document.createElement('div');
+    const rowId = `${entry.sidebarId}-row-${index}`;
+    row.id = rowId;
+    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;background:white;border:1px solid #ddd;border-radius:12px;padding:12px 16px;cursor:pointer;transition:border-color 0.2s;gap:12px;';
+
+    // Left: clinic name + small details. Right: status dot + Book / Out of Stock button
+    const leftHtml = `
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:13px;font-weight:bold;color:#111827;">${mobj.clinic.name}</span>
+        </div>
+        <div style="font-size:12px;color:#6b7280;">${mobj.clinic.address} &nbsp;|&nbsp; ${mobj.clinic.hours}</div>
+      </div>
+    `;
+
+    const statusDot = `<span style="width:10px;height:10px;background:${color};border-radius:50%;display:inline-block;margin-right:8px;"></span>`;
+
+    const rightHtml = mobj.clinic.status === 'out'
+      ? `<div style=\"display:flex;align-items:center;gap:10px;\"><span style=\"font-size:12px;color:${color};font-weight:bold;\">Out of Stock</span><button class=\"book-btn\" disabled style=\"background:#d1d5db;border:none;color:#6b7280;cursor:not-allowed;\">Out of Stock</button></div>`
+      : `<div style=\"display:flex;align-items:center;gap:10px;\"><span style=\"font-size:12px;color:${color};font-weight:bold;\">${STATUS_LABEL[mobj.clinic.status]}</span><button class=\"book-btn\" onclick=\"openBookingModal('${mobj.clinic.name.replace(/'/g, "\\'")}')\" style=\"background:#ef0000;color:white;\">Book</button></div>`;
+
+    row.innerHTML = `<div style=\"display:flex;align-items:center;gap:12px;flex:1;\">${leftHtml}</div><div style=\"display:flex;align-items:center;gap:12px;\">${rightHtml}</div>`;
+
+    row.addEventListener('click', (e) => {
+      // If user clicked the Book button, don't trigger row focus behavior
+      if (e.target && (e.target.tagName === 'BUTTON' || e.target.closest('button'))) return;
+      mapsData.forEach(d => d.markers.forEach(mm => mm.infoWindow.close()));
+      mobj.infoWindow.open(entry.map, mobj.marker);
+      entry.map.panTo(mobj.marker.getPosition());
+      entry.map.setZoom(16);
+      document.querySelectorAll(`#${entry.sidebarId} > div`).forEach(r => { r.style.borderColor = '#ddd'; r.style.background = 'white'; });
+      row.style.borderColor = color; row.style.background = color === '#00b140' ? '#eefcf3' : color === '#d98a00' ? '#fffbe9' : '#fff1f1';
+    });
+
+    sidebar.appendChild(row);
+  });
+}
+
+function filterMarkers(filter, btn) {
+  activeFilter = filter;
+  document.querySelectorAll('.map-filter button').forEach(b => { b.classList.remove('active-btn'); b.style.fontWeight = ''; });
+  if (btn) btn.classList.add('active-btn');
+  mapsData.forEach(entry => {
+    entry.markers.forEach((mobj, i) => {
+      const show = filter === 'all' || mobj.clinic.status === filter;
+      mobj.marker.setVisible(show);
+      mobj.infoWindow.close();
+      const row = document.getElementById(`${entry.sidebarId}-row-${i}`);
+      if (row) row.style.display = show ? 'flex' : 'none';
+    });
+  });
+}
+</script>
+
+<!-- Load Google Maps API (replace YOUR_API_KEY) -->
+<script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap&loading=async" defer></script>
 
 </body>
 </html>

@@ -5,28 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>First Aid Guide - Anti-Rabies Locator</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
-    <link rel="stylesheet" href="first-aid.css">
+        <link rel="stylesheet" href="resident.css">
+        <link rel="stylesheet" href="first-aid.css">
 </head>
 <body>
 
+    <!-- HEADER (reused from resident dashboard) -->
     <header class="top-header">
         <div class="logo-section">
-            <div class="logo-icon">
-                <i class="fa-solid fa-shield-dog"></i>
-            </div>
+            <div class="logo-icon"><i class="fa-solid fa-shield-dog"></i></div>
             <div>
                 <h2>Anti-Rabies Locator</h2>
                 <p>Cabuyao, Laguna</p>
             </div>
         </div>
         <div class="header-right">
-            <a href="residents.html">
-                <button class="fa-solid fa-arrow-left" style="background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;"> Back
-                </button>
+            <h3 id="headerName">John Cruz</h3>
+            <a href="notifications.html" style="color:#374151;font-size:20px;position:relative;" id="notifBell">
+                <i class="fa-regular fa-bell"></i>
+                <span id="notifDot" style="position:absolute;top:-4px;right:-4px;width:8px;height:8px;background:#ef0000;border-radius:50%;display:none;"></span>
             </a>
-
-
-
+            <a href="index.html" style="text-decoration:none;">
                 <button class="signout-btn">
                     <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
                 </button>
@@ -34,7 +33,39 @@
         </div>
     </header>
 
-    <div class="guide-container">
+    <!-- DEMO BANNER -->
+    <div class="demo-banner">
+        <div class="demo-state">
+            <span class="demo-dot new" id="demoDot"></span>
+            <span id="demoStateLabel">New Resident State — No vaccination history</span>
+            <span style="opacity:0.5;margin-left:8px;">| Demo Mode — conditional logic based on staff vaccination update</span>
+        </div>
+        <button class="demo-reset-btn" onclick="/* demo reset */">Reset to New Resident</button>
+    </div>
+
+    <!-- NAV TABS -->
+    <nav class="nav-tabs-bar" id="navTabs">
+        <a class="nav-tab" href="residents.html">
+            <i class="fa-solid fa-house"></i> Overview
+        </a>
+        <a class="nav-tab" href="residents.html#panel-appointments">
+            <i class="fa-regular fa-calendar"></i> Appointments
+        </a>
+        <a class="nav-tab" onclick="/* show records */" style="display:none;">
+            <i class="fa-solid fa-syringe"></i> My Vaccination Records
+        </a>
+        <a class="nav-tab active">
+            <i class="fa-solid fa-kit-medical"></i> First Aid Guide
+        </a>
+        <a class="nav-tab" href="notifications.html" id="nav-notif">
+            <i class="fa-regular fa-bell"></i> Notifications
+            <span id="notifBadge" style="background:#ef0000;color:white;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;display:none;">4</span>
+        </a>
+    </nav>
+
+    <main class="main-container">
+
+        <div class="guide-container">
 
         <!-- HERO -->
         <div class="guide-hero">
@@ -212,6 +243,7 @@
         </div>
 
     </div>
+</main>
 
 </body>
 </html>
