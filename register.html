@@ -201,10 +201,6 @@
                         <i class="fa-solid fa-user"></i>
                         <span>Resident</span>
                     </div>
-                    <div class="role-option" data-role="staff" onclick="selectRole(this)">
-                        <i class="fa-solid fa-hospital"></i>
-                        <span>Clinic Staff</span>
-                    </div>
                 </div>
             </div>
 
@@ -253,11 +249,6 @@
                         <option>San Isidro</option>
                         <option>Sucol</option>
                     </select>
-                </div>
-
-                <div class="form-group" id="clinicGroup" style="display:none;">
-                    <label>Clinic / Health Center Name</label>
-                    <input type="text" placeholder="e.g. Cabuyao City Health Center" />
                 </div>
 
                 <div class="form-row">
@@ -313,15 +304,7 @@
             currentRole = el.dataset.role;
 
             const barangayGroup = document.getElementById('barangayGroup');
-            const clinicGroup = document.getElementById('clinicGroup');
-
-            if (currentRole === 'staff') {
-                barangayGroup.style.display = 'none';
-                clinicGroup.style.display = 'flex';
-            } else {
-                barangayGroup.style.display = 'flex';
-                clinicGroup.style.display = 'none';
-            }
+            barangayGroup.style.display = 'flex';
         }
 
         function togglePw(id) {
@@ -331,7 +314,7 @@
 
         function handleRegister(e) {
             e.preventDefault();
-            const pages = { resident: 'residents.html', staff: 'staff.html' };
+            const pages = { resident: 'residents.html' };
             alert('Account created successfully! (Demo mode)');
             window.location.href = pages[currentRole];
         }
