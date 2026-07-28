@@ -2,7 +2,7 @@ import { auth, db } from '../firebase-config.js';
 import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-document.querySelector('form').addEventListener('submit', async (e) => {
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
   e.preventDefault();
 
   const firstName = document.getElementById('firstName').value.trim();

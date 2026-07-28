@@ -3,7 +3,7 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-aut
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDK•••••••••••••••••••••••••••••••",
+  apiKey: "AIzaSyDK8f4qVtcMus8CVVexYZHdk_BBftnpq_k",
   authDomain: "anti-rabies-locator.firebaseapp.com",
   projectId: "anti-rabies-locator",
   storageBucket: "anti-rabies-locator.firebasestorage.app",
