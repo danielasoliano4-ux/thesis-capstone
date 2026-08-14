@@ -1,15 +1,41 @@
-function getVacStatus() {
-  try { return JSON.parse(localStorage.getItem('resident_vaccination_status') || '{}'); }
-  catch (e) { return {}; }
+import { auth, db } from '../firebase-config.js';
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+let currentUid = null;
+let currentResidentName = '';
+
+async function loadResidentDashboard(uid) {
+  currentUid = uid;
+  const residentDoc = await getDoc(doc(db, 'residents', uid));
+  const residentData = residentDoc.exists() ? residentDoc.data() : {};
+
+  // Prefer resident's first/last name; fall back to users.full_name or auth displayName
+  if (residentData.first_name) {
+    currentResidentName = residentData.first_name + ' ' + (residentData.last_name || '');
+  } else {
+    const userDoc = await getDoc(doc(db, 'users', uid));
+    if (userDoc.exists() && userDoc.data().full_name) {
+      currentResidentName = userDoc.data().full_name;
+    } else if (auth.currentUser && auth.currentUser.displayName) {
+      currentResidentName = auth.currentUser.displayName;
+    }
+  }
+
+  const headerName = document.getElementById('headerName');
+  if (headerName && currentResidentName) headerName.textContent = currentResidentName;
+
+  const recordsSnap = await getDocs(
+    query(collection(db, 'vaccination_records'), where('resident_uid', '==', uid), orderBy('date_given', 'desc'))
+  );
+
+  const hasRecord = !recordsSnap.empty;
+  const latestRecord = hasRecord ? recordsSnap.docs[0].data() : null;
+
+  initView(hasRecord, latestRecord);
 }
 
-const vacStatus = getVacStatus();
-const hasRecord = vacStatus.hasRecord === true;
-const dosesCompleted = vacStatus.dosesCompleted || 1;
-
-function initView() {
-  updateDemoBanner();
-
+function initView(hasRecord, latestRecord) {
   if (hasRecord) {
     document.getElementById('view-new').style.display = 'none';
     document.getElementById('view-active').style.display = 'block';
@@ -18,7 +44,7 @@ function initView() {
     document.getElementById('appt-active-patient').style.display = 'block';
     document.getElementById('notifDot').style.display = 'block';
     document.getElementById('notifBadge').style.display = 'inline';
-    populateActivePatientData(vacStatus);
+    if (latestRecord) populateActivePatientData(latestRecord);
   } else {
     document.getElementById('view-new').style.display = 'block';
     document.getElementById('view-active').style.display = 'none';
@@ -30,20 +56,8 @@ function initView() {
   }
 }
 
-function updateDemoBanner() {
-  const dot = document.getElementById('demoDot');
-  const label = document.getElementById('demoStateLabel');
-  if (hasRecord) {
-    dot.className = 'demo-dot active';
-    label.textContent = 'Active Patient State — Vaccination record exists (triggered by clinic staff)';
-  } else {
-    dot.className = 'demo-dot new';
-    label.textContent = 'New Resident State — No vaccination history';
-  }
-}
-
 function populateActivePatientData(data) {
-  const doses = data.dosesCompleted || 1;
+  const doses = data.dose_number || 1;
   const total = 5;
   const pct = Math.round((doses / total) * 100);
   if (document.getElementById('activeDosesCount')) document.getElementById('activeDosesCount').textContent = doses;
@@ -59,15 +73,13 @@ function populateActivePatientData(data) {
     else if (i === doses + 1) pip.className = 'dose-pip current';
     else pip.className = 'dose-pip';
   }
-  if (data.patientName && document.getElementById('recordName')) document.getElementById('recordName').textContent = data.patientName;
-  if (data.startDate && document.getElementById('recordStart')) document.getElementById('recordStart').textContent = data.startDate;
-  if (data.vaccine && document.getElementById('recordVaccine')) document.getElementById('recordVaccine').textContent = data.vaccine;
-  if (data.biteAnimal && document.getElementById('recordAnimal')) document.getElementById('recordAnimal').textContent = data.biteAnimal;
-  if (data.biteSite && document.getElementById('recordBiteSite')) document.getElementById('recordBiteSite').textContent = data.biteSite;
-  if (data.category && document.getElementById('recordCategory')) document.getElementById('recordCategory').textContent = data.category;
-  if (data.nextDoseDate) {
-    if (document.getElementById('activeNextAppt')) document.getElementById('activeNextAppt').textContent = data.nextDoseDate.replace('2026', '').trim().replace(',','').split(' ').slice(0,2).join(' ');
-    if (document.getElementById('nextDoseLabel')) document.getElementById('nextDoseLabel').innerHTML = `<i class="fa-regular fa-calendar"></i> Next: Dose ${doses + 1} on ${data.nextDoseDate}`;
+  if (data.resident_name && document.getElementById('recordName')) document.getElementById('recordName').textContent = data.resident_name;
+  if (data.vaccine_name && document.getElementById('recordVaccine')) document.getElementById('recordVaccine').textContent = data.vaccine_name;
+  if (data.clinic_name && document.getElementById('recordStart')) document.getElementById('recordStart').textContent = data.clinic_name;
+  if (data.next_due_date) {
+    const nextDate = data.next_due_date.toDate ? data.next_due_date.toDate().toLocaleDateString() : data.next_due_date;
+    if (document.getElementById('activeNextAppt')) document.getElementById('activeNextAppt').textContent = nextDate;
+    if (document.getElementById('nextDoseLabel')) document.getElementById('nextDoseLabel').innerHTML = `<i class="fa-regular fa-calendar"></i> Next: Dose ${doses + 1} on ${nextDate}`;
   }
 }
 
@@ -132,14 +144,71 @@ function openBookingModal(clinic) {
       if (o.text.startsWith(clinic)) { sel.value = o.value; break; }
     }
   }
+  const dateEl = document.getElementById('modalDate');
+  if (dateEl && !dateEl.value) {
+    const today = new Date().toISOString().split('T')[0];
+    dateEl.value = today;
+    dateEl.min = today;
+  }
   document.getElementById('bookingModal').classList.add('open');
 }
+
 function closeBookingModal() {
   document.getElementById('bookingModal').classList.remove('open');
 }
-function confirmBooking() {
-  closeBookingModal();
-  alert('Appointment booked successfully! (Demo mode)\n\nYou will receive a confirmation notification once the clinic confirms your schedule.');
+
+async function confirmBooking() {
+  const clinic = document.getElementById('modalClinic').value;
+  const dose = document.getElementById('modalDose').value;
+  const date = document.getElementById('modalDate').value;
+  const time = document.getElementById('modalTime').value;
+  const msgEl = document.getElementById('bookingMsg');
+
+  if (!date) {
+    msgEl.style.display = 'block';
+    msgEl.style.background = '#fff5f5';
+    msgEl.style.color = '#ef0000';
+    msgEl.style.border = '1px solid #fecaca';
+    msgEl.textContent = 'Please select a preferred date.';
+    return;
+  }
+
+  const btn = document.querySelector('.modal-submit');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Booking...';
+
+  try {
+    await addDoc(collection(db, 'appointments'), {
+      resident_uid: currentUid,
+      resident_name: currentResidentName,
+      clinic_name: clinic,
+      dose_label: dose,
+      preferred_date: date,
+      preferred_time: time,
+      status: 'pending',
+      created_at: serverTimestamp()
+    });
+
+    msgEl.style.display = 'block';
+    msgEl.style.background = '#f0fdf4';
+    msgEl.style.color = '#16a34a';
+    msgEl.style.border = '1px solid #bbf7d0';
+    msgEl.textContent = 'Appointment booked! Waiting for clinic confirmation.';
+
+    setTimeout(() => {
+      closeBookingModal();
+      msgEl.style.display = 'none';
+    }, 2000);
+  } catch (err) {
+    msgEl.style.display = 'block';
+    msgEl.style.background = '#fff5f5';
+    msgEl.style.color = '#ef0000';
+    msgEl.style.border = '1px solid #fecaca';
+    msgEl.textContent = 'Booking failed: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-check"></i> Confirm Booking';
+  }
 }
 
 function filterMap(btn) {
@@ -149,10 +218,6 @@ function filterMap(btn) {
 
 function handleUpload(input) {
   if (input.files.length) alert('File "' + input.files[0].name + '" selected for upload. (Demo mode)');
-}
-function resetDemoState() {
-  localStorage.removeItem('resident_vaccination_status');
-  location.reload();
 }
 
 function toggleResRow(row) {
@@ -201,11 +266,19 @@ document.addEventListener('DOMContentLoaded', function() {
     if (e.target === this) closeBookingModal();
   });
 
-  window.addEventListener('storage', function(e) {
-    if (e.key === 'resident_vaccination_status') location.reload();
+  const signOutBtn = document.getElementById('signOutBtn');
+  if (signOutBtn) signOutBtn.addEventListener('click', () => {
+    signOut(auth).then(() => window.location.href = 'login.html');
   });
 
-  initView();
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      loadResidentDashboard(user.uid);
+    } else {
+      window.location.href = 'login.html';
+    }
+  });
+
   if (location.hash === '#panel-appointments') {
     const apptTab = document.querySelectorAll('.nav-tab')[1];
     if (apptTab) showTab('appointments', apptTab);
