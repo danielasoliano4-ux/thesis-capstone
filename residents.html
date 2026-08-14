@@ -23,25 +23,11 @@
         <i class="fa-regular fa-bell"></i>
         <span id="notifDot" style="position:absolute;top:-4px;right:-4px;width:8px;height:8px;background:#ef0000;border-radius:50%;display:none;"></span>
       </a>
-      <a href="index.html" style="text-decoration:none;">
-        <button class="signout-btn">
-          <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
-        </button>
-      </a>
+      <button class="signout-btn" id="signOutBtn">
+        <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
+      </button>
     </div>
   </header>
-
-  <!-- DEMO BANNER -->
-  <div class="demo-banner">
-    <div class="demo-state">
-      <span class="demo-dot" id="demoDot"></span>
-      <span id="demoStateLabel"></span>
-      <span style="opacity:0.5;margin-left:8px;">| Demo Mode — conditional logic based on staff vaccination update</span>
-    </div>
-    <button class="demo-reset-btn" onclick="resetDemoState()">
-      <i class="fa-solid fa-rotate-left"></i> Reset to New Resident
-    </button>
-  </div>
 
   <!-- NAV TABS -->
   <nav class="nav-tabs-bar" id="navTabs">
@@ -69,7 +55,6 @@
     <!-- ---- STATE A: NEW RESIDENT (no vaccination history) ---- -->
     <div id="view-new" style="display:none;">
 
-
       <!-- MAP + BOOK APPOINTMENT -->
       <div class="three-col">
 
@@ -85,42 +70,25 @@
             </div>
           </div>
           <div class="map-box">
-            <!-- Interactive Google Map container for NEW residents -->
-            <div id="googleMapNew" style="
-                width: 100%;
-                height: 450px;
-                border-radius: 14px;
-                overflow: hidden;
-                border: 1px solid #ddd;
-            "></div>
+            <div id="googleMapNew" style="width:100%;height:450px;border-radius:14px;overflow:hidden;border:1px solid #ddd;"></div>
           </div>
-          <!-- Clinic Status Overview for NEW resident map (inside map area like index) -->
           <div style="margin-top:18px;">
             <h4 style="font-size:14px;color:#374151;margin-bottom:10px;">
               <i class="fa-solid fa-list"></i> Clinic Status Overview
             </h4>
             <div id="clinicSidebarNew" style="display:flex;flex-direction:column;gap:8px;"></div>
           </div>
-
-          <div style="
-              display:flex;gap:18px;margin-top:14px;
-              padding:12px 16px;background:#f9fafb;
-              border-radius:12px;border:1px solid #ddd;
-              flex-wrap:wrap;
-          ">
-              <span style="font-size:13px;font-weight:bold;color:#374151;align-self:center;">Legend:</span>
-              <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
-                  <span style="width:14px;height:14px;background:#00b140;border-radius:50%;display:inline-block;"></span>
-                  Vaccines Available
-              </span>
-              <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
-                  <span style="width:14px;height:14px;background:#d98a00;border-radius:50%;display:inline-block;"></span>
-                  Low Stock
-              </span>
-              <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
-                  <span style="width:14px;height:14px;background:#e60000;border-radius:50%;display:inline-block;"></span>
-                  Out of Stock
-              </span>
+          <div style="display:flex;gap:18px;margin-top:14px;padding:12px 16px;background:#f9fafb;border-radius:12px;border:1px solid #ddd;flex-wrap:wrap;">
+            <span style="font-size:13px;font-weight:bold;color:#374151;align-self:center;">Legend:</span>
+            <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+              <span style="width:14px;height:14px;background:#00b140;border-radius:50%;display:inline-block;"></span>Vaccines Available
+            </span>
+            <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+              <span style="width:14px;height:14px;background:#d98a00;border-radius:50%;display:inline-block;"></span>Low Stock
+            </span>
+            <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+              <span style="width:14px;height:14px;background:#e60000;border-radius:50%;display:inline-block;"></span>Out of Stock
+            </span>
           </div>
         </div>
 
@@ -135,10 +103,6 @@
         </div>
 
       </div>
-
-     
-
-     
 
     </div>
     <!-- END STATE A -->
@@ -260,18 +224,11 @@
           </div>
         </div>
         <div class="map-box">
-          <!-- Interactive Google Map container -->
-          <div id="googleMap" style="
-              width: 100%;
-              height: 450px;
-              border-radius: 14px;
-              overflow: hidden;
-              border: 1px solid #ddd;
-          "></div>
+          <div id="googleMap" style="width:100%;height:450px;border-radius:14px;overflow:hidden;border:1px solid #ddd;"></div>
         </div>
       </div>
 
-      <!-- Clinic Status Overview (same UI as index) -->
+      <!-- Clinic Status Overview -->
       <div style="margin-top:18px;">
         <h4 style="font-size:14px;color:#374151;margin-bottom:10px;">
           <i class="fa-solid fa-list"></i> Clinic Status Overview
@@ -280,37 +237,25 @@
       </div>
 
       <!-- Map Legend -->
-      <div style="
-          display:flex;gap:18px;margin-top:14px;
-          padding:12px 16px;background:#f9fafb;
-          border-radius:12px;border:1px solid #ddd;
-          flex-wrap:wrap;
-      ">
-          <span style="font-size:13px;font-weight:bold;color:#374151;align-self:center;">Legend:</span>
-          <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
-              <span style="width:14px;height:14px;background:#00b140;border-radius:50%;display:inline-block;"></span>
-              Vaccines Available
-          </span>
-          <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
-              <span style="width:14px;height:14px;background:#d98a00;border-radius:50%;display:inline-block;"></span>
-              Low Stock
-          </span>
-          <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
-              <span style="width:14px;height:14px;background:#e60000;border-radius:50%;display:inline-block;"></span>
-              Out of Stock
-          </span>
+      <div style="display:flex;gap:18px;margin-top:14px;padding:12px 16px;background:#f9fafb;border-radius:12px;border:1px solid #ddd;flex-wrap:wrap;">
+        <span style="font-size:13px;font-weight:bold;color:#374151;align-self:center;">Legend:</span>
+        <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+          <span style="width:14px;height:14px;background:#00b140;border-radius:50%;display:inline-block;"></span>Vaccines Available
+        </span>
+        <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+          <span style="width:14px;height:14px;background:#d98a00;border-radius:50%;display:inline-block;"></span>Low Stock
+        </span>
+        <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+          <span style="width:14px;height:14px;background:#e60000;border-radius:50%;display:inline-block;"></span>Out of Stock
+        </span>
       </div>
 
-      
     </div>
     <!-- END STATE B -->
-<!-- ════════════════════════════════════════════════
-         PUBLIC HEALTH DATA HUB
-         Module 2.4 + Module 2.5
-    ═══════════════════════════════════════════════ -->
+
+    <!-- PUBLIC HEALTH DATA HUB -->
     <section class="public-hub">
 
-      <!-- ── MODULE 2.4: RABIES RECORDS & DEATH MONITORING ── -->
       <div class="hub-section-title">
         <i class="fa-solid fa-file-medical" style="color:#e60000;font-size:18px;"></i>
         <h2>Rabies Records &amp; Death Monitoring</h2>
@@ -320,31 +265,13 @@
         Data sourced from the City Health Office and DOH Regional Office IV-A.
       </p>
 
-      <!-- SUMMARY STATS -->
       <div class="records-summary-row">
-        <div class="rec-stat">
-          <i class="fa-solid fa-virus"></i>
-          <h3>127</h3>
-          <p>Confirmed Cases (2026)</p>
-        </div>
-        <div class="rec-stat">
-          <i class="fa-solid fa-skull-crossbones"></i>
-          <h3>3</h3>
-          <p>Rabies-Related Deaths (2026)</p>
-        </div>
-        <div class="rec-stat">
-          <i class="fa-solid fa-syringe"></i>
-          <h3>462</h3>
-          <p>Vaccinations Administered</p>
-        </div>
-        <div class="rec-stat">
-          <i class="fa-solid fa-map-location-dot"></i>
-          <h3>5</h3>
-          <p>High-Risk Barangays</p>
-        </div>
+        <div class="rec-stat"><i class="fa-solid fa-virus"></i><h3>127</h3><p>Confirmed Cases (2026)</p></div>
+        <div class="rec-stat"><i class="fa-solid fa-skull-crossbones"></i><h3>3</h3><p>Rabies-Related Deaths (2026)</p></div>
+        <div class="rec-stat"><i class="fa-solid fa-syringe"></i><h3>462</h3><p>Vaccinations Administered</p></div>
+        <div class="rec-stat"><i class="fa-solid fa-map-location-dot"></i><h3>5</h3><p>High-Risk Barangays</p></div>
       </div>
 
-      <!-- SEARCH & FILTER CONTROLS -->
       <div class="records-controls">
         <input class="records-search" type="text" placeholder="Search by barangay, year, or outcome…" oninput="filterRecords(this.value)">
         <button class="records-filter-btn active-filter" onclick="setFilter('all', this)">All</button>
@@ -353,146 +280,104 @@
         <button class="records-filter-btn" onclick="setFilter('ongoing', this)">Ongoing</button>
       </div>
 
-      <!-- DATA TABLE -->
       <div class="records-table-wrap">
         <table class="records-table" id="recordsTable">
           <thead>
             <tr>
-              <th>Case ID</th>
-              <th>Year</th>
-              <th>Barangay</th>
-              <th>Animal Source</th>
-              <th>WHO Category</th>
-              <th>Severity</th>
-              <th>Outcome</th>
-              <th></th>
+              <th>Case ID</th><th>Year</th><th>Barangay</th><th>Animal Source</th>
+              <th>WHO Category</th><th>Severity</th><th>Outcome</th><th></th>
             </tr>
           </thead>
           <tbody id="recordsTbody">
-            <!-- Row 1 -->
             <tr class="accordion-row" onclick="toggleRow(this)" data-outcome="death">
-              <td><strong>CAB-2026-001</strong></td>
-              <td>2026</td>
-              <td>Mamatid</td>
-              <td>Dog</td>
-              <td>Category III</td>
-              <td><span class="severity-badge sev-high">High</span></td>
+              <td><strong>CAB-2026-001</strong></td><td>2026</td><td>Mamatid</td><td>Dog</td>
+              <td>Category III</td><td><span class="severity-badge sev-high">High</span></td>
               <td><span class="outcome-badge out-death">Death</span></td>
               <td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td>
             </tr>
             <tr class="accordion-detail" id="detail-CAB-2026-001">
-              <td colspan="8">
-                <div class="accordion-detail-grid">
-                  <div class="detail-item"><label>Patient Age</label><span>42 years old</span></div>
-                  <div class="detail-item"><label>Gender</label><span>Male</span></div>
-                  <div class="detail-item"><label>Bite Site</label><span>Left leg</span></div>
-                  <div class="detail-item"><label>Days to Symptom</label><span>18 days</span></div>
-                  <div class="detail-item"><label>PEP Received</label><span>No — delayed consult</span></div>
-                  <div class="detail-item"><label>Date of Death</label><span>March 4, 2026</span></div>
-                  <div class="detail-item"><label>Reporting Facility</label><span>Cabuyao City Health Center</span></div>
-                  <div class="detail-item"><label>Status</label><span style="color:#9d174d;font-weight:700;">Confirmed Fatal</span></div>
-                </div>
-              </td>
+              <td colspan="8"><div class="accordion-detail-grid">
+                <div class="detail-item"><label>Patient Age</label><span>42 years old</span></div>
+                <div class="detail-item"><label>Gender</label><span>Male</span></div>
+                <div class="detail-item"><label>Bite Site</label><span>Left leg</span></div>
+                <div class="detail-item"><label>Days to Symptom</label><span>18 days</span></div>
+                <div class="detail-item"><label>PEP Received</label><span>No — delayed consult</span></div>
+                <div class="detail-item"><label>Date of Death</label><span>March 4, 2026</span></div>
+                <div class="detail-item"><label>Reporting Facility</label><span>Cabuyao City Health Center</span></div>
+                <div class="detail-item"><label>Status</label><span style="color:#9d174d;font-weight:700;">Confirmed Fatal</span></div>
+              </div></td>
             </tr>
-            <!-- Row 2 -->
             <tr class="accordion-row" onclick="toggleRow(this)" data-outcome="recovered">
-              <td><strong>CAB-2026-002</strong></td>
-              <td>2026</td>
-              <td>Banlic</td>
-              <td>Dog</td>
-              <td>Category II</td>
-              <td><span class="severity-badge sev-medium">Medium</span></td>
+              <td><strong>CAB-2026-002</strong></td><td>2026</td><td>Banlic</td><td>Dog</td>
+              <td>Category II</td><td><span class="severity-badge sev-medium">Medium</span></td>
               <td><span class="outcome-badge out-recovered">Recovered</span></td>
               <td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td>
             </tr>
             <tr class="accordion-detail" id="detail-CAB-2026-002">
-              <td colspan="8">
-                <div class="accordion-detail-grid">
-                  <div class="detail-item"><label>Patient Age</label><span>27 years old</span></div>
-                  <div class="detail-item"><label>Gender</label><span>Female</span></div>
-                  <div class="detail-item"><label>Bite Site</label><span>Right hand</span></div>
-                  <div class="detail-item"><label>PEP Received</label><span>Yes — 5/5 doses complete</span></div>
-                  <div class="detail-item"><label>Vaccine Used</label><span>Verorab</span></div>
-                  <div class="detail-item"><label>Date Cleared</label><span>April 12, 2026</span></div>
-                  <div class="detail-item"><label>Reporting Facility</label><span>St. Mary's Medical Clinic</span></div>
-                  <div class="detail-item"><label>Status</label><span style="color:#166534;font-weight:700;">Fully Recovered</span></div>
-                </div>
-              </td>
+              <td colspan="8"><div class="accordion-detail-grid">
+                <div class="detail-item"><label>Patient Age</label><span>27 years old</span></div>
+                <div class="detail-item"><label>Gender</label><span>Female</span></div>
+                <div class="detail-item"><label>Bite Site</label><span>Right hand</span></div>
+                <div class="detail-item"><label>PEP Received</label><span>Yes — 5/5 doses complete</span></div>
+                <div class="detail-item"><label>Vaccine Used</label><span>Verorab</span></div>
+                <div class="detail-item"><label>Date Cleared</label><span>April 12, 2026</span></div>
+                <div class="detail-item"><label>Reporting Facility</label><span>St. Mary's Medical Clinic</span></div>
+                <div class="detail-item"><label>Status</label><span style="color:#166534;font-weight:700;">Fully Recovered</span></div>
+              </div></td>
             </tr>
-            <!-- Row 3 -->
             <tr class="accordion-row" onclick="toggleRow(this)" data-outcome="ongoing">
-              <td><strong>CAB-2026-003</strong></td>
-              <td>2026</td>
-              <td>Pulo</td>
-              <td>Cat</td>
-              <td>Category III</td>
-              <td><span class="severity-badge sev-high">High</span></td>
+              <td><strong>CAB-2026-003</strong></td><td>2026</td><td>Pulo</td><td>Cat</td>
+              <td>Category III</td><td><span class="severity-badge sev-high">High</span></td>
               <td><span class="outcome-badge out-ongoing">Ongoing</span></td>
               <td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td>
             </tr>
             <tr class="accordion-detail">
-              <td colspan="8">
-                <div class="accordion-detail-grid">
-                  <div class="detail-item"><label>Patient Age</label><span>9 years old</span></div>
-                  <div class="detail-item"><label>Gender</label><span>Male</span></div>
-                  <div class="detail-item"><label>Bite Site</label><span>Face</span></div>
-                  <div class="detail-item"><label>PEP Status</label><span>Dose 3 of 5 — in progress</span></div>
-                  <div class="detail-item"><label>Vaccine Used</label><span>Rabipur</span></div>
-                  <div class="detail-item"><label>Next Dose</label><span>July 10, 2026</span></div>
-                  <div class="detail-item"><label>Reporting Facility</label><span>Cabuyao City Health Center</span></div>
-                  <div class="detail-item"><label>Status</label><span style="color:#1d4ed8;font-weight:700;">Under Treatment</span></div>
-                </div>
-              </td>
+              <td colspan="8"><div class="accordion-detail-grid">
+                <div class="detail-item"><label>Patient Age</label><span>9 years old</span></div>
+                <div class="detail-item"><label>Gender</label><span>Male</span></div>
+                <div class="detail-item"><label>Bite Site</label><span>Face</span></div>
+                <div class="detail-item"><label>PEP Status</label><span>Dose 3 of 5 — in progress</span></div>
+                <div class="detail-item"><label>Vaccine Used</label><span>Rabipur</span></div>
+                <div class="detail-item"><label>Next Dose</label><span>July 10, 2026</span></div>
+                <div class="detail-item"><label>Reporting Facility</label><span>Cabuyao City Health Center</span></div>
+                <div class="detail-item"><label>Status</label><span style="color:#1d4ed8;font-weight:700;">Under Treatment</span></div>
+              </div></td>
             </tr>
-            <!-- Row 4 -->
             <tr class="accordion-row" onclick="toggleRow(this)" data-outcome="death">
-              <td><strong>CAB-2025-047</strong></td>
-              <td>2025</td>
-              <td>Sala</td>
-              <td>Dog</td>
-              <td>Category III</td>
-              <td><span class="severity-badge sev-high">High</span></td>
+              <td><strong>CAB-2025-047</strong></td><td>2025</td><td>Sala</td><td>Dog</td>
+              <td>Category III</td><td><span class="severity-badge sev-high">High</span></td>
               <td><span class="outcome-badge out-death">Death</span></td>
               <td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td>
             </tr>
             <tr class="accordion-detail">
-              <td colspan="8">
-                <div class="accordion-detail-grid">
-                  <div class="detail-item"><label>Patient Age</label><span>61 years old</span></div>
-                  <div class="detail-item"><label>Gender</label><span>Female</span></div>
-                  <div class="detail-item"><label>Bite Site</label><span>Multiple — arms and neck</span></div>
-                  <div class="detail-item"><label>PEP Received</label><span>Partial — 2 doses only</span></div>
-                  <div class="detail-item"><label>Date of Death</label><span>November 22, 2025</span></div>
-                  <div class="detail-item"><label>Days to Symptom</label><span>24 days</span></div>
-                  <div class="detail-item"><label>Reporting Facility</label><span>South City Animal Bite Center</span></div>
-                  <div class="detail-item"><label>Status</label><span style="color:#9d174d;font-weight:700;">Confirmed Fatal</span></div>
-                </div>
-              </td>
+              <td colspan="8"><div class="accordion-detail-grid">
+                <div class="detail-item"><label>Patient Age</label><span>61 years old</span></div>
+                <div class="detail-item"><label>Gender</label><span>Female</span></div>
+                <div class="detail-item"><label>Bite Site</label><span>Multiple — arms and neck</span></div>
+                <div class="detail-item"><label>PEP Received</label><span>Partial — 2 doses only</span></div>
+                <div class="detail-item"><label>Date of Death</label><span>November 22, 2025</span></div>
+                <div class="detail-item"><label>Days to Symptom</label><span>24 days</span></div>
+                <div class="detail-item"><label>Reporting Facility</label><span>South City Animal Bite Center</span></div>
+                <div class="detail-item"><label>Status</label><span style="color:#9d174d;font-weight:700;">Confirmed Fatal</span></div>
+              </div></td>
             </tr>
-            <!-- Row 5 -->
             <tr class="accordion-row" onclick="toggleRow(this)" data-outcome="recovered">
-              <td><strong>CAB-2025-039</strong></td>
-              <td>2025</td>
-              <td>Niugan</td>
-              <td>Bat</td>
-              <td>Category III</td>
-              <td><span class="severity-badge sev-medium">Medium</span></td>
+              <td><strong>CAB-2025-039</strong></td><td>2025</td><td>Niugan</td><td>Bat</td>
+              <td>Category III</td><td><span class="severity-badge sev-medium">Medium</span></td>
               <td><span class="outcome-badge out-recovered">Recovered</span></td>
               <td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td>
             </tr>
             <tr class="accordion-detail">
-              <td colspan="8">
-                <div class="accordion-detail-grid">
-                  <div class="detail-item"><label>Patient Age</label><span>34 years old</span></div>
-                  <div class="detail-item"><label>Gender</label><span>Male</span></div>
-                  <div class="detail-item"><label>Bite Site</label><span>Left shoulder</span></div>
-                  <div class="detail-item"><label>PEP Received</label><span>Yes — 5/5 doses complete</span></div>
-                  <div class="detail-item"><label>Vaccine Used</label><span>Speeda</span></div>
-                  <div class="detail-item"><label>Date Cleared</label><span>September 8, 2025</span></div>
-                  <div class="detail-item"><label>Reporting Facility</label><span>Cabuyao City Health Center</span></div>
-                  <div class="detail-item"><label>Status</label><span style="color:#166534;font-weight:700;">Fully Recovered</span></div>
-                </div>
-              </td>
+              <td colspan="8"><div class="accordion-detail-grid">
+                <div class="detail-item"><label>Patient Age</label><span>34 years old</span></div>
+                <div class="detail-item"><label>Gender</label><span>Male</span></div>
+                <div class="detail-item"><label>Bite Site</label><span>Left shoulder</span></div>
+                <div class="detail-item"><label>PEP Received</label><span>Yes — 5/5 doses complete</span></div>
+                <div class="detail-item"><label>Vaccine Used</label><span>Speeda</span></div>
+                <div class="detail-item"><label>Date Cleared</label><span>September 8, 2025</span></div>
+                <div class="detail-item"><label>Reporting Facility</label><span>Cabuyao City Health Center</span></div>
+                <div class="detail-item"><label>Status</label><span style="color:#166534;font-weight:700;">Fully Recovered</span></div>
+              </div></td>
             </tr>
           </tbody>
         </table>
@@ -506,7 +391,6 @@
 
       <hr class="hub-divider">
 
-      <!-- ── MODULE 2.5: DATA VISUALIZATION DASHBOARD ── -->
       <div class="hub-section-title">
         <i class="fa-solid fa-chart-column" style="color:#e60000;font-size:18px;"></i>
         <h2>Data Visualization Dashboard</h2>
@@ -515,10 +399,7 @@
         Statistical analysis of rabies incidence by month, barangay, and demographic group. Updated monthly by the City Health Office.
       </p>
 
-      <!-- TOP VIZ ROW -->
       <div class="viz-grid">
-
-        <!-- MONTHLY TREND CHART (Chart.js) -->
         <div class="viz-card">
           <div class="viz-card-header">
             <div>
@@ -527,12 +408,9 @@
             </div>
             <span class="viz-period-tag">Jan – Jul 2026</span>
           </div>
-          <div class="viz-card-body">
-            <canvas id="monthlyChart" height="200"></canvas>
-          </div>
+          <div class="viz-card-body"><canvas id="monthlyChart" height="200"></canvas></div>
         </div>
 
-        <!-- BARANGAY RISK BARS -->
         <div class="viz-card">
           <div class="viz-card-header">
             <div>
@@ -543,65 +421,29 @@
           </div>
           <div class="viz-card-body">
             <div class="bgy-list">
-              <div class="bgy-row">
-                <div class="bgy-row-top"><span class="bgy-name">Mamatid</span><span class="bgy-count">32 cases</span></div>
-                <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-high" style="width:92%;"></div></div>
-              </div>
-              <div class="bgy-row">
-                <div class="bgy-row-top"><span class="bgy-name">Banlic</span><span class="bgy-count">26 cases</span></div>
-                <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-high" style="width:74%;"></div></div>
-              </div>
-              <div class="bgy-row">
-                <div class="bgy-row-top"><span class="bgy-name">Pulo</span><span class="bgy-count">19 cases</span></div>
-                <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-medium" style="width:54%;"></div></div>
-              </div>
-              <div class="bgy-row">
-                <div class="bgy-row-top"><span class="bgy-name">Sala</span><span class="bgy-count">16 cases</span></div>
-                <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-medium" style="width:46%;"></div></div>
-              </div>
-              <div class="bgy-row">
-                <div class="bgy-row-top"><span class="bgy-name">Marinig</span><span class="bgy-count">11 cases</span></div>
-                <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-low" style="width:32%;"></div></div>
-              </div>
-              <div class="bgy-row">
-                <div class="bgy-row-top"><span class="bgy-name">Niugan</span><span class="bgy-count">9 cases</span></div>
-                <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-low" style="width:26%;"></div></div>
-              </div>
-              <div class="bgy-row">
-                <div class="bgy-row-top"><span class="bgy-name">Butong</span><span class="bgy-count">7 cases</span></div>
-                <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-low" style="width:20%;"></div></div>
-              </div>
-              <div class="bgy-row">
-                <div class="bgy-row-top"><span class="bgy-name">Poblacion Uno</span><span class="bgy-count">7 cases</span></div>
-                <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-low" style="width:20%;"></div></div>
-              </div>
+              <div class="bgy-row"><div class="bgy-row-top"><span class="bgy-name">Mamatid</span><span class="bgy-count">32 cases</span></div><div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-high" style="width:92%;"></div></div></div>
+              <div class="bgy-row"><div class="bgy-row-top"><span class="bgy-name">Banlic</span><span class="bgy-count">26 cases</span></div><div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-high" style="width:74%;"></div></div></div>
+              <div class="bgy-row"><div class="bgy-row-top"><span class="bgy-name">Pulo</span><span class="bgy-count">19 cases</span></div><div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-medium" style="width:54%;"></div></div></div>
+              <div class="bgy-row"><div class="bgy-row-top"><span class="bgy-name">Sala</span><span class="bgy-count">16 cases</span></div><div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-medium" style="width:46%;"></div></div></div>
+              <div class="bgy-row"><div class="bgy-row-top"><span class="bgy-name">Marinig</span><span class="bgy-count">11 cases</span></div><div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-low" style="width:32%;"></div></div></div>
+              <div class="bgy-row"><div class="bgy-row-top"><span class="bgy-name">Niugan</span><span class="bgy-count">9 cases</span></div><div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-low" style="width:26%;"></div></div></div>
+              <div class="bgy-row"><div class="bgy-row-top"><span class="bgy-name">Butong</span><span class="bgy-count">7 cases</span></div><div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-low" style="width:20%;"></div></div></div>
+              <div class="bgy-row"><div class="bgy-row-top"><span class="bgy-name">Poblacion Uno</span><span class="bgy-count">7 cases</span></div><div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-low" style="width:20%;"></div></div></div>
             </div>
           </div>
         </div>
-
       </div>
 
-      <!-- BOTTOM VIZ ROW -->
       <div class="viz-bottom-row">
-
-        <!-- ANIMAL SOURCE DONUT -->
         <div class="viz-mini-card">
           <h4><i class="fa-solid fa-paw" style="color:#e60000;margin-right:6px;"></i>Exposure by Animal Source</h4>
           <div class="donut-wrap">
             <svg class="donut-svg" width="90" height="90" viewBox="0 0 36 36">
-              <!-- Dog 68% -->
               <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e2e8f0" stroke-width="3.8"/>
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e60000" stroke-width="3.8"
-                stroke-dasharray="42.7 57.3" stroke-dashoffset="25" />
-              <!-- Cat 20% -->
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#d98a00" stroke-width="3.8"
-                stroke-dasharray="12.6 87.4" stroke-dashoffset="-17.7" />
-              <!-- Bat 8% -->
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#00b140" stroke-width="3.8"
-                stroke-dasharray="5 95" stroke-dashoffset="-30.3" />
-              <!-- Others 4% -->
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#6b7280" stroke-width="3.8"
-                stroke-dasharray="2.5 97.5" stroke-dashoffset="-35.3" />
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e60000" stroke-width="3.8" stroke-dasharray="42.7 57.3" stroke-dashoffset="25" />
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#d98a00" stroke-width="3.8" stroke-dasharray="12.6 87.4" stroke-dashoffset="-17.7" />
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#00b140" stroke-width="3.8" stroke-dasharray="5 95" stroke-dashoffset="-30.3" />
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#6b7280" stroke-width="3.8" stroke-dasharray="2.5 97.5" stroke-dashoffset="-35.3" />
               <text x="18" y="19.5" text-anchor="middle" fill="#0f172a" font-size="5.5" font-weight="700">68%</text>
               <text x="18" y="24" text-anchor="middle" fill="#94a3b8" font-size="3.5">Dog</text>
             </svg>
@@ -614,7 +456,6 @@
           </div>
         </div>
 
-        <!-- MONTHLY TREND SPARKLINE -->
         <div class="viz-mini-card">
           <h4><i class="fa-solid fa-arrow-trend-up" style="color:#e60000;margin-right:6px;"></i>Case Trend (Jan–Jul 2026)</h4>
           <div class="trend-bars">
@@ -627,12 +468,9 @@
             <div class="trend-bar" style="height:53%;background:#d98a00;" title="Jul: 17"></div>
           </div>
           <div class="trend-labels">
-            <span class="trend-label">Jan</span>
-            <span class="trend-label">Feb</span>
-            <span class="trend-label">Mar</span>
-            <span class="trend-label">Apr</span>
-            <span class="trend-label">May</span>
-            <span class="trend-label">Jun</span>
+            <span class="trend-label">Jan</span><span class="trend-label">Feb</span>
+            <span class="trend-label">Mar</span><span class="trend-label">Apr</span>
+            <span class="trend-label">May</span><span class="trend-label">Jun</span>
             <span class="trend-label">Jul</span>
           </div>
           <p style="font-size:11px;color:#94a3b8;margin-top:8px;">
@@ -641,41 +479,17 @@
           </p>
         </div>
 
-        <!-- AGE GROUP BREAKDOWN -->
         <div class="viz-mini-card">
           <h4><i class="fa-solid fa-users" style="color:#e60000;margin-right:6px;"></i>Cases by Age Group (2026)</h4>
           <div class="age-list">
-            <div class="age-row">
-              <span class="age-label">0–9</span>
-              <div class="age-bar-wrap"><div class="age-bar-fill" style="width:30%;"></div></div>
-              <span class="age-count">18</span>
-            </div>
-            <div class="age-row">
-              <span class="age-label">10–19</span>
-              <div class="age-bar-wrap"><div class="age-bar-fill" style="width:40%;"></div></div>
-              <span class="age-count">24</span>
-            </div>
-            <div class="age-row">
-              <span class="age-label">20–39</span>
-              <div class="age-bar-wrap"><div class="age-bar-fill" style="width:55%;"></div></div>
-              <span class="age-count">33</span>
-            </div>
-            <div class="age-row">
-              <span class="age-label">40–59</span>
-              <div class="age-bar-wrap"><div class="age-bar-fill" style="width:45%;"></div></div>
-              <span class="age-count">27</span>
-            </div>
-            <div class="age-row">
-              <span class="age-label">60+</span>
-              <div class="age-bar-wrap"><div class="age-bar-fill" style="width:22%;"></div></div>
-              <span class="age-count">13</span>
-            </div>
+            <div class="age-row"><span class="age-label">0–9</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:30%;"></div></div><span class="age-count">18</span></div>
+            <div class="age-row"><span class="age-label">10–19</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:40%;"></div></div><span class="age-count">24</span></div>
+            <div class="age-row"><span class="age-label">20–39</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:55%;"></div></div><span class="age-count">33</span></div>
+            <div class="age-row"><span class="age-label">40–59</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:45%;"></div></div><span class="age-count">27</span></div>
+            <div class="age-row"><span class="age-label">60+</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:22%;"></div></div><span class="age-count">13</span></div>
           </div>
-          <p style="font-size:11px;color:#94a3b8;margin-top:10px;">
-            Adults 20–39 represent the highest exposure group (26%)
-          </p>
+          <p style="font-size:11px;color:#94a3b8;margin-top:10px;">Adults 20–39 represent the highest exposure group (26%)</p>
         </div>
-
       </div>
 
     </section>
@@ -698,32 +512,14 @@
       </div>
 
       <div class="steps-flow">
-        <div class="flow-step">
-          <div class="flow-num">1</div>
-          <h4>Find a Clinic</h4>
-          <p>Browse available clinics with real-time vaccine stock below</p>
-        </div>
-        <div class="flow-step">
-          <div class="flow-num">2</div>
-          <h4>Book Appointment</h4>
-          <p>Select your preferred date, time, and dose schedule</p>
-        </div>
-        <div class="flow-step">
-          <div class="flow-num">3</div>
-          <h4>Visit the Clinic</h4>
-          <p>Arrive on time. Bring valid ID and your booking confirmation</p>
-        </div>
-        <div class="flow-step">
-          <div class="flow-num">4</div>
-          <h4>Get Vaccinated</h4>
-          <p>Staff records your dose — your dashboard progress tracker activates automatically</p>
-        </div>
+        <div class="flow-step"><div class="flow-num">1</div><h4>Find a Clinic</h4><p>Browse available clinics with real-time vaccine stock below</p></div>
+        <div class="flow-step"><div class="flow-num">2</div><h4>Book Appointment</h4><p>Select your preferred date, time, and dose schedule</p></div>
+        <div class="flow-step"><div class="flow-num">3</div><h4>Visit the Clinic</h4><p>Arrive on time. Bring valid ID and your booking confirmation</p></div>
+        <div class="flow-step"><div class="flow-num">4</div><h4>Get Vaccinated</h4><p>Staff records your dose — your dashboard progress tracker activates automatically</p></div>
       </div>
 
       <div class="section-card">
-        <div class="section-card-header">
-          <h3>Select a Clinic to Book</h3>
-        </div>
+        <div class="section-card-header"><h3>Select a Clinic to Book</h3></div>
         <div class="clinic-list">
           <div class="clinic-row">
             <div class="clinic-row-icon" style="background:#dcfce7;"><i class="fa-solid fa-hospital" style="color:#16a34a;"></i></div>
@@ -828,7 +624,7 @@
   </div>
   <!-- END APPOINTMENTS PANEL -->
 
-  <!-- ==================== RECORDS TAB (active patient only) ==================== -->
+  <!-- ==================== RECORDS TAB ==================== -->
   <div class="tab-panel" id="panel-records">
 
     <div class="records-hero">
@@ -849,42 +645,27 @@
     <div class="dose-record-list">
       <div class="dose-record">
         <div class="dose-circle done-circle"><i class="fa-solid fa-check"></i></div>
-        <div class="dose-record-info">
-          <h4>Dose 1 — Day 0</h4>
-          <p><span id="d1date">June 25, 2026</span> &nbsp;|&nbsp; Cabuyao City Health Center &nbsp;|&nbsp; Dr. Santos</p>
-        </div>
+        <div class="dose-record-info"><h4>Dose 1 — Day 0</h4><p><span id="d1date">June 25, 2026</span> &nbsp;|&nbsp; Cabuyao City Health Center &nbsp;|&nbsp; Dr. Santos</p></div>
         <div class="dose-record-status"><span class="r-done">Completed</span></div>
       </div>
       <div class="dose-record">
         <div class="dose-circle next-circle"><i class="fa-regular fa-calendar"></i></div>
-        <div class="dose-record-info">
-          <h4>Dose 2 — Day 3</h4>
-          <p>Scheduled: June 29, 2026 at 9:00 AM &nbsp;|&nbsp; Cabuyao City Health Center</p>
-        </div>
+        <div class="dose-record-info"><h4>Dose 2 — Day 3</h4><p>Scheduled: June 29, 2026 at 9:00 AM &nbsp;|&nbsp; Cabuyao City Health Center</p></div>
         <div class="dose-record-status"><span class="r-next">Upcoming</span></div>
       </div>
       <div class="dose-record">
         <div class="dose-circle pending-circle">3</div>
-        <div class="dose-record-info">
-          <h4>Dose 3 — Day 7</h4>
-          <p>Scheduled: July 3, 2026 at 9:00 AM &nbsp;|&nbsp; Cabuyao City Health Center</p>
-        </div>
+        <div class="dose-record-info"><h4>Dose 3 — Day 7</h4><p>Scheduled: July 3, 2026 at 9:00 AM &nbsp;|&nbsp; Cabuyao City Health Center</p></div>
         <div class="dose-record-status"><span class="r-pending">Pending</span></div>
       </div>
       <div class="dose-record">
         <div class="dose-circle pending-circle">4</div>
-        <div class="dose-record-info">
-          <h4>Dose 4 — Day 14</h4>
-          <p>Scheduled: July 10, 2026 at 10:00 AM &nbsp;|&nbsp; Cabuyao City Health Center</p>
-        </div>
+        <div class="dose-record-info"><h4>Dose 4 — Day 14</h4><p>Scheduled: July 10, 2026 at 10:00 AM &nbsp;|&nbsp; Cabuyao City Health Center</p></div>
         <div class="dose-record-status"><span class="r-pending">Pending</span></div>
       </div>
       <div class="dose-record">
         <div class="dose-circle pending-circle">5</div>
-        <div class="dose-record-info">
-          <h4>Dose 5 — Day 28</h4>
-          <p>Scheduled: July 24, 2026 at 9:00 AM &nbsp;|&nbsp; Cabuyao City Health Center</p>
-        </div>
+        <div class="dose-record-info"><h4>Dose 5 — Day 28</h4><p>Scheduled: July 24, 2026 at 9:00 AM &nbsp;|&nbsp; Cabuyao City Health Center</p></div>
         <div class="dose-record-status"><span class="r-pending">Pending</span></div>
       </div>
     </div>
@@ -954,408 +735,9 @@
     </div>
   </div>
 
-  <script>
-    function getVacStatus() {
-      try { return JSON.parse(localStorage.getItem('resident_vaccination_status') || '{}'); }
-      catch (e) { return {}; }
-    }
-
-    const vacStatus = getVacStatus();
-    const hasRecord = vacStatus.hasRecord === true;
-    const dosesCompleted = vacStatus.dosesCompleted || 1;
-
-    function initView() {
-      updateDemoBanner();
-
-      if (hasRecord) {
-        document.getElementById('view-new').style.display = 'none';
-        document.getElementById('view-active').style.display = 'block';
-        document.getElementById('nav-records').style.display = 'flex';
-        document.getElementById('appt-new-resident').style.display = 'none';
-        document.getElementById('appt-active-patient').style.display = 'block';
-        document.getElementById('notifDot').style.display = 'block';
-        document.getElementById('notifBadge').style.display = 'inline';
-        populateActivePatientData(vacStatus);
-      } else {
-        document.getElementById('view-new').style.display = 'block';
-        document.getElementById('view-active').style.display = 'none';
-        document.getElementById('nav-records').style.display = 'none';
-        document.getElementById('panel-records').style.display = 'none';
-        document.getElementById('appt-new-resident').style.display = 'block';
-        document.getElementById('appt-active-patient').style.display = 'none';
-        setTimeout(renderCasesChart, 150);
-      }
-    }
-
-    function updateDemoBanner() {
-      const dot = document.getElementById('demoDot');
-      const label = document.getElementById('demoStateLabel');
-      if (hasRecord) {
-        dot.className = 'demo-dot active';
-        label.textContent = 'Active Patient State — Vaccination record exists (triggered by clinic staff)';
-      } else {
-        dot.className = 'demo-dot new';
-        label.textContent = 'New Resident State — No vaccination history';
-      }
-    }
-
-    function populateActivePatientData(data) {
-      const doses = data.dosesCompleted || 1;
-      const total = 5;
-      const pct = Math.round((doses / total) * 100);
-      if (document.getElementById('activeDosesCount')) document.getElementById('activeDosesCount').textContent = doses;
-      if (document.getElementById('progressLabel')) document.getElementById('progressLabel').textContent = `Treatment Progress — ${doses} of ${total} doses`;
-      if (document.getElementById('progressBar')) document.getElementById('progressBar').style.width = pct + '%';
-      if (document.getElementById('progressPct')) document.getElementById('progressPct').textContent = pct + '% Complete';
-      if (document.getElementById('recordPct')) document.getElementById('recordPct').textContent = pct + '%';
-      if (document.getElementById('recordDoses')) document.getElementById('recordDoses').textContent = `${doses} / ${total} doses`;
-      for (let i = 1; i <= 5; i++) {
-        const pip = document.getElementById('pip' + i);
-        if (!pip) continue;
-        if (i <= doses) pip.className = 'dose-pip done';
-        else if (i === doses + 1) pip.className = 'dose-pip current';
-        else pip.className = 'dose-pip';
-      }
-      if (data.patientName && document.getElementById('recordName')) document.getElementById('recordName').textContent = data.patientName;
-      if (data.startDate && document.getElementById('recordStart')) document.getElementById('recordStart').textContent = data.startDate;
-      if (data.vaccine && document.getElementById('recordVaccine')) document.getElementById('recordVaccine').textContent = data.vaccine;
-      if (data.biteAnimal && document.getElementById('recordAnimal')) document.getElementById('recordAnimal').textContent = data.biteAnimal;
-      if (data.biteSite && document.getElementById('recordBiteSite')) document.getElementById('recordBiteSite').textContent = data.biteSite;
-      if (data.category && document.getElementById('recordCategory')) document.getElementById('recordCategory').textContent = data.category;
-      if (data.nextDoseDate) {
-        if (document.getElementById('activeNextAppt')) document.getElementById('activeNextAppt').textContent = data.nextDoseDate.replace('2026', '').trim().replace(',','').split(' ').slice(0,2).join(' ');
-        if (document.getElementById('nextDoseLabel')) document.getElementById('nextDoseLabel').innerHTML = `<i class="fa-regular fa-calendar"></i> Next: Dose ${doses + 1} on ${data.nextDoseDate}`;
-      }
-    }
-
-    function renderCasesChart() {
-      const ctx = document.getElementById('monthlyChart');
-      if (!ctx || !window.Chart) return;
-      new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
-          datasets: [
-            { label: 'Rabies Cases', data: [12, 18, 15, 22, 19, 24, 17], backgroundColor: 'rgba(239,0,0,0.75)', borderRadius: 4, borderSkipped: false },
-            { label: 'Vaccinations', data: [45, 62, 55, 80, 72, 95, 53], backgroundColor: 'rgba(52,211,153,0.75)', borderRadius: 4, borderSkipped: false }
-          ]
-        },
-        options: {
-          responsive: true,
-          plugins: { legend: { position: 'top', labels: { font: { size: 11 }, padding: 10 } } },
-          scales: {
-            y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { font: { size: 11 } } },
-            x: { grid: { display: false }, ticks: { font: { size: 11 } } }
-          }
-        }
-      });
-    }
-
-    function showTab(tab, el) {
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-      const panel = document.getElementById('panel-' + tab);
-      if (panel) panel.classList.add('active');
-      if (el) el.classList.add('active');
-    }
-
-    function openBookingModal(clinic) {
-      const sel = document.getElementById('modalClinic');
-      if (clinic && sel) {
-        for (let o of sel.options) {
-          if (o.text.startsWith(clinic)) { sel.value = o.value; break; }
-        }
-      }
-      document.getElementById('bookingModal').classList.add('open');
-    }
-    function closeBookingModal() {
-      document.getElementById('bookingModal').classList.remove('open');
-    }
-    function confirmBooking() {
-      closeBookingModal();
-      alert('Appointment booked successfully! (Demo mode)\n\nYou will receive a confirmation notification once the clinic confirms your schedule.');
-    }
-
-    function filterMap(btn) {
-      document.querySelectorAll('.map-filter button').forEach(b => b.classList.remove('active-btn'));
-      btn.classList.add('active-btn');
-    }
-    function handleUpload(input) {
-      if (input.files.length) alert('File "' + input.files[0].name + '" selected for upload. (Demo mode)');
-    }
-    function resetDemoState() {
-      localStorage.removeItem('resident_vaccination_status');
-      location.reload();
-    }
-
-    document.getElementById('bookingModal').addEventListener('click', function(e) {
-      if (e.target === this) closeBookingModal();
-    });
-
-    window.addEventListener('storage', function(e) {
-      if (e.key === 'resident_vaccination_status') location.reload();
-    });
-
-    function renderResVizChart() {
-      const ctx = document.getElementById('resVizChart');
-      if (!ctx || !window.Chart) return;
-      new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul'],
-          datasets: [
-            { label:'Rabies Cases', data:[12,18,15,22,19,24,17], backgroundColor:'rgba(239,0,0,0.75)', borderRadius:4 },
-            { label:'Vaccinations', data:[45,62,55,80,72,95,53], backgroundColor:'rgba(52,211,153,0.75)', borderRadius:4 }
-          ]
-        },
-        options: {
-          responsive:true,
-          plugins:{ legend:{ position:'top', labels:{ font:{size:11}, padding:10 } } },
-          scales:{
-            y:{ beginAtZero:true, grid:{color:'#f3f4f6'}, ticks:{font:{size:11}} },
-            x:{ grid:{display:false}, ticks:{font:{size:11}} }
-          }
-        }
-      });
-    }
-    function toggleResRow(row) {
-      const next = row.nextElementSibling;
-      const icon = row.querySelector('.fa-chevron-down, .fa-chevron-up');
-      const isOpen = next.style.display === 'table-row';
-      document.querySelectorAll('.res-accordion-detail').forEach(d => d.style.display = 'none');
-      document.querySelectorAll('.res-accordion-row i.fa-chevron-up').forEach(i => {
-        i.className = i.className.replace('fa-chevron-up','fa-chevron-down');
-      });
-      if (!isOpen) {
-        next.style.display = 'table-row';
-        if (icon) icon.className = icon.className.replace('fa-chevron-down','fa-chevron-up');
-      }
-    }
-    let resCurrentFilter = 'all';
-    function resSetFilter(filter, btn) {
-      resCurrentFilter = filter;
-      document.querySelectorAll('.res-filter-btn').forEach(b => b.classList.remove('active-filter'));
-      btn.classList.add('active-filter');
-      resApplyFilter();
-    }
-    function resFilterRecords(q) { resApplyFilter(q.toLowerCase().trim()); }
-    function resApplyFilter(q = '') {
-      const rows = document.querySelectorAll('#resTbody .res-accordion-row');
-      let shown = 0;
-      rows.forEach(row => {
-        const outcome = row.dataset.outcome || '';
-        const text = row.textContent.toLowerCase();
-        const matchFilter = resCurrentFilter === 'all' || outcome === resCurrentFilter;
-        const matchSearch = !q || text.includes(q);
-        const show = matchFilter && matchSearch;
-        row.style.display = show ? '' : 'none';
-        const detail = row.nextElementSibling;
-        if (detail && detail.classList.contains('res-accordion-detail')) {
-          if (!show) detail.style.display = 'none';
-        }
-        if (show) shown++;
-      });
-      document.getElementById('resRecordsCount').textContent = 'Showing ' + shown + ' of 5 records';
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-      initView();
-      if (location.hash === '#panel-appointments') {
-        const apptTab = document.querySelectorAll('.nav-tab')[1];
-        if (apptTab) showTab('appointments', apptTab);
-      }
-      renderCasesChart();
-      setTimeout(renderResVizChart, 300);
-    });
-  </script>
-</script>
-
-<!-- Google Maps script: clinic data, map initialization and sidebar builder -->
-<script>
-const CLINICS = [
-  { name: 'Cabuyao City Health Center', lat: 14.2718, lng: 121.1246, status: 'available', address: 'Brgy. Poblacion Uno, Cabuyao City, Laguna', hours: '8:00 AM – 5:00 PM', phone: '(049) 531-2345', stock: 'Verorab: 45 · Rabipur: 30 · Speeda: 12' },
-  { name: "St. Mary's Medical Clinic", lat: 14.2655, lng: 121.1189, status: 'low', address: 'Brgy. Mamatid, Cabuyao City, Laguna', hours: '24/7', phone: '(049) 531-5678', stock: 'Verorab: 5 · Rabipur: 3 · Speeda: 0' },
-  { name: 'South City Animal Bite Center', lat: 14.2592, lng: 121.1310, status: 'out', address: 'Brgy. Banlic, Cabuyao City, Laguna', hours: '7:00 AM – 10:00 PM', phone: '(049) 555-8877', stock: 'No vaccines in stock' },
-  { name: 'Pulo Barangay Health Station', lat: 14.2780, lng: 121.1350, status: 'available', address: 'Brgy. Pulo, Cabuyao City, Laguna', hours: '8:00 AM – 5:00 PM', phone: '(049) 531-9901', stock: 'Verorab: 20 · Rabipur: 18' },
-  { name: 'Marinig Health Center', lat: 14.2840, lng: 121.1200, status: 'low', address: 'Brgy. Marinig, Cabuyao City, Laguna', hours: '8:00 AM – 5:00 PM', phone: '(049) 531-7712', stock: 'Verorab: 4 · Rabipur: 2' }
-];
-
-const STATUS_COLOR = { available: '#00b140', low: '#d98a00', out: '#e60000' };
-const STATUS_LABEL = { available: 'Available', low: 'Low Stock', out: 'Out of Stock' };
-
-let map; let markers = []; let activeFilter = 'all';
-
-function initMap() {
-  const CABUYAO_CENTER = { lat: 14.2718, lng: 121.1246 };
-  map = new google.maps.Map(document.getElementById('googleMap'), {
-    center: CABUYAO_CENTER, zoom: 14,
-    styles: [
-      { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-      { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-      { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
-      { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#dff1f7' }] },
-      { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#f9f9f9' }] }
-    ], mapTypeControl: false, streetViewControl: false, fullscreenControl: false, mapTypeId: 'roadmap'
-  });
-  CLINICS.forEach((clinic, index) => plotClinic(clinic, index));
-  buildSidebar();
-}
-
-function plotClinic(clinic, index) {
-  const color = STATUS_COLOR[clinic.status];
-  const svgMarker = { path: google.maps.SymbolPath.CIRCLE, fillColor: color, fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 2.5, scale: 12 };
-  const marker = new google.maps.Marker({ position: { lat: clinic.lat, lng: clinic.lng }, map, title: clinic.name, icon: svgMarker, zIndex: clinic.status === 'available' ? 10 : clinic.status === 'low' ? 5 : 1 });
-  const badgeBg = clinic.status === 'available' ? '#eefcf3' : clinic.status === 'low' ? '#fffbe9' : '#fff1f1';
-  const badgeColor = color;
-  const infoContent = `
-    <div style="font-family:Arial,sans-serif;padding:4px;min-width:220px;">
-      <div style="font-weight:bold;font-size:14px;color:#111827;margin-bottom:6px;">${clinic.name}</div>
-      <span style="background:${badgeBg};color:${badgeColor};padding:3px 10px;border-radius:20px;font-size:11px;font-weight:bold;display:inline-block;margin-bottom:10px;">${STATUS_LABEL[clinic.status]}</span>
-      <div style="font-size:12px;color:#374151;line-height:1.8;">
-        <div><b>Address:</b> ${clinic.address}</div>
-        <div><b>Hours:</b> ${clinic.hours}</div>
-        <div><b>Phone:</b> ${clinic.phone}</div>
-        <div style="margin-top:6px;padding:8px;background:#f9fafb;border-radius:8px;"><b>Stock:</b> ${clinic.stock}</div>
-      </div>
-      <div style="font-size:11px;color:#9ca3af;margin-top:8px;">© Google Maps</div>
-    </div>
-  `;
-  const infoWindow = new google.maps.InfoWindow({ content: infoContent });
-  marker.addListener('click', () => { infoWindow.open(map, marker); map.panTo(marker.getPosition()); });
-  return { marker, infoWindow, clinic };
-}
-
-// ── Multi-map support: initialize maps for both active and new views
-const mapsData = []; // { mapId, sidebarId, map, markers: [ {marker, infoWindow, clinic} ] }
-
-function initMap() {
-  const containers = [
-    { mapId: 'googleMap', sidebarId: 'clinicSidebar' },
-    { mapId: 'googleMapNew', sidebarId: 'clinicSidebarNew' }
-  ];
-  containers.forEach(c => {
-    if (document.getElementById(c.mapId)) createMap(c.mapId, c.sidebarId);
-  });
-}
-
-function createMap(mapId, sidebarId) {
-  const CABUYAO_CENTER = { lat: 14.2718, lng: 121.1246 };
-  const map = new google.maps.Map(document.getElementById(mapId), {
-    center: CABUYAO_CENTER,
-    zoom: 14,
-    styles: [
-      { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-      { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-      { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
-      { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#dff1f7' }] },
-      { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#f9f9f9' }] }
-    ],
-    mapTypeControl: false,
-    streetViewControl: false,
-    fullscreenControl: false,
-    mapTypeId: 'roadmap'
-  });
-
-  const entry = { mapId, sidebarId, map, markers: [] };
-  CLINICS.forEach(clinic => {
-    const m = createMarkerForMap(map, clinic);
-    entry.markers.push(m);
-  });
-  mapsData.push(entry);
-  buildSidebarFor(entry);
-}
-
-function createMarkerForMap(map, clinic) {
-  const color = STATUS_COLOR[clinic.status];
-  const svgMarker = { path: google.maps.SymbolPath.CIRCLE, fillColor: color, fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 2.5, scale: 12 };
-  const marker = new google.maps.Marker({ position: { lat: clinic.lat, lng: clinic.lng }, map, title: clinic.name, icon: svgMarker, zIndex: clinic.status === 'available' ? 10 : clinic.status === 'low' ? 5 : 1 });
-  const badgeBg = clinic.status === 'available' ? '#eefcf3' : clinic.status === 'low' ? '#fffbe9' : '#fff1f1';
-  const badgeColor = color;
-  const infoContent = `
-    <div style="font-family:Arial,sans-serif;padding:4px;min-width:220px;">
-      <div style="font-weight:bold;font-size:14px;color:#111827;margin-bottom:6px;">${clinic.name}</div>
-      <span style="background:${badgeBg};color:${badgeColor};padding:3px 10px;border-radius:20px;font-size:11px;font-weight:bold;display:inline-block;margin-bottom:10px;">${STATUS_LABEL[clinic.status]}</span>
-      <div style="font-size:12px;color:#374151;line-height:1.8;">
-        <div><b>Address:</b> ${clinic.address}</div>
-        <div><b>Hours:</b> ${clinic.hours}</div>
-        <div><b>Phone:</b> ${clinic.phone}</div>
-        <div style="margin-top:6px;padding:8px;background:#f9fafb;border-radius:8px;"><b>Stock:</b> ${clinic.stock}</div>
-      </div>
-      <div style="font-size:11px;color:#9ca3af;margin-top:8px;">© Google Maps</div>
-    </div>
-  `;
-  const infoWindow = new google.maps.InfoWindow({ content: infoContent });
-  marker.addListener('click', () => {
-    // close all info windows across all maps
-    mapsData.forEach(d => d.markers.forEach(mm => mm.infoWindow.close()));
-    infoWindow.open(map, marker);
-    map.panTo(marker.getPosition());
-  });
-  return { marker, infoWindow, clinic };
-}
-
-function buildSidebarFor(entry) {
-  const sidebar = document.getElementById(entry.sidebarId);
-  if (!sidebar) return;
-  sidebar.innerHTML = '';
-  entry.markers.forEach((mobj, index) => {
-    const color = STATUS_COLOR[mobj.clinic.status];
-    const row = document.createElement('div');
-    const rowId = `${entry.sidebarId}-row-${index}`;
-    row.id = rowId;
-    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;background:white;border:1px solid #ddd;border-radius:12px;padding:12px 16px;cursor:pointer;transition:border-color 0.2s;gap:12px;';
-
-    // Left: clinic name + small details. Right: status dot + Book / Out of Stock button
-    const leftHtml = `
-      <div style="display:flex;flex-direction:column;gap:4px;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="font-size:13px;font-weight:bold;color:#111827;">${mobj.clinic.name}</span>
-        </div>
-        <div style="font-size:12px;color:#6b7280;">${mobj.clinic.address} &nbsp;|&nbsp; ${mobj.clinic.hours}</div>
-      </div>
-    `;
-
-    const statusDot = `<span style="width:10px;height:10px;background:${color};border-radius:50%;display:inline-block;margin-right:8px;"></span>`;
-
-    const rightHtml = mobj.clinic.status === 'out'
-      ? `<div style=\"display:flex;align-items:center;gap:10px;\"><span style=\"font-size:12px;color:${color};font-weight:bold;\">Out of Stock</span><button class=\"book-btn\" disabled style=\"background:#d1d5db;border:none;color:#6b7280;cursor:not-allowed;\">Out of Stock</button></div>`
-      : `<div style=\"display:flex;align-items:center;gap:10px;\"><span style=\"font-size:12px;color:${color};font-weight:bold;\">${STATUS_LABEL[mobj.clinic.status]}</span><button class=\"book-btn\" onclick=\"openBookingModal('${mobj.clinic.name.replace(/'/g, "\\'")}')\" style=\"background:#ef0000;color:white;\">Book</button></div>`;
-
-    row.innerHTML = `<div style=\"display:flex;align-items:center;gap:12px;flex:1;\">${leftHtml}</div><div style=\"display:flex;align-items:center;gap:12px;\">${rightHtml}</div>`;
-
-    row.addEventListener('click', (e) => {
-      // If user clicked the Book button, don't trigger row focus behavior
-      if (e.target && (e.target.tagName === 'BUTTON' || e.target.closest('button'))) return;
-      mapsData.forEach(d => d.markers.forEach(mm => mm.infoWindow.close()));
-      mobj.infoWindow.open(entry.map, mobj.marker);
-      entry.map.panTo(mobj.marker.getPosition());
-      entry.map.setZoom(16);
-      document.querySelectorAll(`#${entry.sidebarId} > div`).forEach(r => { r.style.borderColor = '#ddd'; r.style.background = 'white'; });
-      row.style.borderColor = color; row.style.background = color === '#00b140' ? '#eefcf3' : color === '#d98a00' ? '#fffbe9' : '#fff1f1';
-    });
-
-    sidebar.appendChild(row);
-  });
-}
-
-function filterMarkers(filter, btn) {
-  activeFilter = filter;
-  document.querySelectorAll('.map-filter button').forEach(b => { b.classList.remove('active-btn'); b.style.fontWeight = ''; });
-  if (btn) btn.classList.add('active-btn');
-  mapsData.forEach(entry => {
-    entry.markers.forEach((mobj, i) => {
-      const show = filter === 'all' || mobj.clinic.status === filter;
-      mobj.marker.setVisible(show);
-      mobj.infoWindow.close();
-      const row = document.getElementById(`${entry.sidebarId}-row-${i}`);
-      if (row) row.style.display = show ? 'flex' : 'none';
-    });
-  });
-}
-</script>
-
-<!-- Load Google Maps API (replace YOUR_API_KEY) -->
-<script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap&loading=async" defer></script>
+  <script type="module" src="scripts/residents.js"></script>
+  <script src="scripts/residents-map.js"></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap&loading=async" defer></script>
 
 </body>
 </html>

@@ -54,46 +54,6 @@
             outline: none;
             border-color: #ef0000;
         }
-        .role-select-group {
-            margin-bottom: 20px;
-        }
-        .role-select-group label {
-            font-size: 13px;
-            font-weight: 600;
-            color: #374151;
-            display: block;
-            margin-bottom: 10px;
-        }
-        .role-options {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-        }
-        .role-option {
-            border: 2px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 12px 8px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .role-option:hover { border-color: #ef0000; }
-        .role-option.selected {
-            border-color: #ef0000;
-            background: #fff5f5;
-        }
-        .role-option i {
-            font-size: 20px;
-            color: #6b7280;
-            margin-bottom: 6px;
-            display: block;
-        }
-        .role-option.selected i { color: #ef0000; }
-        .role-option span {
-            font-size: 12px;
-            font-weight: 600;
-            color: #374151;
-        }
         .register-btn {
             width: 100%;
             padding: 12px;
@@ -161,7 +121,6 @@
         }
         @media (max-width: 600px) {
             .form-row { grid-template-columns: 1fr; }
-            .role-options { grid-template-columns: 1fr; }
             .register-card { padding: 24px 16px; }
         }
     </style>
@@ -194,45 +153,31 @@
             <h2>Register</h2>
             <p class="subtitle">Fill in your details to create an account</p>
 
-            <div class="role-select-group">
-                <label>Select Your Role</label>
-                <div class="role-options">
-                    <div class="role-option selected" data-role="resident" onclick="selectRole(this)">
-                        <i class="fa-solid fa-user"></i>
-                        <span>Resident</span>
-                    </div>
-                    <div class="role-option" data-role="staff" onclick="selectRole(this)">
-                        <i class="fa-solid fa-hospital"></i>
-                        <span>Clinic Staff</span>
-                    </div>
-                </div>
-            </div>
-
-            <form onsubmit="handleRegister(event)">
+            <form id="registerForm">
                 <div class="form-row">
                     <div class="form-group">
                         <label>First Name</label>
-                        <input type="text" placeholder="Juan" required />
+                        <input type="text" id="firstName" placeholder="Juan" required />
                     </div>
                     <div class="form-group">
                         <label>Last Name</label>
-                        <input type="text" placeholder="Dela Cruz" required />
+                        <input type="text" id="lastName" placeholder="Dela Cruz" required />
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label>Email Address</label>
-                    <input type="email" placeholder="you@example.com" required />
+                    <input type="email" id="emailInput" placeholder="you@example.com" required />
                 </div>
 
                 <div class="form-group">
                     <label>Contact Number</label>
-                    <input type="tel" placeholder="09XX-XXX-XXXX" />
+                    <input type="tel" id="phoneInput" placeholder="09XX-XXX-XXXX" />
                 </div>
 
                 <div class="form-group" id="barangayGroup">
                     <label>Barangay</label>
-                    <select>
+                    <select id="barangaySelect">
                         <option value="">Select your barangay</option>
                         <option>Baclaran</option>
                         <option>Banlic</option>
@@ -253,11 +198,6 @@
                         <option>San Isidro</option>
                         <option>Sucol</option>
                     </select>
-                </div>
-
-                <div class="form-group" id="clinicGroup" style="display:none;">
-                    <label>Clinic / Health Center Name</label>
-                    <input type="text" placeholder="e.g. Cabuyao City Health Center" />
                 </div>
 
                 <div class="form-row">
@@ -304,36 +244,11 @@
         </footer>
     </main>
 
+    <script type="module" src="scripts/register.js"></script>
     <script>
-        let currentRole = 'resident';
-
-        function selectRole(el) {
-            document.querySelectorAll('.role-option').forEach(o => o.classList.remove('selected'));
-            el.classList.add('selected');
-            currentRole = el.dataset.role;
-
-            const barangayGroup = document.getElementById('barangayGroup');
-            const clinicGroup = document.getElementById('clinicGroup');
-
-            if (currentRole === 'staff') {
-                barangayGroup.style.display = 'none';
-                clinicGroup.style.display = 'flex';
-            } else {
-                barangayGroup.style.display = 'flex';
-                clinicGroup.style.display = 'none';
-            }
-        }
-
         function togglePw(id) {
             const input = document.getElementById(id);
             input.type = input.type === 'password' ? 'text' : 'password';
-        }
-
-        function handleRegister(e) {
-            e.preventDefault();
-            const pages = { resident: 'residents.html', staff: 'staff.html' };
-            alert('Account created successfully! (Demo mode)');
-            window.location.href = pages[currentRole];
         }
     </script>
 </body>

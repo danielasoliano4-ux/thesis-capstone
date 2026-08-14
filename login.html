@@ -186,6 +186,7 @@
     </main>
 
     <script>
+    document.addEventListener('DOMContentLoaded', function() {
         const roles = {
             resident: {
                 label: 'Resident',
@@ -246,6 +247,7 @@
             emailInput.value = roleData.email;
             passwordInput.value = roleData.password;
             currentRole = role;
+            window.currentRole = role;
 
             roleBoxes.forEach(box => {
                 const icon = box.querySelector('.role-icon');
@@ -261,12 +263,14 @@
             box.addEventListener('click', () => updateFeatures(box.dataset.role));
         });
 
-        loginBtn.addEventListener('click', () => {
-            window.location.href = roles[currentRole].page;
-        });
+        // login button click is handled by scripts/login.js via Firebase Auth
+        window.currentRole = 'resident';
 
         updateFeatures('resident');
+    }); // end DOMContentLoaded
     </script>
+
+    <script type="module" src="scripts/login.js"></script>
 
 </body>
 </html>

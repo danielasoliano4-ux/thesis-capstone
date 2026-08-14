@@ -37,12 +37,10 @@
             Clinic Dashboard
         </a>
 
-        <a href="index.html" style="text-decoration: none;">
-            <button class="signout-btn">
+        <button class="signout-btn">
             <i class="fa-solid fa-arrow-right-from-bracket"></i>
             Sign Out
         </button>
-        </a>
 
         </div>
 
@@ -268,6 +266,17 @@
         </section>
 
     </main>
+
+    <script type="module">
+      import { auth } from './firebase-config.js';
+      import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+      onAuthStateChanged(auth, (user) => {
+        if (!user) window.location.href = 'login.html';
+      });
+      document.querySelector('.signout-btn').addEventListener('click', () => {
+        signOut(auth).then(() => window.location.href = 'login.html');
+      });
+    </script>
 
 </body>
 </html>
