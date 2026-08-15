@@ -267,16 +267,16 @@
 
     </main>
 
-    <script type="module">
-      import { auth } from './firebase-config.js';
-      import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-      onAuthStateChanged(auth, (user) => {
-        if (!user) window.location.href = 'login.html';
-      });
-      document.querySelector('.signout-btn').addEventListener('click', () => {
-        signOut(auth).then(() => window.location.href = 'login.html');
-      });
-    </script>
+        <script type="module">
+            import { auth } from './scripts/firebase.js';
+            import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+            onAuthStateChanged(auth, (user) => {
+                if (!user) window.location.href = 'login.html';
+            });
+            document.querySelector('.signout-btn').addEventListener('click', () => {
+                signOut(auth).then(() => window.location.href = 'login.html');
+            });
+        </script>
 
 </body>
 </html>

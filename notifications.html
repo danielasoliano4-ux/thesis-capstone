@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
     <link rel="stylesheet" href="resident.css">
     <link rel="stylesheet" href="notifications.css">
-      <script src="scripts/notifications.js"></script>
 </head>
 <body>
 
@@ -22,27 +21,15 @@
             </div>
         </div>
         <div class="header-right">
-            <h3>John Cruz</h3>
-            <a href="notifications.html" style="color:#374151;font-size:20px;position:relative;">
+            <h3 id="headerName">Guest</h3>
+            <a href="notifications.html" style="color:#374151;font-size:20px;position:relative;" id="notifBell">
                 <i class="fa-regular fa-bell"></i>
             </a>
-            <a href="index.html" style="text-decoration:none;">
-                <button class="signout-btn">
-                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
-                </button>
-            </a>
+            <button class="signout-btn" id="signOutBtn" style="display:none;">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
+            </button>
         </div>
     </header>
-
-    <!-- DEMO BANNER -->
-    <div class="demo-banner">
-        <div class="demo-state">
-            <span class="demo-dot new"></span>
-            <span>New Resident State — No vaccination history</span>
-            <span style="opacity:0.5;margin-left:8px;">| Demo Mode — conditional logic based on staff vaccination update</span>
-        </div>
-        <button class="demo-reset-btn" onclick="/* reset */">Reset to New Resident</button>
-    </div>
 
     <!-- NAV TABS -->
     <nav class="nav-tabs-bar" id="navTabs" style="margin-bottom:18px;">
@@ -61,16 +48,16 @@
                 <h1><i class="fa-regular fa-bell" style="color:#ef0000;margin-right:10px;"></i>Notifications</h1>
                 <p style="font-size:13px;color:#6b7280;margin-top:4px;">You have <strong id="unreadCount">4</strong> unread notifications</p>
             </div>
-            <button class="mark-all-btn" onclick="markAllRead()">
+            <button class="mark-all-btn" id="markAllReadBtn">
                 <i class="fa-solid fa-check-double"></i> Mark all as read
             </button>
         </div>
 
         <div class="filter-tabs">
-            <button class="filter-tab active" onclick="filterNotifs('all', this)">All</button>
-            <button class="filter-tab" onclick="filterNotifs('appointment', this)">Appointments</button>
-            <button class="filter-tab" onclick="filterNotifs('vaccine', this)">Vaccine Updates</button>
-            <button class="filter-tab" onclick="filterNotifs('system', this)">System</button>
+            <button class="filter-tab active" data-filter="all">All</button>
+            <button class="filter-tab" data-filter="appointment">Appointments</button>
+            <button class="filter-tab" data-filter="vaccine">Vaccine Updates</button>
+            <button class="filter-tab" data-filter="system">System</button>
         </div>
 
         <!-- TODAY -->
@@ -183,6 +170,6 @@
         </div>
 
     </div>
-
+        <script type="module" src="scripts/notifications.js"></script>
 </body>
 </html>

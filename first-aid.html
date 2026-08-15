@@ -19,49 +19,13 @@
                 <p>Cabuyao, Laguna</p>
             </div>
         </div>
-        <div class="header-right">
-            <h3 id="headerName">John Cruz</h3>
-            <a href="notifications.html" style="color:#374151;font-size:20px;position:relative;" id="notifBell">
-                <i class="fa-regular fa-bell"></i>
-                <span id="notifDot" style="position:absolute;top:-4px;right:-4px;width:8px;height:8px;background:#ef0000;border-radius:50%;display:none;"></span>
-            </a>
-            <a href="index.html" style="text-decoration:none;">
-                <button class="signout-btn">
-                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
+            <div class="header-right">
+                <h3 id="headerName">Guest</h3>
+                <button class="sig-in" id="signInBtn" style="display:none;">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign In
                 </button>
-            </a>
-        </div>
-    </header>
-
-    <!-- DEMO BANNER -->
-    <div class="demo-banner">
-        <div class="demo-state">
-            <span class="demo-dot new" id="demoDot"></span>
-            <span id="demoStateLabel">New Resident State — No vaccination history</span>
-            <span style="opacity:0.5;margin-left:8px;">| Demo Mode — conditional logic based on staff vaccination update</span>
-        </div>
-        <button class="demo-reset-btn" onclick="/* demo reset */">Reset to New Resident</button>
-    </div>
-
-    <!-- NAV TABS -->
-    <nav class="nav-tabs-bar" id="navTabs">
-        <a class="nav-tab" href="residents.html">
-            <i class="fa-solid fa-house"></i> Overview
-        </a>
-        <a class="nav-tab" href="residents.html#panel-appointments">
-            <i class="fa-regular fa-calendar"></i> Appointments
-        </a>
-        <a class="nav-tab" onclick="/* show records */" style="display:none;">
-            <i class="fa-solid fa-syringe"></i> My Vaccination Records
-        </a>
-        <a class="nav-tab active">
-            <i class="fa-solid fa-kit-medical"></i> First Aid Guide
-        </a>
-        <a class="nav-tab" href="notifications.html" id="nav-notif">
-            <i class="fa-regular fa-bell"></i> Notifications
-            <span id="notifBadge" style="background:#ef0000;color:white;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;display:none;">4</span>
-        </a>
-    </nav>
+            </div>
+        </header>
 
     <main class="main-container">
 
@@ -245,5 +209,6 @@
     </div>
 </main>
 
+    <script type="module" src="scripts/firstaid.js"></script>
 </body>
 </html>

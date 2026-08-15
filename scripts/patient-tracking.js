@@ -1,9 +1,9 @@
-import { auth, db } from '../firebase-config.js';
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { auth, db } from './firebase.js';
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 import {
   collection, query, where, orderBy, getDocs,
   doc, updateDoc, addDoc, serverTimestamp, getDoc
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let pendingCount = 0;
 

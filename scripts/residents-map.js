@@ -13,8 +13,9 @@ const mapsData = [];
 
 function initMap() {
   const containers = [
-    { mapId: 'googleMap',    sidebarId: 'clinicSidebar'    },
-    { mapId: 'googleMapNew', sidebarId: 'clinicSidebarNew' }
+    { mapId: 'googleMapOverview', sidebarId: 'clinicSidebarOverview' },
+    { mapId: 'googleMap',         sidebarId: 'clinicSidebar'         },
+    { mapId: 'googleMapNew',      sidebarId: 'clinicSidebarNew'      }
   ];
   containers.forEach(c => {
     if (document.getElementById(c.mapId)) createMap(c.mapId, c.sidebarId);
@@ -40,6 +41,7 @@ function createMap(mapId, sidebarId) {
   });
 
   const entry = { mapId, sidebarId, map, markers: [] };
+  entry.center = CABUYAO_CENTER;
   CLINICS.forEach(clinic => {
     entry.markers.push(createMarkerForMap(map, clinic));
   });
@@ -137,3 +139,18 @@ function filterMarkers(filter, btn) {
     });
   });
 }
+
+// Call this if a map's container was hidden during initialization
+function refreshMaps() {
+  if (!window.google || !google.maps) return;
+  mapsData.forEach(entry => {
+    try {
+      google.maps.event.trigger(entry.map, 'resize');
+      if (entry.center) entry.map.setCenter(entry.center);
+    } catch (e) {
+      // ignore
+    }
+  });
+}
+
+window.refreshMaps = refreshMaps;

@@ -1,9 +1,46 @@
-import { auth, db } from '../firebase-config.js';
-import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { auth, db, fetchUserProfile, onAuthStateChanged, signOutUser } from './firebase.js';
+import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let currentUid = null;
 let currentResidentName = '';
+
+function markAllRead() {
+  document.querySelectorAll('.notif-item.unread').forEach(item => {
+    item.classList.remove('unread');
+    const dot = item.querySelector('.unread-dot');
+    if (dot) dot.remove();
+  });
+
+  const unread = document.getElementById('unreadCount');
+  if (unread) unread.textContent = '0';
+}
+
+function filterNotifs(type, btn) {
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  const items = document.querySelectorAll('.notif-item');
+  let visible = 0;
+
+  items.forEach(item => {
+    if (type === 'all' || item.dataset.type === type) {
+      item.style.display = 'flex';
+      visible++;
+    } else {
+      item.style.display = 'none';
+    }
+  });
+
+  const emptyState = document.getElementById('emptyState');
+  if (emptyState) emptyState.style.display = visible === 0 ? 'block' : 'none';
+
+  document.querySelectorAll('.notif-group-label').forEach(g => {
+    g.style.display = type === 'all' ? 'block' : 'none';
+  });
+}
+
+window.markAllRead = markAllRead;
+window.filterNotifs = filterNotifs;
 
 async function loadResidentDashboard(uid) {
   currentUid = uid;
@@ -135,7 +172,28 @@ function showTab(tab, el) {
   const panel = document.getElementById('panel-' + tab);
   if (panel) panel.classList.add('active');
   if (el) el.classList.add('active');
+  // If the Overview panel contains maps, refresh them after layout changes
+  if (tab === 'overview' && window.refreshMaps) setTimeout(() => window.refreshMaps(), 150);
+  // Make sure the first aid and notifications panels stay visible when selected
+  if ((tab === 'firstaid' || tab === 'notifications') && panel) panel.classList.add('active');
+  // Ensure one of the appointments sub-views is visible when opening Appointments
+  if (tab === 'appointments') {
+    const newEl = document.getElementById('appt-new-resident');
+    const activeEl = document.getElementById('appt-active-patient');
+    if (newEl && activeEl) {
+      const newVis = window.getComputedStyle(newEl).display;
+      const actVis = window.getComputedStyle(activeEl).display;
+      if (newVis === 'none' && actVis === 'none') {
+        // default to new resident view
+        newEl.style.display = 'block';
+        activeEl.style.display = 'none';
+      }
+    }
+  }
 }
+
+// Note: functions used by inline `onclick` will be exposed to `window` after they are defined,
+// inside DOMContentLoaded, so HTML inline handlers continue working with module scripts.
 
 function openBookingModal(clinic) {
   const sel = document.getElementById('modalClinic');
@@ -268,8 +326,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
   const signOutBtn = document.getElementById('signOutBtn');
   if (signOutBtn) signOutBtn.addEventListener('click', () => {
-    signOut(auth).then(() => window.location.href = 'login.html');
+    signOutUser().then(() => window.location.href = 'login.html');
   });
+
+  // Expose some functions to window for inline onclick attributes (module scope isn't global)
+  window.showTab = showTab;
+  window.openBookingModal = openBookingModal;
+  window.closeBookingModal = closeBookingModal;
+  window.confirmBooking = confirmBooking;
+  window.filterMap = filterMap;
+  window.handleUpload = handleUpload;
+  window.toggleResRow = toggleResRow;
 
   onAuthStateChanged(auth, (user) => {
     if (user) {
