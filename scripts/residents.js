@@ -340,7 +340,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
   onAuthStateChanged(auth, (user) => {
     if (user) {
-      loadResidentDashboard(user.uid);
+      fetchUserProfile(user.uid).then((profile) => {
+        if (!profile || profile.role !== 'resident') {
+          alert('This account does not have resident access.');
+          signOutUser().then(() => window.location.href = 'login.html');
+          return;
+        }
+        loadResidentDashboard(user.uid);
+      });
     } else {
       window.location.href = 'login.html';
     }

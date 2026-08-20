@@ -269,14 +269,15 @@
 
         <script type="module">
             import { auth } from './scripts/firebase.js';
-            import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-            onAuthStateChanged(auth, (user) => {
-                if (!user) window.location.href = 'login.html';
-            });
+            import { signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+            import { protectPage } from './scripts/role-guard.js';
+            protectPage('clinic_staff');
             document.querySelector('.signout-btn').addEventListener('click', () => {
                 signOut(auth).then(() => window.location.href = 'login.html');
             });
         </script>
+
+  <!-- <script type="module" src="scripts/staff.js"></script> -->
 
 </body>
 </html>

@@ -1,5 +1,5 @@
 import { auth, db } from './firebase.js';
-import { signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+import { signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 console.log('login.js loaded');
@@ -8,6 +8,12 @@ const rolePages = {
   resident:     'residents.html',
   clinic_staff: 'staff.html',
   admin:        'admin.html'
+};
+
+const loginRoles = {
+  resident: 'resident',
+  staff: 'clinic_staff',
+  admin: 'admin'
 };
 
 document.getElementById('loginBtn').addEventListener('click', async () => {
@@ -27,16 +33,32 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   try {
     const userCred = await signInWithEmailAndPassword(auth, email, password);
     const uid = userCred.user.uid;
+    const selectedRole = window.currentRole || 'resident';
+    const expectedRole = loginRoles[selectedRole];
 
     const userDoc = await getDoc(doc(db, 'users', uid));
     if (!userDoc.exists()) {
       alert('Account not found in database. Contact your administrator.');
+      await signOut(auth);
       btn.textContent = originalText;
       btn.disabled = false;
       return;
     }
 
     const role = userDoc.data().role;
+    if (role !== expectedRole) {
+      const roleLabels = {
+        resident: 'resident',
+        clinic_staff: 'clinic staff',
+        admin: 'administrator'
+      };
+      alert(`This account does not have ${roleLabels[expectedRole] || 'this'} access.`);
+      await signOut(auth);
+      btn.textContent = originalText;
+      btn.disabled = false;
+      return;
+    }
+
     const page = rolePages[role];
 
     if (!page) {
