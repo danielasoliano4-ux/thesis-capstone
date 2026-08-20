@@ -1,8 +1,9 @@
 import { auth, db, fetchUserProfile, onAuthStateChanged, signOutUser } from './firebase.js';
-import { doc, getDoc, collection, query, where, orderBy, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { doc, getDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let currentUid = null;
 let currentResidentName = '';
+let selectedClinic = null;
 
 function markAllRead() {
   document.querySelectorAll('.notif-item.unread').forEach(item => {
@@ -70,6 +71,93 @@ async function loadResidentDashboard(uid) {
   const latestRecord = hasRecord ? recordsSnap.docs[0].data() : null;
 
   initView(hasRecord, latestRecord);
+  loadResidentBookings(uid);
+}
+
+function populateClinicOptions(clinics) {
+  const select = document.getElementById('modalClinic');
+  if (select) {
+    select.innerHTML = '';
+    clinics.forEach((clinic) => {
+      const option = document.createElement('option');
+      option.value = clinic.id;
+      option.textContent = `${clinic.name} - ${clinic.status === 'out' ? 'Out of Stock' : clinic.status === 'low' ? 'Low Stock' : 'Available'}`;
+      option.dataset.name = clinic.name;
+      select.appendChild(option);
+    });
+  }
+  renderClinicBookingList(clinics);
+}
+
+window.populateClinicOptions = populateClinicOptions;
+if (window.clinicDirectory) populateClinicOptions(window.clinicDirectory);
+
+function renderClinicBookingList(clinics) {
+  const list = document.getElementById('clinicBookingList');
+  if (!list) return;
+  if (!clinics.length) {
+    list.innerHTML = '<p style="padding:16px;color:#6b7280;">No clinics are available yet.</p>';
+    return;
+  }
+
+  list.innerHTML = clinics.map((clinic) => {
+    const isOut = clinic.status === 'out';
+    const isLow = clinic.status === 'low';
+    const color = isOut ? '#ef4444' : isLow ? '#d97706' : '#16a34a';
+    const background = isOut ? '#fee2e2' : isLow ? '#fef3c7' : '#dcfce7';
+    const statusText = isOut ? 'Out of stock' : isLow ? 'Low stock' : `${clinic.stock_total || 0} doses available`;
+    return `
+      <div class="clinic-row">
+        <div class="clinic-row-icon" style="background:${background};"><i class="fa-solid fa-hospital" style="color:${color};"></i></div>
+        <div class="clinic-row-info">
+          <h4>${escapeHtml(clinic.name)}</h4>
+          <p>${escapeHtml(clinic.address || 'Address not provided')} &nbsp;|&nbsp; ${escapeHtml(clinic.hours || 'Hours not provided')} &nbsp;|&nbsp; <strong style="color:${color};">${statusText}</strong></p>
+        </div>
+        <button class="book-btn dynamic-book-btn" data-clinic-id="${escapeHtml(clinic.id)}" ${isOut ? 'disabled' : ''}>${isOut ? 'Unavailable' : 'Book Now'}</button>
+      </div>`;
+  }).join('');
+
+  list.querySelectorAll('.dynamic-book-btn').forEach((button) => {
+    button.addEventListener('click', () => {
+      const clinic = clinics.find(item => item.id === button.dataset.clinicId);
+      if (clinic) openBookingModal(clinic.name, clinic.id);
+    });
+  });
+}
+
+async function loadResidentBookings(uid) {
+  const container = document.getElementById('residentBookings');
+  if (!container) return;
+  try {
+    onSnapshot(query(collection(db, 'appointments'), where('resident_uid', '==', uid)), (snapshot) => {
+      const bookings = snapshot.docs.map(item => ({ id: item.id, ...item.data() }))
+        .filter(item => ['pending', 'confirmed'].includes(item.status))
+        .sort((a, b) => `${a.preferred_date} ${a.preferred_time}`.localeCompare(`${b.preferred_date} ${b.preferred_time}`));
+
+      if (!bookings.length) {
+        container.innerHTML = '';
+        return;
+      }
+
+      container.innerHTML = `
+      <div style="background:#fff;border:1px solid #ddd;border-radius:14px;padding:18px;">
+        <h3 style="margin:0 0 12px;color:#111827;"><i class="fa-regular fa-calendar-check" style="color:#ef0000;margin-right:8px;"></i>Upcoming Bookings</h3>
+        ${bookings.map(booking => `
+          <div style="display:flex;justify-content:space-between;gap:16px;align-items:center;padding:12px 0;border-top:1px solid #f1f1f1;flex-wrap:wrap;">
+            <div><strong>${escapeHtml(booking.clinic_name || 'Clinic')}</strong><div style="font-size:13px;color:#6b7280;">${escapeHtml(booking.preferred_date)} at ${escapeHtml(booking.preferred_time)} · ${escapeHtml(booking.dose_label || 'Dose 1')}</div></div>
+            <span style="padding:5px 10px;border-radius:14px;font-size:12px;font-weight:700;background:${booking.status === 'confirmed' ? '#dcfce7' : '#fef3c7'};color:${booking.status === 'confirmed' ? '#15803d' : '#92400e'};">${booking.status === 'confirmed' ? 'Confirmed' : 'Waiting for clinic'}</span>
+          </div>`).join('')}
+      </div>`;
+    }, (error) => console.error('Failed to listen for resident bookings:', error));
+  } catch (error) {
+    console.error('Failed to load resident bookings:', error);
+  }
+}
+
+function escapeHtml(value = '') {
+  const element = document.createElement('div');
+  element.textContent = value;
+  return element.innerHTML;
 }
 
 function initView(hasRecord, latestRecord) {
@@ -195,13 +283,15 @@ function showTab(tab, el) {
 // Note: functions used by inline `onclick` will be exposed to `window` after they are defined,
 // inside DOMContentLoaded, so HTML inline handlers continue working with module scripts.
 
-function openBookingModal(clinic) {
+function openBookingModal(clinic, clinicId = '') {
   const sel = document.getElementById('modalClinic');
-  if (clinic && sel) {
-    for (let o of sel.options) {
-      if (o.text.startsWith(clinic)) { sel.value = o.value; break; }
-    }
+  if (sel && clinicId) {
+    sel.value = clinicId;
+  } else if (clinic && sel) {
+    const option = [...sel.options].find(item => item.dataset.name === clinic || item.text.startsWith(clinic));
+    if (option) sel.value = option.value;
   }
+  selectedClinic = window.clinicDirectory?.find(item => item.id === sel?.value) || null;
   const dateEl = document.getElementById('modalDate');
   if (dateEl && !dateEl.value) {
     const today = new Date().toISOString().split('T')[0];
@@ -216,7 +306,9 @@ function closeBookingModal() {
 }
 
 async function confirmBooking() {
-  const clinic = document.getElementById('modalClinic').value;
+  const clinicSelect = document.getElementById('modalClinic');
+  const clinicId = clinicSelect.value;
+  const clinic = window.clinicDirectory?.find(item => item.id === clinicId) || selectedClinic;
   const dose = document.getElementById('modalDose').value;
   const date = document.getElementById('modalDate').value;
   const time = document.getElementById('modalTime').value;
@@ -235,17 +327,39 @@ async function confirmBooking() {
   btn.disabled = true;
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Booking...';
 
+  if (!clinic) {
+    msgEl.style.display = 'block';
+    msgEl.textContent = 'Please select a clinic from the map first.';
+    return;
+  }
+
   try {
-    await addDoc(collection(db, 'appointments'), {
+    const appointmentRef = await addDoc(collection(db, 'appointments'), {
       resident_uid: currentUid,
       resident_name: currentResidentName,
-      clinic_name: clinic,
+      clinic_id: clinic.id,
+      clinic_name: clinic.name,
+      clinic_staff_uid: clinic.staff_uid || '',
       dose_label: dose,
       preferred_date: date,
       preferred_time: time,
       status: 'pending',
       created_at: serverTimestamp()
     });
+
+    if (clinic.staff_uid) {
+      await addDoc(collection(db, 'notifications'), {
+        recipient_uid: clinic.staff_uid,
+        user_id: clinic.staff_uid,
+        clinic_id: clinic.id,
+        appointment_id: appointmentRef.id,
+        type: 'appointment',
+        title: 'New appointment request',
+        message: `${currentResidentName} requested an appointment on ${date} at ${time}.`,
+        read: false,
+        created_at: serverTimestamp()
+      });
+    }
 
     msgEl.style.display = 'block';
     msgEl.style.background = '#f0fdf4';
@@ -255,6 +369,7 @@ async function confirmBooking() {
 
     setTimeout(() => {
       closeBookingModal();
+      loadResidentBookings(currentUid);
       msgEl.style.display = 'none';
     }, 2000);
   } catch (err) {

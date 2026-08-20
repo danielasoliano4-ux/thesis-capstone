@@ -1,0 +1,89 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return signedIn() && userProfile().role == 'admin';
+    }
+
+    function isClinicStaff() {
+      return signedIn() && userProfile().role == 'clinic_staff';
+    }
+
+    function isResident() {
+      return signedIn() && userProfile().role == 'resident';
+    }
+
+    function belongsToClinic(clinicId) {
+      return isClinicStaff()
+        && (userProfile().clinic_id == clinicId || request.auth.uid == clinicId);
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if signedIn() && request.auth.uid == userId;
+      allow update, delete: if isAdmin();
+    }
+
+    match /clinics/{clinicId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() || belongsToClinic(clinicId);
+      allow delete: if isAdmin();
+    }
+
+    match /inventory/{inventoryId} {
+      allow read: if isAdmin() || belongsToClinic(resource.data.clinic_id);
+      allow create: if isAdmin() || (belongsToClinic(request.resource.data.clinic_id)
+        && request.resource.data.type is string
+        && request.resource.data.manufacturer is string
+        && request.resource.data.batch is string
+        && request.resource.data.quantity is number
+        && request.resource.data.expiry is string);
+      allow update: if isAdmin() || (belongsToClinic(resource.data.clinic_id)
+        && belongsToClinic(request.resource.data.clinic_id)
+        && request.resource.data.type is string
+        && request.resource.data.manufacturer is string
+        && request.resource.data.batch is string
+        && request.resource.data.quantity is number
+        && request.resource.data.expiry is string);
+      allow delete: if isAdmin() || belongsToClinic(resource.data.clinic_id);
+    }
+
+    match /appointments/{appointmentId} {
+      allow create: if isResident()
+        && request.resource.data.resident_uid == request.auth.uid;
+      allow read: if isResident()
+        && resource.data.resident_uid == request.auth.uid;
+      allow read: if isAdmin() || belongsToClinic(resource.data.clinic_id);
+      allow update: if isAdmin()
+        || (belongsToClinic(resource.data.clinic_id)
+          && request.resource.data.clinic_id == resource.data.clinic_id);
+      allow delete: if isAdmin()
+        || (isResident() && resource.data.resident_uid == request.auth.uid);
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAdmin()
+        || (isLoggedIn() && (
+          resource.data.recipient_uid == request.auth.uid
+          || resource.data.user_id == request.auth.uid
+          || belongsToClinic(resource.data.clinic_id)
+        ));
+      allow create: if isAdmin()
+        || isClinicStaff()
+        || (isResident() && request.resource.data.type == 'appointment');
+      allow update: if isLoggedIn()
+        && (resource.data.recipient_uid == request.auth.uid
+          || resource.data.user_id == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+  }
+}

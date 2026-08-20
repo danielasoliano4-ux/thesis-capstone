@@ -785,6 +785,8 @@
   <!-- ==================== APPOINTMENTS TAB ==================== -->
   <div class="tab-panel" id="panel-appointments">
 
+    <div id="residentBookings" style="max-width:1100px;margin:0 auto 20px;padding:0 20px;"></div>
+
     <!-- NEW RESIDENT: Onboarding flow -->
     <div id="appt-new-resident" style="display:none;">
 
@@ -805,39 +807,8 @@
 
       <div class="section-card">
         <div class="section-card-header"><h3>Select a Clinic to Book</h3></div>
-        <div class="clinic-list">
-          <div class="clinic-row">
-            <div class="clinic-row-icon" style="background:#dcfce7;"><i class="fa-solid fa-hospital" style="color:#16a34a;"></i></div>
-            <div class="clinic-row-info">
-              <h4>Cabuyao City Health Center</h4>
-              <p>Brgy. Poblacion Uno &nbsp;|&nbsp; Public &nbsp;|&nbsp; 8:00 AM – 5:00 PM &nbsp;|&nbsp; <strong style="color:#16a34a;">55 doses available</strong></p>
-            </div>
-            <button class="book-btn" onclick="openBookingModal('Cabuyao City Health Center')">Book Now</button>
-          </div>
-          <div class="clinic-row">
-            <div class="clinic-row-icon" style="background:#fef3c7;"><i class="fa-solid fa-building" style="color:#d97706;"></i></div>
-            <div class="clinic-row-info">
-              <h4>St. Mary's Medical Clinic</h4>
-              <p>Brgy. Mamatid &nbsp;|&nbsp; Private &nbsp;|&nbsp; 24/7 &nbsp;|&nbsp; <strong style="color:#d97706;">8 doses — low stock</strong></p>
-            </div>
-            <button class="book-btn" onclick="openBookingModal('St. Mary\'s Medical Clinic')">Book Now</button>
-          </div>
-          <div class="clinic-row">
-            <div class="clinic-row-icon" style="background:#dcfce7;"><i class="fa-solid fa-hospital" style="color:#16a34a;"></i></div>
-            <div class="clinic-row-info">
-              <h4>Laguna Medical Clinic</h4>
-              <p>Brgy. Sala &nbsp;|&nbsp; Private &nbsp;|&nbsp; 24/7 &nbsp;|&nbsp; <strong style="color:#16a34a;">22 doses available</strong></p>
-            </div>
-            <button class="book-btn" onclick="openBookingModal('Laguna Medical Clinic')">Book Now</button>
-          </div>
-          <div class="clinic-row">
-            <div class="clinic-row-icon" style="background:#fee2e2;"><i class="fa-solid fa-building" style="color:#ef4444;"></i></div>
-            <div class="clinic-row-info">
-              <h4>South City Animal Bite Center</h4>
-              <p>Brgy. Banlic &nbsp;|&nbsp; Private &nbsp;|&nbsp; 7:00 AM – 10:00 PM &nbsp;|&nbsp; <strong style="color:#ef4444;">Out of stock</strong></p>
-            </div>
-            <button class="book-btn" disabled>Unavailable</button>
-          </div>
+        <div class="clinic-list" id="clinicBookingList">
+          <p style="padding:16px;color:#6b7280;">Loading clinics...</p>
         </div>
       </div>
 
@@ -1264,7 +1235,7 @@
   </div>
 
   <script type="module" src="scripts/residents.js"></script>
-  <script src="scripts/residents-map.js"></script>
+  <script type="module" src="scripts/residents-map.js"></script>
   <script>
     // Provide a visible error when Google Maps fails to load or auth fails
     window.gm_authFailure = function() {

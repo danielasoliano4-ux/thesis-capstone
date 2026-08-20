@@ -68,7 +68,7 @@
 
                 <div>
                     <span>Total Stock</span>
-                    <h2>55</h2>
+                    <h2 id="statTotalStock">0</h2>
                 </div>
 
                 <i class="fa-solid fa-cube blue"></i>
@@ -80,7 +80,7 @@
 
                 <div>
                     <span>Active Patients</span>
-                    <h2>2</h2>
+                    <h2 id="statActivePatients">0</h2>
                 </div>
 
                 <i class="fa-solid fa-user-group green"></i>
@@ -92,7 +92,7 @@
 
                 <div>
                     <span>This Month</span>
-                    <h2>127</h2>
+                    <h2 id="statThisMonth">0</h2>
                 </div>
 
                 <i class="fa-solid fa-arrow-trend-up purple"></i>
@@ -104,7 +104,7 @@
 
                 <div>
                     <span>Low Stock Items</span>
-                    <h2 class="red-text">2</h2>
+                    <h2 id="statLowStock" class="red-text">0</h2>
                 </div>
 
                 <i class="fa-solid fa-triangle-exclamation red"></i>
@@ -190,72 +190,7 @@
 
                         </thead>
 
-                        <tbody>
-
-                            <tr>
-                                <td><strong>Verorab</strong></td>
-                                <td>Sanofi Pasteur</td>
-                                <td>VR2026-A123</td>
-                                <td><strong>45 doses</strong></td>
-                                <td>12/31/2026</td>
-
-                                <td>
-                                    <span class="status adequate">
-                                        adequate
-                                    </span>
-                                </td>
-
-                                <td>
-                                    <a href="#" class="update-link">
-                                        <i class="fa-regular fa-pen-to-square"></i>
-                                        Update
-                                    </a>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td><strong>Rabipur</strong></td>
-                                <td>GSK</td>
-                                <td>RP2026-B456</td>
-                                <td><strong>8 doses</strong></td>
-                                <td>10/15/2026</td>
-
-                                <td>
-                                    <span class="status low">
-                                        low
-                                    </span>
-                                </td>
-
-                                <td>
-                                    <a href="#" class="update-link">
-                                        <i class="fa-regular fa-pen-to-square"></i>
-                                        Update
-                                    </a>
-                                </td>
-                            </tr>
-
-                            <tr>
-                                <td><strong>Speeda</strong></td>
-                                <td>MassBiologics</td>
-                                <td>SD2026-C789</td>
-                                <td><strong>2 doses</strong></td>
-                                <td>8/20/2026</td>
-
-                                <td>
-                                    <span class="status critical">
-                                        critical
-                                    </span>
-                                </td>
-
-                                <td>
-                                    <a href="#" class="update-link">
-                                        <i class="fa-regular fa-pen-to-square"></i>
-                                        Update
-                                    </a>
-                                </td>
-                            </tr>
-
-                        </tbody>
+                        <tbody id="inventoryTableBody"></tbody>
 
                     </table>
 
@@ -267,17 +202,25 @@
 
     </main>
 
-        <script type="module">
-            import { auth } from './scripts/firebase.js';
-            import { signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-            import { protectPage } from './scripts/role-guard.js';
-            protectPage('clinic_staff');
-            document.querySelector('.signout-btn').addEventListener('click', () => {
-                signOut(auth).then(() => window.location.href = 'login.html');
-            });
-        </script>
+    <div id="vaccineModal" class="modal" aria-hidden="true">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add New Stock</h2>
+                <button type="button" id="closeModalBtn" class="modal-close" aria-label="Close">&times;</button>
+            </div>
+            <form id="vaccineForm">
+                <input type="hidden" id="vaccineDocId">
+                <label>Vaccine Type<input id="vacType" required></label>
+                <label>Manufacturer<input id="vacManufacturer" required></label>
+                <label>Batch Number<input id="vacBatch" required></label>
+                <label>Quantity (doses)<input id="vacQuantity" type="number" min="0" required></label>
+                <label>Expiry Date<input id="vacExpiry" type="date" required></label>
+                <button type="submit" class="add-btn">Save Stock</button>
+            </form>
+        </div>
+    </div>
 
-  <!-- <script type="module" src="scripts/staff.js"></script> -->
+    <script type="module" src="scripts/staff.js"></script>
 
 </body>
 </html>

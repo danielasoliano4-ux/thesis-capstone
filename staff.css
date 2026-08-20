@@ -227,6 +227,69 @@ body {
     margin-right: 8px;
 }
 
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(17, 24, 39, 0.55);
+}
+
+.modal-content {
+    width: min(500px, 100%);
+    padding: 24px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.modal-close {
+    border: 0;
+    background: transparent;
+    color: #6b7280;
+    font-size: 28px;
+    cursor: pointer;
+}
+
+#vaccineForm {
+    display: grid;
+    gap: 14px;
+}
+
+#vaccineForm label {
+    display: grid;
+    gap: 6px;
+    color: #374151;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+#vaccineForm input {
+    width: 100%;
+    padding: 11px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: normal;
+}
+
+.edit-item-btn {
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-size: 15px;
+}
+
 /* ALERT */
 
 .alert-box {

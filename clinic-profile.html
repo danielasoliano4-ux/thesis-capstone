@@ -27,12 +27,10 @@
                 <i class="fa-regular fa-hospital"></i>
                 Clinic Dashboard
             </a>
-            <a href="index.html" style="text-decoration: none;">
-                <button class="signout-btn">
-                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
-                    Sign Out
-                </button>
-            </a>
+            <button type="button" class="signout-btn">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                Sign Out
+            </button>
         </div>
     </header>
 
@@ -62,7 +60,7 @@
             </div>
 
             <!-- CLINIC PROFILE CONTENT -->
-            <div class="clinic-profile-content">
+            <form id="clinicProfileForm" class="clinic-profile-content">
 
                 <h2 style="margin-bottom: 30px;">Clinic Business Profile</h2>
 
@@ -70,29 +68,29 @@
                 <div class="profile-row">
                     <div class="profile-field">
                         <label>Clinic Name</label>
-                        <input type="text" value="Cabuyao City Health Center" readonly/>
+                        <input id="profileName" type="text" value="Cabuyao City Health Center" required/>
                     </div>
                     <div class="profile-field">
                         <label>Clinic Type</label>
-                        <input type="text" value="Public Health Center" readonly/>
+                        <input id="profileType" type="text" value="Public Health Center" required/>
                     </div>
                 </div>
 
                 <!-- ADDRESS -->
                 <div class="profile-field full-width">
                     <label>Address</label>
-                    <input type="text" value="Brgy. Poblacion Uno, Cabuyao City, Laguna" readonly/>
+                    <input id="profileAddress" type="text" value="Brgy. Poblacion Uno, Cabuyao City, Laguna" required/>
                 </div>
 
                 <!-- CONTACT AND EMAIL -->
                 <div class="profile-row">
                     <div class="profile-field">
                         <label>Contact Number</label>
-                        <input type="text" value="(049) 531-2345" readonly/>
+                        <input id="profileContact" type="text" value="(049) 531-2345" required/>
                     </div>
                     <div class="profile-field">
                         <label>Email Address</label>
-                        <input type="email" value="cabuyaohealth@gmail.com" readonly/>
+                        <input id="profileEmail" type="email" value="cabuyaohealth@gmail.com" required/>
                     </div>
                 </div>
 
@@ -105,7 +103,7 @@
                                 <i class="fa-solid fa-clock" style="color: #4a90e2;"></i>
                                 <div>
                                     <strong>Weekdays (Mon-Fri)</strong>
-                                    <p style="margin: 5px 0 0 0; color: #666;">8:00 AM - 5:00 PM</p>
+                                    <input id="profileWeekdayHours" class="hours-input" value="8:00 AM - 5:00 PM" required/>
                                 </div>
                             </div>
                         </div>
@@ -114,7 +112,7 @@
                                 <i class="fa-solid fa-clock" style="color: #4a90e2;"></i>
                                 <div>
                                     <strong>Weekends (Sat-Sun)</strong>
-                                    <p style="margin: 5px 0 0 0; color: #999;">Closed</p>
+                                    <input id="profileWeekendHours" class="hours-input" value="Closed" required/>
                                 </div>
                             </div>
                         </div>
@@ -126,27 +124,27 @@
                     <h3 style="margin-bottom: 15px;">Services Offered</h3>
                     <div class="services-grid">
                         <div class="service-item">
-                            <i class="fa-solid fa-check-circle" style="color: #4caf50;"></i>
+                            <input type="checkbox" name="services" value="Rabies Vaccination" checked>
                             <span>Rabies Vaccination</span>
                         </div>
                         <div class="service-item">
-                            <i class="fa-solid fa-check-circle" style="color: #4caf50;"></i>
+                            <input type="checkbox" name="services" value="Wound Cleaning" checked>
                             <span>Wound Cleaning</span>
                         </div>
                         <div class="service-item">
-                            <i class="fa-solid fa-check-circle" style="color: #4caf50;"></i>
+                            <input type="checkbox" name="services" value="Post-Exposure Treatment" checked>
                             <span>Post-Exposure Treatment</span>
                         </div>
                         <div class="service-item">
-                            <i class="fa-solid fa-check-circle" style="color: #4caf50;"></i>
+                            <input type="checkbox" name="services" value="Medical Consultation" checked>
                             <span>Medical Consultation</span>
                         </div>
                         <div class="service-item">
-                            <i class="fa-solid fa-check-circle" style="color: #4caf50;"></i>
+                            <input type="checkbox" name="services" value="Emergency Care" checked>
                             <span>Emergency Care</span>
                         </div>
                         <div class="service-item">
-                            <i class="fa-solid fa-check-circle" style="color: #4caf50;"></i>
+                            <input type="checkbox" name="services" value="Follow-up Services" checked>
                             <span>Follow-up Services</span>
                         </div>
                     </div>
@@ -155,13 +153,14 @@
                 <!-- ACTION BUTTONS -->
                 <div style="margin-top: 40px; display: flex; gap: 10px;">
                     <button class="save-btn">Save Changes</button>
-                    <button class="cancel-btn">Cancel</button>
+                    <button type="button" class="cancel-btn">Cancel</button>
                 </div>
 
-            </div>
+            </form>
 
         </section>
 
     </main>
+    <script type="module" src="scripts/clinic-profile.js"></script>
 </body>
 </html>
