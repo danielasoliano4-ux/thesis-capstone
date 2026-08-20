@@ -243,6 +243,83 @@ form input[type="password"] {
     border-radius: 12px;
     margin-bottom: 20px;
     font-size: 15px;
+    outline: none;
+}
+
+form input[type="text"]:focus,
+form input[type="password"]:focus {
+    outline: none;
+}
+
+.password-input-wrapper input[type="password"]:focus {
+    border-color: #cbd5e1;
+}
+
+.password-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+    height: 50px;
+    width: 100%;
+    margin-top: 20px; 
+}
+
+/* Updated selector: targets ALL inputs inside the wrapper (password & text) */
+.password-input-wrapper input {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box; /* Prevents padding from breaking height */
+    padding: 14px 45px 14px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    font-size: 15px;
+    margin: 0;
+    line-height: 1;
+}
+
+.password-input-wrapper input:focus {
+    border-color: #cbd5e1;
+    outline: none;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 12px;
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;    
+    height: 30px;   
+    padding: 0;   
+    transition: color 0.2s;
+    outline: none !important;
+    box-shadow: none !important;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    margin-bottom: 10px;
+}
+
+.password-toggle:hover,
+.password-toggle:active,
+.password-toggle:focus {
+    color: #ef0000;
+}
+
+.password-toggle:hover {
+    color: #ef0000;
+}
+
+.password-toggle:active,
+.password-toggle:focus {
+    outline: none !important;
+    box-shadow: none !important;
+    color: #ef0000;
 }
 
 .form-options {

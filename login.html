@@ -29,8 +29,6 @@
 
         </div>
 
-        <button class="signin-btn">Sign In</button>
-
     </header>
 
     <!-- MAIN -->
@@ -115,10 +113,15 @@
                 <form>
 
                     <label>Email or Username</label>
-                    <input type="text" value="resident@demo.com">
+                    <input type="text" value=" ">
 
                     <label>Password</label>
-                    <input type="password" value="123456">
+                    <div class="password-input-wrapper">
+                        <input type="password" id="passwordInput" value=" ">
+                        <button type="button" class="password-toggle" id="passwordToggle">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
 
                     <!-- OPTIONS -->
                     <div class="form-options">
@@ -185,14 +188,15 @@
 
     </main>
 
+    <script type="module" src="scripts/login.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         const roles = {
             resident: {
                 label: 'Resident',
                 buttonText: 'Sign In as Resident',
-                email: 'resident@demo.com',
-                password: 'demo123',
+                email: ' ',
+                password: '',
                 features: [
                     'Book and manage appointments',
                     'Receive vaccination reminders',
@@ -204,8 +208,8 @@
             staff: {
                 label: 'Clinic Staff',
                 buttonText: 'Sign In as Clinic Staff',
-                email: 'staff@demo.com',
-                password: 'demo123',
+                email: '',
+                password: '',
                 features: [
                     'Manage vaccine inventory',
                     'Update patient dosage records',
@@ -217,8 +221,8 @@
             admin: {
                 label: 'Administrator',
                 buttonText: 'Sign In as Administrator',
-                email: 'admin@demo.com',
-                password: 'demo123',
+                email: '',
+                password: '',
                 features: [
                     'Monitor system analytics',
                     'Review clinic performance',
@@ -235,6 +239,7 @@
         const passwordInput = document.querySelector('input[type="password"]');
         const featuresHeading = document.getElementById('featuresHeading');
         const featuresList = document.getElementById('featuresList');
+        const registerText = document.querySelector('.register-text');
 
         let currentRole = 'resident';
 
@@ -249,6 +254,11 @@
             currentRole = role;
             window.currentRole = role;
 
+            // Hide register link for non-resident roles
+            if (registerText) {
+                registerText.style.display = role === 'resident' ? 'block' : 'none';
+            }
+
             roleBoxes.forEach(box => {
                 const icon = box.querySelector('.role-icon');
                 const isActive = box.dataset.role === role;
@@ -260,8 +270,43 @@
         }
 
         roleBoxes.forEach(box => {
-            box.addEventListener('click', () => updateFeatures(box.dataset.role));
+            box.addEventListener('click', () => {
+                updateFeatures(box.dataset.role);
+                // Reset password visibility when switching roles
+                const passwordInput = document.getElementById('passwordInput');
+                const passwordToggle = document.getElementById('passwordToggle');
+                if (passwordInput) {
+                    passwordInput.type = 'password';
+                    const icon = passwordToggle.querySelector('i');
+                    if (icon) icon.className = 'fa-solid fa-eye';
+                }
+            });
         });
+
+        // Password visibility toggle
+        const passwordToggleBtn = document.getElementById('passwordToggle');
+        const passwordInputField = document.getElementById('passwordInput');
+        
+        if (passwordToggleBtn) {
+            passwordToggleBtn.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+            
+            passwordToggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const isPassword = passwordInputField.type === 'password';
+                passwordInputField.type = isPassword ? 'text' : 'password';
+                const icon = passwordToggleBtn.querySelector('i');
+                if (icon) {
+                    icon.className = isPassword ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+                }
+                // Blur both button and input to prevent focus styling
+                passwordToggleBtn.blur();
+                passwordInputField.blur();
+            });
+        }
 
         // login button click is handled by scripts/login.js via Firebase Auth
         window.currentRole = 'resident';

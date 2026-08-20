@@ -153,13 +153,13 @@
     </div>
 
     <script type="module" src="scripts/patient-tracking.js"></script>
-    <script type="module">
-      import { auth } from './firebase-config.js';
-      import { signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-      document.querySelector('.signout-btn').addEventListener('click', () => {
-        signOut(auth).then(() => window.location.href = 'login.html');
-      });
-    </script>
+        <script type="module">
+            import { auth } from './scripts/firebase.js';
+            import { signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+            document.querySelector('.signout-btn').addEventListener('click', () => {
+                signOut(auth).then(() => window.location.href = 'login.html');
+            });
+        </script>
 
 </body>
 </html>
