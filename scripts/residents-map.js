@@ -1,10 +1,7 @@
-const CLINICS = [
-  { name: 'Cabuyao City Health Center', lat: 14.2718, lng: 121.1246, status: 'available', address: 'Brgy. Poblacion Uno, Cabuyao City, Laguna', hours: '8:00 AM – 5:00 PM', phone: '(049) 531-2345', stock: 'Verorab: 45 · Rabipur: 30 · Speeda: 12' },
-  { name: "St. Mary's Medical Clinic", lat: 14.2655, lng: 121.1189, status: 'low', address: 'Brgy. Mamatid, Cabuyao City, Laguna', hours: '24/7', phone: '(049) 531-5678', stock: 'Verorab: 5 · Rabipur: 3 · Speeda: 0' },
-  { name: 'South City Animal Bite Center', lat: 14.2592, lng: 121.1310, status: 'out', address: 'Brgy. Banlic, Cabuyao City, Laguna', hours: '7:00 AM – 10:00 PM', phone: '(049) 555-8877', stock: 'No vaccines in stock' },
-  { name: 'Pulo Barangay Health Station', lat: 14.2780, lng: 121.1350, status: 'available', address: 'Brgy. Pulo, Cabuyao City, Laguna', hours: '8:00 AM – 5:00 PM', phone: '(049) 531-9901', stock: 'Verorab: 20 · Rabipur: 18' },
-  { name: 'Marinig Health Center', lat: 14.2840, lng: 121.1200, status: 'low', address: 'Brgy. Marinig, Cabuyao City, Laguna', hours: '8:00 AM – 5:00 PM', phone: '(049) 531-7712', stock: 'Verorab: 4 · Rabipur: 2' }
-];
+import { auth, db, onAuthStateChanged } from './firebase.js';
+import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
+
+let CLINICS = [];
 
 const STATUS_COLOR = { available: '#00b140', low: '#d98a00', out: '#e60000' };
 const STATUS_LABEL = { available: 'Available', low: 'Low Stock', out: 'Out of Stock' };
@@ -17,9 +14,37 @@ function initMap() {
     { mapId: 'googleMap',         sidebarId: 'clinicSidebar'         },
     { mapId: 'googleMapNew',      sidebarId: 'clinicSidebarNew'      }
   ];
+  if (!CLINICS.length) return;
   containers.forEach(c => {
     if (document.getElementById(c.mapId)) createMap(c.mapId, c.sidebarId);
   });
+}
+
+function loadClinics() {
+  onSnapshot(collection(db, 'clinics'), (snapshot) => {
+    CLINICS = snapshot.docs.map(clinicDoc => {
+      const data = clinicDoc.data();
+      return {
+        id: clinicDoc.id,
+        name: data.name || 'Unnamed Clinic',
+        lat: Number(data.lat),
+        lng: Number(data.lng),
+        status: data.stock_status || data.status || 'out',
+        address: data.address || '',
+        hours: data.weekdayHours || data.hours || 'Contact clinic',
+        phone: data.contact || '',
+        stock: data.stock_summary || data.stock || `${Number(data.stock_total || 0)} doses`,
+        stock_total: Number(data.stock_total || 0),
+        staff_uid: data.staff_uid || ''
+      };
+    });
+
+    window.clinicDirectory = CLINICS;
+    if (window.populateClinicOptions) window.populateClinicOptions(CLINICS);
+    mapsData.splice(0).forEach(entry => entry.markers.forEach(marker => marker.marker.setMap(null)));
+    mapsData.splice(0);
+    if (window.google && google.maps) initMap();
+  }, (error) => console.error('Failed to load clinics:', error));
 }
 
 function createMap(mapId, sidebarId) {
@@ -42,7 +67,7 @@ function createMap(mapId, sidebarId) {
 
   const entry = { mapId, sidebarId, map, markers: [] };
   entry.center = CABUYAO_CENTER;
-  CLINICS.forEach(clinic => {
+  CLINICS.filter(clinic => Number.isFinite(clinic.lat) && Number.isFinite(clinic.lng)).forEach(clinic => {
     entry.markers.push(createMarkerForMap(map, clinic));
   });
   mapsData.push(entry);
@@ -107,7 +132,7 @@ function buildSidebarFor(entry) {
 
     const rightHtml = mobj.clinic.status === 'out'
       ? `<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;color:${color};font-weight:bold;">Out of Stock</span><button class="book-btn" disabled style="background:#d1d5db;border:none;color:#6b7280;cursor:not-allowed;">Out of Stock</button></div>`
-      : `<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;color:${color};font-weight:bold;">${STATUS_LABEL[mobj.clinic.status]}</span><button class="book-btn" onclick="openBookingModal('${mobj.clinic.name.replace(/'/g, "\\'")}')">Book</button></div>`;
+      : `<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;color:${color};font-weight:bold;">${STATUS_LABEL[mobj.clinic.status]}</span><button class="book-btn" onclick="openBookingModal('${mobj.clinic.name.replace(/'/g, "\\'")}', '${mobj.clinic.id}')">Book</button></div>`;
 
     row.innerHTML = `<div style="display:flex;align-items:center;gap:12px;flex:1;">${leftHtml}</div><div style="display:flex;align-items:center;gap:12px;">${rightHtml}</div>`;
 
@@ -154,3 +179,7 @@ function refreshMaps() {
 }
 
 window.refreshMaps = refreshMaps;
+window.initMap = initMap;
+onAuthStateChanged(auth, (user) => {
+  if (user) loadClinics();
+});

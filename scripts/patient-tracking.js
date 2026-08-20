@@ -1,4 +1,4 @@
-import { auth, db } from './firebase.js';
+import { auth, db, fetchUserProfile } from './firebase.js';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 import {
   collection, query, where, orderBy, getDocs,
@@ -11,22 +11,31 @@ async function loadAppointments() {
   const list = document.getElementById('apptList');
   list.innerHTML = '<p style="color:#6b7280;padding:16px;">Loading appointments…</p>';
 
-  const snap = await getDocs(
-    query(collection(db, 'appointments'), where('status', '==', 'pending'), orderBy('created_at', 'asc'))
-  );
+  const staff = await fetchUserProfile(auth.currentUser.uid);
+  const clinicId = staff?.clinic_id || auth.currentUser.uid;
+  const snap = await getDocs(query(
+    collection(db, 'appointments'),
+    where('clinic_id', '==', clinicId),
+    where('status', '==', 'pending')
+  ));
+  const pendingAppointments = snap.docs.sort((a, b) => {
+    const first = a.data().created_at?.toMillis?.() || 0;
+    const second = b.data().created_at?.toMillis?.() || 0;
+    return first - second;
+  });
 
-  if (snap.empty) {
+  if (!pendingAppointments.length) {
     list.innerHTML = '<p style="color:#6b7280;padding:16px;"><i class="fa-solid fa-circle-check" style="color:#22c55e;margin-right:6px;"></i>No pending appointments.</p>';
     document.getElementById('pendingCount').textContent = 0;
     document.getElementById('pendingCount').style.background = '#22c55e';
     return;
   }
 
-  pendingCount = snap.size;
+  pendingCount = pendingAppointments.length;
   document.getElementById('pendingCount').textContent = pendingCount;
   list.innerHTML = '';
 
-  snap.forEach(docSnap => {
+  pendingAppointments.forEach(docSnap => {
     const d = docSnap.data();
     const card = buildApptCard(docSnap.id, d);
     list.appendChild(card);
@@ -37,6 +46,10 @@ function buildApptCard(id, d) {
   const card = document.createElement('div');
   card.className = 'appt-card';
   card.id = 'apptCard-' + id;
+  card.dataset.residentUid = d.resident_uid || '';
+  card.dataset.clinicName = d.clinic_name || 'the clinic';
+  card.dataset.date = d.preferred_date || '';
+  card.dataset.time = d.preferred_time || '';
   card.innerHTML = `
     <div class="appt-avatar" id="apptAvatar-${id}">
       <i class="fa-solid fa-user"></i>
@@ -78,6 +91,17 @@ window.confirmAppt = async function(apptId) {
       confirmed_at: serverTimestamp()
     });
 
+    await addDoc(collection(db, 'notifications'), {
+      recipient_uid: card.dataset.residentUid,
+      user_id: card.dataset.residentUid,
+      appointment_id: apptId,
+      type: 'appointment',
+      title: 'Appointment confirmed',
+      message: `Your appointment at ${card.dataset.clinicName} on ${card.dataset.date} at ${card.dataset.time} was confirmed.`,
+      read: false,
+      created_at: serverTimestamp()
+    });
+
     badge.textContent = 'Confirmed';
     badge.className = 'status-badge completed';
     card.classList.add('completed-card');
@@ -115,6 +139,17 @@ window.declineAppt = async function(apptId) {
     badge.style.color = '#dc2626';
     card.style.opacity = '0.5';
 
+    await addDoc(collection(db, 'notifications'), {
+      recipient_uid: card.dataset.residentUid,
+      user_id: card.dataset.residentUid,
+      appointment_id: apptId,
+      type: 'appointment',
+      title: 'Appointment declined',
+      message: `Your appointment request for ${card.dataset.date} was declined. Please choose another clinic or date.`,
+      read: false,
+      created_at: serverTimestamp()
+    });
+
     pendingCount = Math.max(0, pendingCount - 1);
     document.getElementById('pendingCount').textContent = pendingCount;
     if (pendingCount === 0) document.getElementById('pendingCount').style.background = '#22c55e';
@@ -137,11 +172,43 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('todayDate').textContent =
     new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, async (user) => {
     if (user) {
-      loadAppointments();
+      await loadAppointments();
+      loadActivePatients();
     } else {
       window.location.href = 'login.html';
     }
   });
 });
+
+async function loadActivePatients() {
+  const grid = document.getElementById('patientsGrid');
+  if (!grid || !auth.currentUser) return;
+  const staff = await fetchUserProfile(auth.currentUser.uid);
+  const clinicId = staff?.clinic_id || auth.currentUser.uid;
+  const snapshot = await getDocs(query(
+    collection(db, 'appointments'),
+    where('clinic_id', '==', clinicId),
+    where('status', '==', 'confirmed')
+  ));
+  if (snapshot.empty) return;
+  grid.innerHTML = '';
+  snapshot.docs.forEach((appointmentDoc) => {
+    const appointment = appointmentDoc.data();
+    const card = document.createElement('div');
+    card.className = 'patient-card blue-tint';
+    card.innerHTML = `
+      <div class="patient-header"><h3>${escapeHtml(appointment.resident_name || 'Resident')}</h3><p class="patient-id">Appointment patient</p></div>
+      <div class="treatment-section"><label>Appointment</label><div><span class="doses-badge">${escapeHtml(appointment.dose_label || 'Dose 1')}</span></div></div>
+      <div class="appointment-info"><i class="fa-regular fa-calendar"></i><span><strong>Scheduled:</strong> ${escapeHtml(appointment.preferred_date)} at ${escapeHtml(appointment.preferred_time)}</span></div>
+      <button class="view-record-btn" type="button">View Full Record</button>`;
+    grid.appendChild(card);
+  });
+}
+
+function escapeHtml(value = '') {
+  const element = document.createElement('div');
+  element.textContent = value;
+  return element.innerHTML;
+}

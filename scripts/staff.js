@@ -1,41 +1,13 @@
-import { auth, db, fetchUserProfile } from './scripts/firebase.js';
-import { signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-import { 
-    collection, 
-    doc, 
-    getDoc, 
-    setDoc, 
-    updateDoc, 
-    addDoc, 
-    onSnapshot, 
-    query, 
-    where 
-} from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-import { protectPage } from './scripts/role-guard.js';
+import { auth, db, fetchUserProfile } from './firebase.js';
+import { signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
+import { addDoc, collection, doc, onSnapshot, query, setDoc, updateDoc, where } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
+import { protectPage } from './role-guard.js';
 
 protectPage('clinic_staff');
 
 let currentClinicId = null;
-
-// Tab Switcher
-const tabInventoryBtn = document.getElementById('tabInventoryBtn');
-const tabProfileBtn = document.getElementById('tabProfileBtn');
-const inventorySection = document.getElementById('inventorySection');
-const profileSection = document.getElementById('profileSection');
-
-tabInventoryBtn.addEventListener('click', () => {
-    tabInventoryBtn.classList.add('active-tab');
-    tabProfileBtn.classList.remove('active-tab');
-    inventorySection.style.display = 'block';
-    profileSection.style.display = 'none';
-});
-
-tabProfileBtn.addEventListener('click', () => {
-    tabProfileBtn.classList.add('active-tab');
-    tabInventoryBtn.classList.remove('active-tab');
-    profileSection.style.display = 'block';
-    inventorySection.style.display = 'none';
-});
+const modal = document.getElementById('vaccineModal');
+const vaccineForm = document.getElementById('vaccineForm');
 
 // Auth state handling
 onAuthStateChanged(auth, async (user) => {
@@ -46,165 +18,112 @@ onAuthStateChanged(auth, async (user) => {
 
     currentClinicId = profile.clinic_id || user.uid;
 
-    loadClinicProfile(currentClinicId);
     listenToInventory(currentClinicId);
-});
-
-// --- CLINIC PROFILE CRUD ---
-async function loadClinicProfile(clinicId) {
-    try {
-        const docRef = doc(db, 'clinics', clinicId);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            document.getElementById('clinicDashboardTitle').textContent = data.name || "Clinic Dashboard";
-            document.getElementById('profName').value = data.name || '';
-            document.getElementById('profContact').value = data.contact || '';
-            document.getElementById('profHours').value = data.hours || '';
-        }
-    } catch (err) {
-        console.error("Failed to load clinic profile:", err);
-    }
-}
-
-document.getElementById('clinicProfileForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!currentClinicId) return;
-
-    const name = document.getElementById('profName').value;
-    const contact = document.getElementById('profContact').value;
-    const hours = document.getElementById('profHours').value;
-
-    try {
-        await setDoc(doc(db, 'clinics', currentClinicId), {
-            name,
-            contact,
-            hours
-        }, { merge: true });
-
-        document.getElementById('clinicDashboardTitle').textContent = name;
-        alert('Clinic profile updated successfully!');
-    } catch (err) {
-        console.error("Error saving profile:", err);
-        alert('Failed to update profile.');
-    }
 });
 
 // --- INVENTORY MANAGEMENT (Real-Time) ---
 function listenToInventory(clinicId) {
-    const q = query(collection(db, 'inventory'), where('clinic_id', '==', clinicId));
-
-    onSnapshot(q, (snapshot) => {
+    const inventoryQuery = query(collection(db, 'inventory'), where('clinic_id', '==', clinicId));
+    onSnapshot(inventoryQuery, (snapshot) => {
         const tbody = document.getElementById('inventoryTableBody');
         tbody.innerHTML = '';
-
         let totalStock = 0;
         let lowStockCount = 0;
 
-        snapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-            const id = docSnap.id;
-            const qty = parseInt(data.quantity || 0, 10);
-            totalStock += qty;
+        snapshot.forEach((inventoryDoc) => {
+            const data = inventoryDoc.data();
+            const quantity = Number(data.quantity || 0);
+            totalStock += quantity;
+            const status = quantity <= 5 ? 'critical' : quantity <= 15 ? 'low' : 'adequate';
+            if (status !== 'adequate') lowStockCount++;
 
-            let statusClass = 'adequate';
-            if (qty <= 5) {
-                statusClass = 'critical';
-                lowStockCount++;
-            } else if (qty <= 15) {
-                statusClass = 'low';
-                lowStockCount++;
-            }
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><strong>${escapeHtml(data.type)}</strong></td>
+                <td>${escapeHtml(data.manufacturer)}</td>
+                <td>${escapeHtml(data.batch)}</td>
+                <td><strong>${quantity} doses</strong></td>
+                <td>${escapeHtml(data.expiry)}</td>
+                <td><span class="status ${status}">${status}</span></td>
+                <td><button type="button" class="update-link edit-item-btn" data-id="${inventoryDoc.id}">
+                    <i class="fa-regular fa-pen-to-square"></i> Update
+                </button></td>`;
+            tbody.appendChild(row);
 
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><strong>${data.type}</strong></td>
-                <td>${data.manufacturer}</td>
-                <td>${data.batch}</td>
-                <td><strong>${qty} doses</strong></td>
-                <td>${data.expiry}</td>
-                <td><span class="status ${statusClass}">${statusClass}</span></td>
-                <td>
-                    <button class="edit-item-btn" data-id="${id}">
-                        <i class="fa-regular fa-pen-to-square"></i> Update
-                    </button>
-                </td>
-            `;
-            tbody.appendChild(tr);
+            row.querySelector('.edit-item-btn').addEventListener('click', () => openModal(inventoryDoc.id, data));
         });
 
         document.getElementById('statTotalStock').textContent = totalStock;
         document.getElementById('statLowStock').textContent = lowStockCount;
-
-        // Attach event listeners to Edit buttons
-        document.querySelectorAll('.edit-item-btn').forEach((btn) => {
-            btn.addEventListener('click', (e) => {
-                const docId = e.currentTarget.getAttribute('data-id');
-                const docData = snapshot.docs.find((d) => d.id === docId).data();
-                openModal(docId, docData);
-            });
-        });
+        document.querySelector('.alert-box p').textContent = `${lowStockCount} stock item${lowStockCount === 1 ? '' : 's'} require immediate attention.`;
+        setDoc(doc(db, 'clinics', clinicId), {
+            stock_total: totalStock,
+            stock_status: totalStock === 0 ? 'out' : lowStockCount > 0 ? 'low' : 'available',
+            stock_summary: snapshot.docs.map(item => `${item.data().type || 'Vaccine'}: ${Number(item.data().quantity || 0)}`).join(' · ')
+        }, { merge: true }).catch(error => console.error('Failed to publish clinic stock summary:', error));
+    }, (error) => {
+        console.error('Failed to load inventory:', error);
+        alert('Failed to load vaccine inventory.');
     });
 }
 
-// Modal Handlers
-const modal = document.getElementById('vaccineModal');
-const vaccineForm = document.getElementById('vaccineForm');
+function escapeHtml(value = '') {
+    const element = document.createElement('div');
+    element.textContent = value;
+    return element.innerHTML;
+}
 
-document.getElementById('openAddModalBtn').addEventListener('click', () => openModal());
-document.getElementById('closeModalBtn').addEventListener('click', closeModal);
-
-function openModal(docId = null, data = null) {
+function openModal(docId = '', data = {}) {
+    document.getElementById('modalTitle').textContent = docId ? 'Update Stock' : 'Add New Stock';
+    document.getElementById('vaccineDocId').value = docId;
+    document.getElementById('vacType').value = data.type || '';
+    document.getElementById('vacManufacturer').value = data.manufacturer || '';
+    document.getElementById('vacBatch').value = data.batch || '';
+    document.getElementById('vacQuantity').value = data.quantity ?? '';
+    document.getElementById('vacExpiry').value = data.expiry || '';
     modal.style.display = 'flex';
-    if (docId && data) {
-        document.getElementById('modalTitle').textContent = 'Update Stock';
-        document.getElementById('vaccineDocId').value = docId;
-        document.getElementById('vacType').value = data.type || '';
-        document.getElementById('vacManufacturer').value = data.manufacturer || '';
-        document.getElementById('vacBatch').value = data.batch || '';
-        document.getElementById('vacQuantity').value = data.quantity || 0;
-        document.getElementById('vacExpiry').value = data.expiry || '';
-    } else {
-        document.getElementById('modalTitle').textContent = 'Add New Stock';
-        vaccineForm.reset();
-        document.getElementById('vaccineDocId').value = '';
-    }
+    modal.setAttribute('aria-hidden', 'false');
 }
 
 function closeModal() {
     modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
     vaccineForm.reset();
 }
 
-vaccineForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!currentClinicId) return;
+document.querySelector('.add-btn').addEventListener('click', () => openModal());
+document.getElementById('closeModalBtn').addEventListener('click', closeModal);
+modal.addEventListener('click', (event) => {
+    if (event.target === modal) closeModal();
+});
 
+vaccineForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!currentClinicId) {
+        alert('Your staff account is not linked to a clinic. Add a clinic_id to your users profile first.');
+        return;
+    }
     const docId = document.getElementById('vaccineDocId').value;
     const payload = {
         clinic_id: currentClinicId,
-        type: document.getElementById('vacType').value,
-        manufacturer: document.getElementById('vacManufacturer').value,
-        batch: document.getElementById('vacBatch').value,
+        type: document.getElementById('vacType').value.trim(),
+        manufacturer: document.getElementById('vacManufacturer').value.trim(),
+        batch: document.getElementById('vacBatch').value.trim(),
         quantity: Number(document.getElementById('vacQuantity').value),
         expiry: document.getElementById('vacExpiry').value
     };
 
     try {
-        if (docId) {
-            await updateDoc(doc(db, 'inventory', docId), payload);
-        } else {
-            await addDoc(collection(db, 'inventory'), payload);
-        }
+        if (docId) await updateDoc(doc(db, 'inventory', docId), payload);
+        else await addDoc(collection(db, 'inventory'), payload);
         closeModal();
-    } catch (err) {
-        console.error("Error saving vaccine record:", err);
-        alert('Failed to save inventory record.');
+    } catch (error) {
+        console.error('Error saving vaccine record:', error);
+        const reason = error.code ? ` (${error.code})` : '';
+        alert(`Failed to save inventory record${reason}: ${error.message || 'Unknown Firebase error.'}`);
     }
 });
 
-// Sign Out
 document.querySelector('.signout-btn').addEventListener('click', async () => {
     await signOut(auth);
     window.location.href = 'login.html';
