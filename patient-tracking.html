@@ -152,6 +152,67 @@
         </div>
     </div>
 
+    <div id="recordModal" class="modal" aria-hidden="true">
+        <div class="modal-content record-modal-content" role="dialog" aria-modal="true" aria-labelledby="recordModalTitle">
+            <div class="modal-header">
+                <h2 id="recordModalTitle">Patient Full Record</h2>
+                <button type="button" id="closeRecordModalBtn" class="modal-close" aria-label="Close">&times;</button>
+            </div>
+            <div id="recordDetails" class="record-details"></div>
+            <button type="button" id="editRecordBtn" class="edit-record-btn" aria-label="Edit patient record" title="Edit patient record">
+                <i class="fa-solid fa-pencil"></i>
+            </button>
+            <form id="staffRecordForm" class="record-edit-form" hidden>
+                <input type="hidden" id="recordAppointmentId">
+                <h3>Clinic Assessment</h3>
+                <div class="record-edit-grid">
+                    <label>Address<input id="editAddress" type="text"></label>
+                    <label>Age<input id="editAge" type="number" min="0" max="120"></label>
+                    <label>Sex
+                        <select id="editSex">
+                            <option value="">Not provided</option>
+                            <option value="Female">Female</option>
+                            <option value="Male">Male</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </label>
+                    <label>Date of Bite<input id="editBiteDate" type="date"></label>
+                    <label>Animal That Bit You<input id="editAnimal" type="text"></label>
+                    <label>Body Part of the Bite<input id="editBitePart" type="text"></label>
+                </div>
+                <h3>Clinic Assessment</h3>
+                <label>Category of Patient
+                    <select id="recordCategory">
+                        <option value="">Select category</option>
+                        <option value="Category I">Category I</option>
+                        <option value="Category II">Category II</option>
+                        <option value="Category III">Category III</option>
+                    </select>
+                </label>
+                <label>Was the bite washed?
+                    <select id="recordWoundWashed">
+                        <option value="">Select answer</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                    </select>
+                </label>
+                <label>Type of Bite
+                    <select id="recordBiteType">
+                        <option value="">Select type</option>
+                        <option value="Bite">Bite</option>
+                        <option value="Scratch">Scratch</option>
+                        <option value="Both bite and scratch">Both bite and scratch</option>
+                        <option value="Lick on broken skin">Lick on broken skin</option>
+                    </select>
+                </label>
+                <div class="record-edit-actions">
+                    <button type="button" id="cancelEditBtn" class="record-cancel-btn">Cancel</button>
+                    <button type="submit" class="add-btn">Save Patient Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script type="module" src="scripts/patient-tracking.js"></script>
         <script type="module">
             import { auth } from './scripts/firebase.js';

@@ -2,7 +2,7 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
+    function isLoggedIn() {
       return request.auth != null;
     }
 
@@ -11,15 +11,15 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return signedIn() && userProfile().role == 'admin';
+      return isLoggedIn() && (userProfile().role == 'admin' || userProfile().role == 'administrator');
     }
 
     function isClinicStaff() {
-      return signedIn() && userProfile().role == 'clinic_staff';
+      return isLoggedIn() && userProfile().role == 'clinic_staff';
     }
 
     function isResident() {
-      return signedIn() && userProfile().role == 'resident';
+      return isLoggedIn() && userProfile().role == 'resident';
     }
 
     function belongsToClinic(clinicId) {
@@ -28,15 +28,20 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
-      allow create: if signedIn() && request.auth.uid == userId;
+      allow read: if isLoggedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isLoggedIn() && request.auth.uid == userId;
       allow update, delete: if isAdmin();
     }
 
     match /clinics/{clinicId} {
-      allow read: if signedIn();
+      allow read: if isLoggedIn();
       allow create, update: if isAdmin() || belongsToClinic(clinicId);
       allow delete: if isAdmin();
+    }
+
+    match /system_settings/{settingId} {
+      allow read: if true;
+      allow create, update: if isAdmin();
     }
 
     match /inventory/{inventoryId} {

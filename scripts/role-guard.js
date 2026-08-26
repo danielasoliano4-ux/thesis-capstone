@@ -8,7 +8,9 @@ export function protectPage(expectedRole, loginPage = 'login.html') {
     }
 
     const profile = await fetchUserProfile(user.uid);
-    if (!profile || profile.role !== expectedRole) {
+    const hasExpectedRole = profile && (profile.role === expectedRole
+      || (expectedRole === 'admin' && profile.role === 'administrator'));
+    if (!hasExpectedRole) {
       alert(`This account does not have ${expectedRole === 'clinic_staff' ? 'clinic staff' : expectedRole} access.`);
       await signOutUser();
       window.location.href = loginPage;
