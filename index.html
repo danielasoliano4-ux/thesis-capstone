@@ -230,6 +230,10 @@
       .donut-legend { display: flex; flex-direction: column; gap: 9px; font-size: 13px; color: #374151; }
       .donut-legend-item { display: flex; align-items: center; gap: 8px; }
       .donut-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+      .animal-donut { width: 90px; height: 90px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+      .animal-donut > div { width: 56px; height: 56px; border-radius: 50%; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+      .animal-donut strong { font-size: 16px; color: #0f172a; }
+      .animal-donut small { font-size: 10px; color: #94a3b8; }
 
       .trend-bars { display: flex; align-items: flex-end; gap: 6px; height: 64px; }
       .trend-bar { flex: 1; border-radius: 4px 4px 0 0; min-width: 0; }
@@ -685,7 +689,7 @@
             <span class="viz-period-tag">2026 YTD</span>
           </div>
           <div class="viz-card-body">
-            <div class="bgy-list">
+            <div class="bgy-list" id="barangayIncidentRate">
               <div class="bgy-row">
                 <div class="bgy-row-top"><span class="bgy-name">Mamatid</span><span class="bgy-count">32 cases</span></div>
                 <div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-high" style="width:92%;"></div></div>
@@ -730,7 +734,7 @@
         <!-- ANIMAL SOURCE DONUT -->
         <div class="viz-mini-card">
           <h4><i class="fa-solid fa-paw" style="color:#e60000;margin-right:6px;"></i>Exposure by Animal Source</h4>
-          <div class="donut-wrap">
+          <div class="donut-wrap" id="animalExposureChart">
             <svg class="donut-svg" width="90" height="90" viewBox="0 0 36 36">
               <!-- Dog 68% -->
               <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e2e8f0" stroke-width="3.8"/>
@@ -760,7 +764,7 @@
         <!-- MONTHLY TREND SPARKLINE -->
         <div class="viz-mini-card">
           <h4><i class="fa-solid fa-arrow-trend-up" style="color:#e60000;margin-right:6px;"></i>Case Trend (Jan–Jul 2026)</h4>
-          <div class="trend-bars">
+          <div class="trend-bars" id="caseTrendChart">
             <div class="trend-bar" style="height:38%;background:#00b140;" title="Jan: 12"></div>
             <div class="trend-bar" style="height:57%;background:#d98a00;" title="Feb: 18"></div>
             <div class="trend-bar" style="height:47%;background:#00b140;" title="Mar: 15"></div>
@@ -787,7 +791,7 @@
         <!-- AGE GROUP BREAKDOWN -->
         <div class="viz-mini-card">
           <h4><i class="fa-solid fa-users" style="color:#e60000;margin-right:6px;"></i>Cases by Age Group (2026)</h4>
-          <div class="age-list">
+          <div class="age-list" id="ageGroupChart">
             <div class="age-row">
               <span class="age-label">0–9</span>
               <div class="age-bar-wrap"><div class="age-bar-fill" style="width:30%;"></div></div>
@@ -823,11 +827,12 @@
 
     </section>
 
+    <script type="module" src="scripts/public-analytics.js"></script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <script>
       // ── Monthly Chart ──
-      new Chart(document.getElementById('monthlyChart'), {
+      window.monthlyChart = new Chart(document.getElementById('monthlyChart'), {
         type: 'bar',
         data: {
           labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],

@@ -63,6 +63,10 @@ async function loadResidentDashboard(uid) {
   const headerName = document.getElementById('headerName');
   if (headerName && currentResidentName) headerName.textContent = currentResidentName;
 
+  loadResidentBookings(uid);
+  listenToAnimalExposure();
+  listenToDashboardAnalytics();
+
   const recordsSnap = await getDocs(
     query(collection(db, 'vaccination_records'), where('resident_uid', '==', uid), orderBy('date_given', 'desc'))
   );
@@ -71,7 +75,6 @@ async function loadResidentDashboard(uid) {
   const latestRecord = hasRecord ? recordsSnap.docs[0].data() : null;
 
   initView(hasRecord, latestRecord);
-  loadResidentBookings(uid);
 }
 
 function populateClinicOptions(clinics) {
@@ -126,29 +129,48 @@ function renderClinicBookingList(clinics) {
 }
 
 async function loadResidentBookings(uid) {
-  const container = document.getElementById('residentBookings');
+  const container = document.getElementById('bookingRecords');
   if (!container) return;
   try {
     onSnapshot(query(collection(db, 'appointments'), where('resident_uid', '==', uid)), (snapshot) => {
       const bookings = snapshot.docs.map(item => ({ id: item.id, ...item.data() }))
-        .filter(item => ['pending', 'confirmed'].includes(item.status))
         .sort((a, b) => `${a.preferred_date} ${a.preferred_time}`.localeCompare(`${b.preferred_date} ${b.preferred_time}`));
 
       if (!bookings.length) {
-        container.innerHTML = '';
+        container.innerHTML = `
+          <div class="booking-progress-panel booking-empty-state">
+            <h3><i class="fa-regular fa-calendar-check"></i> Booking Records</h3>
+            <p>No booking records yet. Your appointment progress will appear here after you book.</p>
+          </div>`;
         return;
       }
 
-      container.innerHTML = `
-      <div style="background:#fff;border:1px solid #ddd;border-radius:14px;padding:18px;">
-        <h3 style="margin:0 0 12px;color:#111827;"><i class="fa-regular fa-calendar-check" style="color:#ef0000;margin-right:8px;"></i>Upcoming Bookings</h3>
+      const bookingMarkup = `
+      <div class="booking-progress-panel">
+        <h3><i class="fa-regular fa-calendar-check"></i> Booking Records</h3>
         ${bookings.map(booking => `
-          <div style="display:flex;justify-content:space-between;gap:16px;align-items:center;padding:12px 0;border-top:1px solid #f1f1f1;flex-wrap:wrap;">
-            <div><strong>${escapeHtml(booking.clinic_name || 'Clinic')}</strong><div style="font-size:13px;color:#6b7280;">${escapeHtml(booking.preferred_date)} at ${escapeHtml(booking.preferred_time)} · ${escapeHtml(booking.dose_label || 'Dose 1')}</div></div>
-            <span style="padding:5px 10px;border-radius:14px;font-size:12px;font-weight:700;background:${booking.status === 'confirmed' ? '#dcfce7' : '#fef3c7'};color:${booking.status === 'confirmed' ? '#15803d' : '#92400e'};">${booking.status === 'confirmed' ? 'Confirmed' : 'Waiting for clinic'}</span>
+          <div class="booking-progress-card">
+            <div class="booking-progress-heading">
+              <div><strong>${escapeHtml(booking.clinic_name || 'Clinic')}</strong><div>${escapeHtml(booking.preferred_date)} at ${escapeHtml(booking.preferred_time)} · ${escapeHtml(booking.dose_label || 'Dose 1')}</div></div>
+              <span class="booking-status status-${escapeHtml(booking.status || 'pending')}">${booking.status === 'confirmed' ? 'Confirmed' : booking.status === 'completed' ? 'Completed' : booking.status === 'declined' ? 'Declined' : 'Pending clinic review'}</span>
+            </div>
+            ${booking.status === 'declined' ? '<p class="booking-status-message">This appointment was declined by the clinic. Please choose another clinic or date.</p>' : `
+            <div class="booking-steps">
+              <div class="booking-step done"><span><i class="fa-solid fa-check"></i></span><small>Booked</small></div>
+              <div class="booking-step ${booking.status === 'pending' ? 'current' : 'done'}"><span>${booking.status === 'pending' ? '<i class="fa-solid fa-clock"></i>' : '<i class="fa-solid fa-check"></i>'}</span><small>${booking.status === 'pending' ? 'Under review' : 'Confirmed'}</small></div>
+              <div class="booking-step ${booking.status === 'completed' ? 'done' : ''}"><span>${booking.status === 'completed' ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-calendar-day"></i>'}</span><small>${booking.status === 'completed' ? 'Visited' : 'Appointment'}</small></div>
+            </div>`}
           </div>`).join('')}
       </div>`;
-    }, (error) => console.error('Failed to listen for resident bookings:', error));
+          container.innerHTML = bookingMarkup;
+    }, (error) => {
+      console.error('Failed to listen for resident bookings:', error);
+      container.innerHTML = `
+        <div class="booking-progress-panel booking-empty-state">
+          <h3><i class="fa-regular fa-calendar-xmark"></i> Booking Records</h3>
+          <p>Booking records could not be loaded. Please refresh the page and try again.</p>
+        </div>`;
+    });
   } catch (error) {
     console.error('Failed to load resident bookings:', error);
   }
@@ -158,6 +180,50 @@ function escapeHtml(value = '') {
   const element = document.createElement('div');
   element.textContent = value;
   return element.innerHTML;
+}
+
+function renderAnimalExposure(data = {}) {
+  const chart = document.getElementById('animalExposureChart');
+  if (!chart) return;
+  const colors = ['#e60000', '#d98a00', '#00b140', '#6b7280'];
+  const animals = Array.isArray(data.animals) && data.animals.length ? data.animals : [
+    { name: 'Dog', percent: 68 }, { name: 'Cat', percent: 20 },
+    { name: 'Bat', percent: 8 }, { name: 'Others', percent: 4 }
+  ];
+  let offset = 0;
+  const stops = animals.map((animal, index) => {
+    const start = offset;
+    offset += Number(animal.percent) || 0;
+    return `${colors[index % colors.length]} ${start}% ${offset}%`;
+  }).join(', ');
+  chart.innerHTML = `<div class="animal-donut" style="background:conic-gradient(${stops});"><div><strong>${escapeHtml(animals[0].percent)}%</strong><small>${escapeHtml(animals[0].name)}</small></div></div><div class="donut-legend">${animals.map((animal, index) => `<div class="donut-legend-item"><span class="donut-dot" style="background:${colors[index % colors.length]};"></span> ${escapeHtml(animal.name)} — ${escapeHtml(animal.percent)}%</div>`).join('')}</div>`;
+}
+
+function listenToAnimalExposure() {
+  onSnapshot(doc(db, 'system_settings', 'animal_exposure'), snapshot => {
+    renderAnimalExposure(snapshot.exists() ? snapshot.data() : {});
+  }, error => console.error('Failed to load animal exposure data:', error));
+}
+
+function listenToDashboardAnalytics() {
+  onSnapshot(doc(db, 'system_settings', 'dashboard_analytics'), snapshot => {
+    const data = snapshot.exists() ? snapshot.data() : {};
+    const monthlyCases = data.monthlyCases || [12, 18, 15, 22, 19, 24, 17];
+    const monthlyVaccinations = data.monthlyVaccinations || [45, 62, 55, 80, 72, 95, 53];
+    if (window.residentMonthlyChart) {
+      window.residentMonthlyChart.data.datasets[0].data = monthlyCases;
+      window.residentMonthlyChart.data.datasets[1].data = monthlyVaccinations;
+      window.residentMonthlyChart.update();
+    }
+    renderAnalyticsList('barangayIncidentRate', data.barangays, item => `<div class="bgy-row"><div class="bgy-row-top"><span class="bgy-name">${escapeHtml(item.name)}</span><span class="bgy-count">${escapeHtml(item.cases)} cases</span></div><div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-high" style="width:${Math.min(100, Number(item.cases) * 3)}%;"></div></div></div>`);
+    renderAnalyticsList('caseTrendChart', data.caseTrend, value => `<div class="trend-bar" style="height:${Math.min(100, Number(value))}%;background:#d98a00;"></div>`);
+    renderAnalyticsList('ageGroupChart', data.ageGroups, (value, index) => `<div class="age-row"><span class="age-label">${['0–9','10–19','20–39','40–59','60+'][index]}</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:${Math.min(100, Number(value) * 2)}%;"></div></div><span class="age-count">${escapeHtml(value)}</span></div>`);
+  }, error => console.error('Failed to load dashboard analytics:', error));
+}
+
+function renderAnalyticsList(id, values, renderItem) {
+  const element = document.getElementById(id);
+  if (element && Array.isArray(values) && values.length) element.innerHTML = values.map(renderItem).join('');
 }
 
 function initView(hasRecord, latestRecord) {
@@ -211,7 +277,7 @@ function populateActivePatientData(data) {
 function renderCasesChart() {
   const ctx = document.getElementById('monthlyChart');
   if (!ctx || !window.Chart) return;
-  new Chart(ctx, {
+  window.residentMonthlyChart = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
@@ -312,14 +378,15 @@ async function confirmBooking() {
   const dose = document.getElementById('modalDose').value;
   const date = document.getElementById('modalDate').value;
   const time = document.getElementById('modalTime').value;
+  const address = document.getElementById('modalAddress').value.trim();
   const msgEl = document.getElementById('bookingMsg');
 
-  if (!date) {
+  if (!date || !address) {
     msgEl.style.display = 'block';
     msgEl.style.background = '#fff5f5';
     msgEl.style.color = '#ef0000';
     msgEl.style.border = '1px solid #fecaca';
-    msgEl.textContent = 'Please select a preferred date.';
+    msgEl.textContent = !date ? 'Please select a preferred date.' : 'Please provide your address.';
     return;
   }
 
@@ -343,6 +410,15 @@ async function confirmBooking() {
       dose_label: dose,
       preferred_date: date,
       preferred_time: time,
+      resident_address: address,
+      patient_age: document.getElementById('modalAge').value ? Number(document.getElementById('modalAge').value) : null,
+      patient_sex: document.getElementById('modalSex').value,
+      bite_date: document.getElementById('modalBiteDate').value,
+      animal_type: document.getElementById('modalAnimal').value.trim(),
+      bite_body_part: document.getElementById('modalBitePart').value.trim(),
+      patient_category: '',
+      wound_washed: '',
+      bite_type: '',
       status: 'pending',
       created_at: serverTimestamp()
     });

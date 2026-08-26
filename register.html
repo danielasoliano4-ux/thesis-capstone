@@ -101,7 +101,16 @@
             text-align: center;
             margin-top: 12px;
         }
-        .terms-text a { color: #ef0000; text-decoration: none; }
+        .terms-text a { color: #ef0000; text-decoration: none; font-weight: 600; }
+        .terms-text a:hover { text-decoration: underline; }
+        .policy-modal { display: none; position: fixed; inset: 0; z-index: 2000; align-items: center; justify-content: center; padding: 20px; background: rgba(17,24,39,0.55); }
+        .policy-modal.open { display: flex; }
+        .policy-dialog { width: min(620px, 100%); max-height: 88vh; overflow-y: auto; background: #fff; border-radius: 12px; padding: 26px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
+        .policy-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+        .policy-header h2 { font-size: 20px; color: #111827; }
+        .policy-close { border: 0; background: transparent; color: #6b7280; font-size: 28px; line-height: 1; cursor: pointer; }
+        .policy-dialog h3 { margin: 18px 0 6px; font-size: 14px; color: #111827; }
+        .policy-dialog p { color: #4b5563; font-size: 13px; line-height: 1.6; }
         .password-wrapper {
             position: relative;
         }
@@ -228,7 +237,7 @@
 
             <p class="terms-text">
                 By registering you agree to the
-                <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+                <a href="#terms" data-policy="terms">Terms of Service</a> and <a href="#privacy" data-policy="privacy">Privacy Policy</a>.
             </p>
 
             <div class="divider">or</div>
@@ -236,6 +245,16 @@
             <p class="login-link">
                 Already have an account? <a href="login.html">Sign in here</a>
             </p>
+        </div>
+
+        <div class="policy-modal" id="policyModal" aria-hidden="true">
+            <div class="policy-dialog" role="dialog" aria-modal="true" aria-labelledby="policyTitle">
+                <div class="policy-header">
+                    <h2 id="policyTitle">Privacy Policy</h2>
+                    <button type="button" class="policy-close" id="policyClose" aria-label="Close policy">&times;</button>
+                </div>
+                <div id="policyContent"></div>
+            </div>
         </div>
 
         <footer class="footer" style="margin-top: 40px;">

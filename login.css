@@ -283,6 +283,11 @@ form input[type="password"]:focus {
     outline: none;
 }
 
+.password-input-wrapper input::-ms-reveal,
+.password-input-wrapper input::-ms-clear {
+    display: none;
+}
+
 .password-toggle {
     position: absolute;
     right: 12px;

@@ -293,6 +293,9 @@
       <i class="fa-regular fa-bell"></i> Notifications
       <span id="notifBadge" style="background:#ef0000;color:white;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;display:none;">4</span>
     </a>
+    <a class="nav-tab" onclick="showTab('booking-records', this)" id="nav-booking-records">
+      <i class="fa-regular fa-folder-open"></i> Booking Records
+    </a>
   </nav>
 
   <!-- ==================== OVERVIEW TAB ==================== -->
@@ -703,7 +706,7 @@
             <span class="viz-period-tag">2026 YTD</span>
           </div>
           <div class="viz-card-body">
-            <div class="bgy-list">
+            <div class="bgy-list" id="barangayIncidentRate">
               <div class="bgy-row"><div class="bgy-row-top"><span class="bgy-name">Mamatid</span><span class="bgy-count">32 cases</span></div><div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-high" style="width:92%;"></div></div></div>
               <div class="bgy-row"><div class="bgy-row-top"><span class="bgy-name">Banlic</span><span class="bgy-count">26 cases</span></div><div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-high" style="width:74%;"></div></div></div>
               <div class="bgy-row"><div class="bgy-row-top"><span class="bgy-name">Pulo</span><span class="bgy-count">19 cases</span></div><div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-medium" style="width:54%;"></div></div></div>
@@ -720,7 +723,7 @@
       <div class="viz-bottom-row">
         <div class="viz-mini-card">
           <h4><i class="fa-solid fa-paw" style="color:#e60000;margin-right:6px;"></i>Exposure by Animal Source</h4>
-          <div class="donut-wrap">
+          <div class="donut-wrap" id="animalExposureChart">
             <svg class="donut-svg" width="90" height="90" viewBox="0 0 36 36">
               <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e2e8f0" stroke-width="3.8"/>
               <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e60000" stroke-width="3.8" stroke-dasharray="42.7 57.3" stroke-dashoffset="25" />
@@ -741,7 +744,7 @@
 
         <div class="viz-mini-card">
           <h4><i class="fa-solid fa-arrow-trend-up" style="color:#e60000;margin-right:6px;"></i>Case Trend (Jan–Jul 2026)</h4>
-          <div class="trend-bars">
+          <div class="trend-bars" id="caseTrendChart">
             <div class="trend-bar" style="height:38%;background:#00b140;" title="Jan: 12"></div>
             <div class="trend-bar" style="height:57%;background:#d98a00;" title="Feb: 18"></div>
             <div class="trend-bar" style="height:47%;background:#00b140;" title="Mar: 15"></div>
@@ -764,7 +767,7 @@
 
         <div class="viz-mini-card">
           <h4><i class="fa-solid fa-users" style="color:#e60000;margin-right:6px;"></i>Cases by Age Group (2026)</h4>
-          <div class="age-list">
+          <div class="age-list" id="ageGroupChart">
             <div class="age-row"><span class="age-label">0–9</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:30%;"></div></div><span class="age-count">18</span></div>
             <div class="age-row"><span class="age-label">10–19</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:40%;"></div></div><span class="age-count">24</span></div>
             <div class="age-row"><span class="age-label">20–39</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:55%;"></div></div><span class="age-count">33</span></div>
@@ -785,8 +788,6 @@
   <!-- ==================== APPOINTMENTS TAB ==================== -->
   <div class="tab-panel" id="panel-appointments">
 
-    <div id="residentBookings" style="max-width:1100px;margin:0 auto 20px;padding:0 20px;"></div>
-
     <!-- NEW RESIDENT: Onboarding flow -->
     <div id="appt-new-resident" style="display:none;">
 
@@ -801,7 +802,7 @@
       <div class="steps-flow">
         <div class="flow-step"><div class="flow-num">1</div><h4>Find a Clinic</h4><p>Browse available clinics with real-time vaccine stock below</p></div>
         <div class="flow-step"><div class="flow-num">2</div><h4>Book Appointment</h4><p>Select your preferred date, time, and dose schedule</p></div>
-        <div class="flow-step"><div class="flow-num">3</div><h4>Visit the Clinic</h4><p>Arrive on time. Bring valid ID and your booking confirmation</p></div>
+        <div class="flow-step"><div class="flow-num">3</div><h4>Visit the Clinic</h4><p>Arrive on time. Bring booking confirmation</p></div>
         <div class="flow-step"><div class="flow-num">4</div><h4>Get Vaccinated</h4><p>Staff records your dose — your dashboard progress tracker activates automatically</p></div>
       </div>
 
@@ -1185,6 +1186,17 @@
   </div>
   <!-- END NOTIFICATIONS PANEL -->
 
+  <!-- ==================== BOOKING RECORDS TAB ==================== -->
+  <div class="tab-panel" id="panel-booking-records">
+    <div id="bookingRecords" class="booking-records-container">
+      <div class="booking-progress-panel booking-empty-state">
+        <h3><i class="fa-regular fa-calendar-check"></i> Booking Records</h3>
+        <p>No booking records yet. Your appointment progress will appear here after you book.</p>
+      </div>
+    </div>
+  </div>
+  <!-- END BOOKING RECORDS PANEL -->
+
   <!-- BOOKING MODAL -->
   <div class="modal-overlay" id="bookingModal">
     <div class="modal-box">
@@ -1223,6 +1235,36 @@
           <option>2:00 PM</option>
           <option>3:00 PM</option>
         </select>
+      </div>
+      <div class="modal-field">
+        <label for="modalAddress">Address</label>
+        <input id="modalAddress" type="text" placeholder="House number, street, barangay" required />
+      </div>
+      <p style="margin:14px 0 8px;font-size:12px;color:#6b7280;">The clinic staff may complete the bite details with you during your visit.</p>
+      <div class="modal-field">
+        <label for="modalAge">Age <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
+        <input id="modalAge" type="number" min="0" max="120" placeholder="Age" />
+      </div>
+      <div class="modal-field">
+        <label for="modalSex">Sex <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
+        <select id="modalSex">
+          <option value="">Prefer not to say / staff will ask</option>
+          <option value="Female">Female</option>
+          <option value="Male">Male</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <label for="modalBiteDate">Date of Bite <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
+        <input id="modalBiteDate" type="date" />
+      </div>
+      <div class="modal-field">
+        <label for="modalAnimal">Animal That Bit You <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
+        <input id="modalAnimal" type="text" placeholder="Dog, cat, etc." />
+      </div>
+      <div class="modal-field">
+        <label for="modalBitePart">Body Part of the Bite <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
+        <input id="modalBitePart" type="text" placeholder="Hand, leg, arm, etc." />
       </div>
       <div id="bookingMsg" style="display:none;margin-top:10px;padding:10px;border-radius:8px;font-size:13px;"></div>
       <div class="modal-actions">

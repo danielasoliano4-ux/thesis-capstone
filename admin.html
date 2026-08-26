@@ -78,6 +78,7 @@
             <div class="chart-card-body">
                 <canvas id="monthlyChart" height="240"></canvas>
             </div>
+            <button type="button" class="dashboard-pencil-btn" data-edit-form="dashboardAnalyticsForm" aria-label="Edit dashboard analytics" title="Edit dashboard analytics"><i class="fa-solid fa-pencil"></i></button>
         </div>
         <div class="chart-card">
             <div class="chart-card-header">
@@ -87,6 +88,42 @@
                 <canvas id="stockChart" height="240"></canvas>
             </div>
         </div>
+    </div>
+    <div class="content-box animal-exposure-editor">
+        <div class="content-box-header">
+            <div>
+                <h3><i class="fa-solid fa-paw" style="color:#ef0000;margin-right:6px;"></i>Exposure by Animal Source</h3>
+                <p>Update the animal labels and percentages shown on the resident dashboard.</p>
+            </div>
+            <span id="animalExposureSaveStatus" class="status adequate">Ready</span>
+        </div>
+        <form id="animalExposureForm" class="animal-exposure-form" hidden>
+            <label>Animal 1<input id="animalName1" type="text" required></label>
+            <label>Percent<input id="animalPercent1" type="number" min="0" max="100" required></label>
+            <label>Animal 2<input id="animalName2" type="text" required></label>
+            <label>Percent<input id="animalPercent2" type="number" min="0" max="100" required></label>
+            <label>Animal 3<input id="animalName3" type="text" required></label>
+            <label>Percent<input id="animalPercent3" type="number" min="0" max="100" required></label>
+            <label>Animal 4<input id="animalName4" type="text" required></label>
+            <label>Percent<input id="animalPercent4" type="number" min="0" max="100" required></label>
+            <button class="btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save Animal Data</button>
+        </form>
+        <p id="animalExposureFormMessage" class="animal-exposure-form-message" aria-live="polite"></p>
+        <button type="button" class="analytics-edit-btn" data-edit-form="animalExposureForm" aria-label="Edit animal exposure data" title="Edit animal exposure data"><i class="fa-solid fa-pencil"></i></button>
+    </div>
+    <div class="content-box dashboard-analytics-editor">
+        <div class="content-box-header"><div><h3><i class="fa-solid fa-chart-line" style="color:#ef0000;margin-right:6px;"></i>Dashboard Analytics Data</h3><p>Edit the values displayed on public and resident dashboards. Separate values with commas.</p></div><span id="dashboardAnalyticsSaveStatus" class="status adequate">Ready</span></div>
+        <form id="dashboardAnalyticsForm" class="dashboard-analytics-form" hidden>
+            <label>Monthly Cases (Jan-Jul)<input id="monthlyCases" type="text" required></label>
+            <label>Monthly Vaccinations (Jan-Jul)<input id="monthlyVaccinations" type="text" required></label>
+            <label>Barangay Names<input id="barangayNames" type="text" required></label>
+            <label>Barangay Cases<input id="barangayCases" type="text" required></label>
+            <label>Case Trend Values<input id="caseTrendValues" type="text" required></label>
+            <label>Age Group Counts<input id="ageGroupCounts" type="text" required></label>
+            <button class="btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save Dashboard Data</button>
+        </form>
+        <p id="dashboardAnalyticsMessage" class="animal-exposure-form-message" aria-live="polite"></p>
+        <button type="button" class="analytics-edit-btn" data-edit-form="dashboardAnalyticsForm" aria-label="Edit dashboard analytics" title="Edit dashboard analytics"><i class="fa-solid fa-pencil"></i></button>
     </div>
     <div class="content-box">
         <div class="content-box-header">
@@ -333,5 +370,6 @@
     import { protectPage } from './scripts/role-guard.js';
     protectPage('admin');
 </script>
+<script type="module" src="scripts/admin-analytics.js"></script>
 </body> 
 </html> 

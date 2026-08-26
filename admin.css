@@ -612,3 +612,25 @@ tbody tr:last-child td {
         gap: 15px;
     }
 }
+.animal-exposure-editor { margin-top: 20px; }
+.animal-exposure-editor .content-box-header { align-items: flex-start; }
+.animal-exposure-editor .content-box-header p { margin-top: 5px; color: #6b7280; font-size: 12px; }
+.animal-exposure-form { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 0 22px 12px; }
+.animal-exposure-form label { display: grid; gap: 5px; color: #374151; font-size: 12px; font-weight: 600; }
+.animal-exposure-form input { width: 100%; padding: 9px 10px; border: 1px solid #d1d5db; border-radius: 6px; font: inherit; }
+.animal-exposure-form button { align-self: end; }
+.animal-exposure-form-message { min-height: 18px; padding: 0 22px 16px; color: #15803d; font-size: 12px; }
+.animal-exposure-editor, .dashboard-analytics-editor { position: relative; }
+.animal-exposure-form[hidden], .dashboard-analytics-form[hidden] { display: none; }
+.analytics-edit-btn { display: block; margin: 0 22px 16px auto; border: 0; background: transparent; color: #6b7280; font-size: 16px; cursor: pointer; }
+.analytics-edit-btn:hover { color: #ef0000; }
+.dashboard-analytics-editor { margin-top: 20px; }
+.dashboard-analytics-editor .content-box-header p { margin-top: 5px; color: #6b7280; font-size: 12px; }
+.dashboard-analytics-form { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; padding: 0 22px 12px; }
+.dashboard-analytics-form label { display: grid; gap: 5px; color: #374151; font-size: 12px; font-weight: 600; }
+.dashboard-analytics-form input { width: 100%; padding: 9px 10px; border: 1px solid #d1d5db; border-radius: 6px; font: inherit; }
+.dashboard-analytics-form button { justify-self: start; }
+.chart-card { position: relative; }
+.dashboard-pencil-btn { position: absolute; right: 16px; bottom: 12px; width: 32px; height: 32px; border: 1px solid #e5e7eb; border-radius: 50%; background: #fff; color: #6b7280; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+.dashboard-pencil-btn:hover { color: #ef0000; border-color: #fecaca; background: #fffafa; }
+@media (max-width: 800px) { .animal-exposure-form { grid-template-columns: repeat(2, 1fr); } }

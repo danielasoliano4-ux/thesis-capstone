@@ -12,7 +12,7 @@ function approveUser(btn) {
     btn.disabled = true;
 }
 const monthCtx = document.getElementById('monthlyChart').getContext('2d');
-new Chart(monthCtx, {
+window.adminMonthlyChart = new Chart(monthCtx, {
     type: 'bar',
     data: {
         labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],

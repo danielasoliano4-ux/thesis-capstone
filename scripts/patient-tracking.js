@@ -204,8 +204,103 @@ async function loadActivePatients() {
       <div class="appointment-info"><i class="fa-regular fa-calendar"></i><span><strong>Scheduled:</strong> ${escapeHtml(appointment.preferred_date)} at ${escapeHtml(appointment.preferred_time)}</span></div>
       <button class="view-record-btn" type="button">View Full Record</button>`;
     grid.appendChild(card);
+    card.querySelector('.view-record-btn').addEventListener('click', () => openRecordModal(appointmentDoc.id));
   });
 }
+
+function displayValue(value) {
+  return value === null || value === undefined || value === '' ? 'Not provided' : escapeHtml(String(value));
+}
+
+async function openRecordModal(id) {
+  try {
+    const appointmentSnap = await getDoc(doc(db, 'appointments', id));
+    if (!appointmentSnap.exists()) {
+      alert('This patient record is no longer available.');
+      return;
+    }
+    const appointment = appointmentSnap.data();
+  document.getElementById('recordAppointmentId').value = id;
+  document.getElementById('recordModalTitle').textContent = `${appointment.resident_name || 'Resident'} — Full Record`;
+  document.getElementById('recordDetails').innerHTML = `
+    <div class="record-detail-grid">
+      <div><strong>Address</strong><span>${displayValue(appointment.resident_address)}</span></div>
+      <div><strong>Age</strong><span>${displayValue(appointment.patient_age)}</span></div>
+      <div><strong>Sex</strong><span>${displayValue(appointment.patient_sex)}</span></div>
+      <div><strong>Date of Bite</strong><span>${displayValue(appointment.bite_date)}</span></div>
+      <div><strong>Animal</strong><span>${displayValue(appointment.animal_type)}</span></div>
+      <div><strong>Body Part</strong><span>${displayValue(appointment.bite_body_part)}</span></div>
+      <div><strong>Appointment</strong><span>${displayValue(appointment.preferred_date)} at ${displayValue(appointment.preferred_time)}</span></div>
+      <div><strong>Dose</strong><span>${displayValue(appointment.dose_label)}</span></div>
+      <div><strong>Category of Patient</strong><span>${displayValue(appointment.patient_category)}</span></div>
+      <div><strong>Was the Bite Washed?</strong><span>${displayValue(appointment.wound_washed)}</span></div>
+      <div><strong>Type of Bite</strong><span>${displayValue(appointment.bite_type)}</span></div>
+    </div>`;
+  document.getElementById('editAddress').value = appointment.resident_address || '';
+  document.getElementById('editAge').value = appointment.patient_age ?? '';
+  document.getElementById('editSex').value = appointment.patient_sex || '';
+  document.getElementById('editBiteDate').value = appointment.bite_date || '';
+  document.getElementById('editAnimal').value = appointment.animal_type || '';
+  document.getElementById('editBitePart').value = appointment.bite_body_part || '';
+  document.getElementById('recordCategory').value = appointment.patient_category || '';
+  document.getElementById('recordWoundWashed').value = appointment.wound_washed || '';
+  document.getElementById('recordBiteType').value = appointment.bite_type || '';
+  document.getElementById('staffRecordForm').hidden = true;
+  document.getElementById('editRecordBtn').hidden = false;
+  const modal = document.getElementById('recordModal');
+  modal.style.display = 'flex';
+  modal.setAttribute('aria-hidden', 'false');
+  } catch (error) {
+    alert('Failed to load patient record: ' + error.message);
+  }
+}
+
+function closeRecordModal() {
+  const modal = document.getElementById('recordModal');
+  modal.style.display = 'none';
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = document.getElementById('recordModal');
+  document.getElementById('closeRecordModalBtn').addEventListener('click', closeRecordModal);
+  document.getElementById('editRecordBtn').addEventListener('click', () => {
+    document.getElementById('staffRecordForm').hidden = false;
+    document.getElementById('editRecordBtn').hidden = true;
+  });
+  document.getElementById('cancelEditBtn').addEventListener('click', () => {
+    document.getElementById('staffRecordForm').hidden = true;
+    document.getElementById('editRecordBtn').hidden = false;
+  });
+  modal.addEventListener('click', event => {
+    if (event.target === modal) closeRecordModal();
+  });
+  document.getElementById('staffRecordForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const appointmentId = document.getElementById('recordAppointmentId').value;
+    try {
+      await updateDoc(doc(db, 'appointments', appointmentId), {
+        resident_address: document.getElementById('editAddress').value.trim(),
+        patient_age: document.getElementById('editAge').value ? Number(document.getElementById('editAge').value) : null,
+        patient_sex: document.getElementById('editSex').value,
+        bite_date: document.getElementById('editBiteDate').value,
+        animal_type: document.getElementById('editAnimal').value.trim(),
+        bite_body_part: document.getElementById('editBitePart').value.trim(),
+        patient_category: document.getElementById('recordCategory').value,
+        wound_washed: document.getElementById('recordWoundWashed').value,
+        bite_type: document.getElementById('recordBiteType').value,
+        assessed_by: auth.currentUser.uid,
+        assessed_at: serverTimestamp()
+      });
+      closeRecordModal();
+      document.getElementById('staffRecordForm').hidden = true;
+      document.getElementById('editRecordBtn').hidden = false;
+      showToast('Patient record saved.');
+    } catch (error) {
+      alert('Failed to save patient record: ' + error.message);
+    }
+  });
+});
 
 function escapeHtml(value = '') {
   const element = document.createElement('div');

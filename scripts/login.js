@@ -17,8 +17,8 @@ const loginRoles = {
 };
 
 document.getElementById('loginBtn').addEventListener('click', async () => {
-  const email    = document.querySelector('input[type="text"]').value.trim();
-  const password = document.querySelector('input[type="password"]').value;
+  const email    = document.querySelector('.signin-section input[type="text"]').value.trim();
+  const password = document.getElementById('passwordInput').value;
   const btn      = document.getElementById('loginBtn');
 
   if (!email || !password) {
@@ -46,7 +46,9 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     }
 
     const role = userDoc.data().role;
-    if (role !== expectedRole) {
+    const hasExpectedRole = role === expectedRole
+      || (expectedRole === 'admin' && role === 'administrator');
+    if (!hasExpectedRole) {
       const roleLabels = {
         resident: 'resident',
         clinic_staff: 'clinic staff',
@@ -59,7 +61,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
       return;
     }
 
-    const page = rolePages[role];
+    const page = rolePages[expectedRole];
 
     if (!page) {
       alert('Unknown role. Contact your administrator.');
