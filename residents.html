@@ -13,6 +13,8 @@
       /* ── PUBLIC HEALTH HUB SECTION ──────────────────────────── */
       .public-hub {
         padding: 0 40px 50px;
+        width: 1450px;
+        margin-left: 15px;
       }
       .hub-section-title {
         display: flex;
@@ -265,10 +267,9 @@
     </div>
     <div class="header-right">
       <h3 id="headerName">John Cruz</h3>
-      <a href="notifications.html" style="color:#374151;font-size:20px;position:relative;" id="notifBell">
-        <i class="fa-regular fa-bell"></i>
-        <span id="notifDot" style="position:absolute;top:-4px;right:-4px;width:8px;height:8px;background:#ef0000;border-radius:50%;display:none;"></span>
-      </a>
+      <button type="button" class="profile-btn" id="profileBtn" aria-label="Open profile" title="Profile">
+        <i class="fa-solid fa-user-circle"></i>
+      </button>
       <button class="signout-btn" id="signOutBtn">
         <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
       </button>
@@ -298,45 +299,95 @@
     </a>
   </nav>
 
-  <!-- ==================== OVERVIEW TAB ==================== -->
-  <div class="tab-panel active" id="panel-overview">
-    <div class="overview-row" style="display:flex;gap:20px;align-items:flex-start;">
-      <aside class="emergency-panel" style="width:300px;background:#fff6f6;border-radius:12px;padding:18px;border:1px solid #f5c6c6;">
-        <div style="background:#ef4444;color:white;padding:10px;border-radius:8px;font-weight:700;margin-bottom:12px;">Emergency First Aid for Animal Bites</div>
-        <ol style="margin:0;padding-left:18px;color:#374151;">
-          <li style="margin-bottom:12px;"><strong>Wash the wound immediately</strong><div style="font-size:13px;color:#6b7280;">Use soap and running water for at least 15 minutes</div></li>
-          <li style="margin-bottom:12px;"><strong>Apply antiseptic solution</strong><div style="font-size:13px;color:#6b7280;">Use povidone-iodine, alcohol, or hydrogen peroxide</div></li>
-          <li style="margin-bottom:12px;"><strong>Do NOT cover the wound</strong><div style="font-size:13px;color:#6b7280;">Leave it open to prevent infection</div></li>
-          <li style="margin-bottom:12px;"><strong>Seek medical attention immediately</strong><div style="font-size:13px;color:#6b7280;">Go to the nearest clinic within 24 hours</div></li>
-        </ol>
-        <div style="border:1px solid #f5c6c6;background:#fff;padding:12px;border-radius:8px;margin-top:14px;">
-          <strong style="color:#b91c1c;">CRITICAL WARNING</strong>
-          <p style="font-size:13px;color:#6b7280;margin-top:6px;">Rabies is 100% fatal once symptoms appear. Early treatment is essential for survival.</p>
-        </div>
-      </aside>
-
-      <div class="overview-main" style="flex:1;min-width:0;">
-
-      <!-- PERSISTENT OVERVIEW MAP (always visible on Overview) -->
-      <div class="map-card" style="margin-bottom:18px;">
-        <div class="map-top">
-          <h3><i class="fa-solid fa-location-dot" style="color:#ef0000;margin-right:6px;"></i> Find Nearby Clinics</h3>
-          <div class="map-filter">
-            <button class="active-btn" onclick="filterMarkers('all', this)">All</button>
-            <button onclick="filterMarkers('available', this)">Available</button>
-            <button onclick="filterMarkers('low', this)">Low Stock</button>
-            <button onclick="filterMarkers('out', this)">Out of Stock</button>
-          </div>
-        </div>
-        <div class="map-box">
-          <div id="googleMapOverview" style="width:100%;height:450px;border-radius:14px;overflow:hidden;border:1px solid #ddd;"></div>
-        </div>
-        <div style="margin-top:12px;">
-          <h4 style="font-size:14px;color:#374151;margin-bottom:10px;"><i class="fa-solid fa-list"></i> Clinic Status Overview</h4>
-          <div id="clinicSidebarOverview" style="display:flex;flex-direction:column;gap:8px;margin-top:6px;"></div>
-        </div>
+  <div class="profile-modal" id="profileModal" aria-hidden="true">
+    <div class="profile-dialog" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+      <div class="profile-dialog-header">
+        <div><h2 id="profileTitle"><i class="fa-solid fa-user-circle"></i> My Profile</h2><p>Manage your personal details</p></div>
+        <button type="button" class="profile-close" id="profileClose" aria-label="Close profile">&times;</button>
       </div>
+      <form id="profileForm">
+        <div class="profile-form-grid">
+          <label>Username<input id="profileUsername" type="text" required></label>
+          <label>Email<input id="profileEmail" type="email" readonly></label>
+          <label>Phone Number<input id="profilePhone" type="tel"></label>
+          <label>Birthday<input id="profileBirthday" type="date"></label>
+          <label>Gender<select id="profileGender"><option value="">Select gender</option><option>Female</option><option>Male</option><option>Other</option><option>Prefer not to say</option></select></label>
+          <label>Address<input id="profileAddress" type="text" placeholder="House number, street, barangay"></label>
+        </div>
+        <p id="profileMessage" class="profile-message" aria-live="polite"></p>
+        <button type="submit" class="profile-save-btn"><i class="fa-solid fa-floppy-disk"></i> Save Profile</button>
+      </form>
+    </div>
+  </div>
 
+  <!-- ==================== OVERVIEW TAB ==================== -->
+
+  <div class="tab-panel active" id="panel-overview">
+ <div class="top-grid" style="margin-top: 25px;">
+  <!-- Left Side: First Aid Card (Width fixed at 400px by grid) -->
+  <div class="first-aid-card">
+    <div class="card-header">
+      Emergency First Aid for Animal Bites
+    </div>
+
+    <div class="step">
+      <div class="step-number">1</div>
+      <div>
+        <h4>Wash the wound immediately</h4>
+        <p>Use soap and running water for at least 15 minutes</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">2</div>
+      <div>
+        <h4>Apply antiseptic solution</h4>
+        <p>Use povidone-iodine, alcohol, or hydrogen peroxide</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">3</div>
+      <div>
+        <h4>Do NOT cover the wound</h4>
+        <p>Leave it open to prevent infection</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-number">4</div>
+      <div>
+        <h4>Seek medical attention immediately</h4>
+        <p>Go to the nearest clinic within 24 hours</p>
+      </div>
+    </div>
+
+    <div class="warning-box" style="margin: 0 20px 20px; border: 1px solid #f5c6c6; background: #fff; padding: 12px; border-radius: 12px;">
+      <strong style="color: #b91c1c;">CRITICAL WARNING</strong>
+      <p style="font-size: 13px; color: #6b7280; margin-top: 6px;">Rabies is 100% fatal once symptoms appear. Early treatment is essential for survival.</p>
+    </div>
+  </div>
+
+  <!-- Right Side: Map Card (Fills remaining space) -->
+  <div class="map-card">
+    <div class="map-top">
+      <h3><i class="fa-solid fa-location-dot" style="color:#ef0000;margin-right:6px;"></i> Find Nearby Clinics</h3>
+      <div class="map-filter">
+        <button class="active-btn" onclick="filterMarkers('all', this)">All</button>
+        <button onclick="filterMarkers('available', this)">Available</button>
+        <button onclick="filterMarkers('low', this)">Low Stock</button>
+        <button onclick="filterMarkers('out', this)">Out of Stock</button>
+      </div>
+    </div>
+    <div class="map-box">
+      <div id="googleMapOverview" style="width:100%;height:450px;border-radius:14px;overflow:hidden;border:1px solid #ddd;"></div>
+    </div>
+    <div style="margin-top:12px;">
+      <h4 style="font-size:14px;color:#374151;margin-bottom:10px;"><i class="fa-solid fa-list"></i> Clinic Status Overview</h4>
+      <div id="clinicSidebarOverview" style="display:flex;flex-direction:column;gap:8px;margin-top:6px;"></div>
+    </div>
+  </div>
+</div>
 
     <!-- ---- STATE A: NEW RESIDENT (no vaccination history) ---- -->
     <div id="view-new" style="display:none;">

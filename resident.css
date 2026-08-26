@@ -70,6 +70,25 @@ body {
 .header-right h3 {
     font-size: 16px;
 }
+.profile-btn { border: 0; background: transparent; color: #374151; font-size: 24px; cursor: pointer; padding: 4px; }
+.profile-btn:hover { color: #ef0000; }
+.profile-modal { display: none; position: fixed; inset: 0; z-index: 2100; align-items: center; justify-content: center; padding: 20px; background: rgba(17,24,39,0.55); }
+.profile-modal.open { display: flex; }
+.profile-dialog { width: min(650px, 100%); max-height: 90vh; overflow-y: auto; background: #fff; border-radius: 14px; padding: 26px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
+.profile-dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+.profile-dialog-header h2 { font-size: 21px; color: #111827; }
+.profile-dialog-header h2 i { color: #ef0000; margin-right: 7px; }
+.profile-dialog-header p { color: #6b7280; font-size: 13px; margin-top: 5px; }
+.profile-close { border: 0; background: transparent; color: #6b7280; font-size: 28px; line-height: 1; cursor: pointer; }
+.profile-form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+.profile-form-grid label { display: grid; gap: 6px; color: #374151; font-size: 13px; font-weight: 600; }
+.profile-form-grid input, .profile-form-grid select { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 7px; background: #fff; color: #111827; font: inherit; }
+.profile-form-grid input:focus, .profile-form-grid select:focus { outline: 2px solid #fecaca; border-color: #ef0000; }
+.profile-form-grid input[readonly] { background: #f3f4f6; color: #6b7280; }
+.profile-message { min-height: 20px; margin: 16px 0 8px; font-size: 13px; }
+.profile-save-btn { width: 100%; border: 0; border-radius: 7px; padding: 11px; background: #ef0000; color: #fff; font-weight: 700; cursor: pointer; }
+.profile-save-btn:hover { background: #cc0000; }
+@media (max-width: 600px) { .profile-form-grid { grid-template-columns: 1fr; } .profile-dialog { padding: 20px; } }
 
 .menu-btn {
     width: 42px;

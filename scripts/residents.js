@@ -1,5 +1,5 @@
 import { auth, db, fetchUserProfile, onAuthStateChanged, signOutUser } from './firebase.js';
-import { doc, getDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let currentUid = null;
 let currentResidentName = '';
@@ -47,6 +47,7 @@ async function loadResidentDashboard(uid) {
   currentUid = uid;
   const residentDoc = await getDoc(doc(db, 'residents', uid));
   const residentData = residentDoc.exists() ? residentDoc.data() : {};
+  populateResidentProfile(residentData);
 
   // Prefer resident's first/last name; fall back to users.full_name or auth displayName
   if (residentData.first_name) {
@@ -75,6 +76,16 @@ async function loadResidentDashboard(uid) {
   const latestRecord = hasRecord ? recordsSnap.docs[0].data() : null;
 
   initView(hasRecord, latestRecord);
+}
+
+function populateResidentProfile(data) {
+  const user = auth.currentUser;
+  document.getElementById('profileUsername').value = data.username || [data.first_name, data.last_name].filter(Boolean).join(' ') || currentResidentName;
+  document.getElementById('profileEmail').value = data.email || user?.email || '';
+  document.getElementById('profilePhone').value = data.phone || '';
+  document.getElementById('profileBirthday').value = data.birthday || '';
+  document.getElementById('profileGender').value = data.gender || '';
+  document.getElementById('profileAddress').value = data.address || '';
 }
 
 function populateClinicOptions(clinics) {
@@ -511,6 +522,51 @@ function resApplyFilter(q = '') {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+  const profileModal = document.getElementById('profileModal');
+  const profileMessage = document.getElementById('profileMessage');
+  const openProfile = () => {
+    profileModal.classList.add('open');
+    profileModal.setAttribute('aria-hidden', 'false');
+  };
+  const closeProfile = () => {
+    profileModal.classList.remove('open');
+    profileModal.setAttribute('aria-hidden', 'true');
+  };
+  document.getElementById('profileBtn').addEventListener('click', openProfile);
+  document.getElementById('profileClose').addEventListener('click', closeProfile);
+  profileModal.addEventListener('click', event => {
+    if (event.target === profileModal) closeProfile();
+  });
+  document.getElementById('profileForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!currentUid) return;
+    const username = document.getElementById('profileUsername').value.trim();
+    if (!username) return;
+    const saveButton = event.currentTarget.querySelector('.profile-save-btn');
+    saveButton.disabled = true;
+    profileMessage.textContent = 'Saving profile...';
+    profileMessage.style.color = '#6b7280';
+    try {
+      await updateDoc(doc(db, 'residents', currentUid), {
+        username,
+        phone: document.getElementById('profilePhone').value.trim(),
+        birthday: document.getElementById('profileBirthday').value,
+        gender: document.getElementById('profileGender').value,
+        address: document.getElementById('profileAddress').value.trim()
+      });
+      currentResidentName = username;
+      const headerName = document.getElementById('headerName');
+      if (headerName) headerName.textContent = username;
+      profileMessage.textContent = 'Profile saved successfully.';
+      profileMessage.style.color = '#15803d';
+    } catch (error) {
+      profileMessage.textContent = 'Could not save profile: ' + error.message;
+      profileMessage.style.color = '#b91c1c';
+    } finally {
+      saveButton.disabled = false;
+    }
+  });
+
   document.getElementById('bookingModal').addEventListener('click', function(e) {
     if (e.target === this) closeBookingModal();
   });
