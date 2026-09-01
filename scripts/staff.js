@@ -1,6 +1,6 @@
 import { auth, db, fetchUserProfile } from './firebase.js';
 import { signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
-import { addDoc, collection, doc, onSnapshot, query, setDoc, updateDoc, where } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
+import { addDoc, collection, doc, onSnapshot, query, setDoc, updateDoc, where, getDocs } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 import { protectPage } from './role-guard.js';
 
 protectPage('clinic_staff');
@@ -18,7 +18,10 @@ onAuthStateChanged(auth, async (user) => {
 
     currentClinicId = profile.clinic_id || user.uid;
 
+    await setDoc(doc(db, 'clinics', currentClinicId), { staff_uid: user.uid }, { merge: true });
+
     listenToInventory(currentClinicId);
+    listenToActivePatients(currentClinicId);
 });
 
 // --- INVENTORY MANAGEMENT (Real-Time) ---

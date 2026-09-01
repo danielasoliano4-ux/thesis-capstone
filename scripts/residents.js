@@ -1,9 +1,12 @@
 import { auth, db, fetchUserProfile, onAuthStateChanged, signOutUser } from './firebase.js';
-import { doc, getDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let currentUid = null;
 let currentResidentName = '';
 let selectedClinic = null;
+let completedDoseCount = 0;
+let firstDoseDate = null;
+const doseDayOffsets = [0, 3, 7, 14, 28];
 
 function markAllRead() {
   document.querySelectorAll('.notif-item.unread').forEach(item => {
@@ -43,25 +46,26 @@ function filterNotifs(type, btn) {
 window.markAllRead = markAllRead;
 window.filterNotifs = filterNotifs;
 
-async function loadResidentDashboard(uid) {
+async function loadResidentDashboard(uid, userProfile = {}) {
   currentUid = uid;
   const residentDoc = await getDoc(doc(db, 'residents', uid));
   const residentData = residentDoc.exists() ? residentDoc.data() : {};
+  populateResidentProfile(residentData);
 
-  // Prefer resident's first/last name; fall back to users.full_name or auth displayName
-  if (residentData.first_name) {
-    currentResidentName = residentData.first_name + ' ' + (residentData.last_name || '');
-  } else {
-    const userDoc = await getDoc(doc(db, 'users', uid));
-    if (userDoc.exists() && userDoc.data().full_name) {
-      currentResidentName = userDoc.data().full_name;
-    } else if (auth.currentUser && auth.currentUser.displayName) {
-      currentResidentName = auth.currentUser.displayName;
-    }
-  }
+  const residentName = [residentData.first_name, residentData.last_name].filter(Boolean).join(' ');
+  currentResidentName = residentName
+    || residentData.username
+    || userProfile.full_name
+    || userProfile.name
+    || auth.currentUser?.displayName
+    || auth.currentUser?.email
+    || 'Resident';
 
+  const displayName = currentResidentName || auth.currentUser?.email || 'Resident';
   const headerName = document.getElementById('headerName');
-  if (headerName && currentResidentName) headerName.textContent = currentResidentName;
+  const recordName = document.getElementById('recordName');
+  if (headerName) headerName.textContent = displayName;
+  if (recordName) recordName.textContent = displayName;
 
   loadResidentBookings(uid);
   listenToAnimalExposure();
@@ -71,10 +75,27 @@ async function loadResidentDashboard(uid) {
     query(collection(db, 'vaccination_records'), where('resident_uid', '==', uid), orderBy('date_given', 'desc'))
   );
 
+  const vaccinationRecords = recordsSnap.docs.map(item => item.data());
+  completedDoseCount = Math.min(5, vaccinationRecords.reduce((highest, record) => Math.max(highest, Number(record.dose_number || 0)), 0));
+  firstDoseDate = vaccinationRecords.reduce((earliest, record) => {
+    const value = toDate(record.date_given);
+    return value && (!earliest || value < earliest) ? value : earliest;
+  }, null);
+
   const hasRecord = !recordsSnap.empty;
   const latestRecord = hasRecord ? recordsSnap.docs[0].data() : null;
 
   initView(hasRecord, latestRecord);
+}
+
+function populateResidentProfile(data) {
+  const user = auth.currentUser;
+  document.getElementById('profileUsername').value = data.username || [data.first_name, data.last_name].filter(Boolean).join(' ') || currentResidentName;
+  document.getElementById('profileEmail').value = data.email || user?.email || '';
+  document.getElementById('profilePhone').value = data.phone || '';
+  document.getElementById('profileBirthday').value = data.birthday || '';
+  document.getElementById('profileGender').value = data.gender || '';
+  document.getElementById('profileAddress').value = data.address || '';
 }
 
 function populateClinicOptions(clinics) {
@@ -154,6 +175,13 @@ async function loadResidentBookings(uid) {
               <div><strong>${escapeHtml(booking.clinic_name || 'Clinic')}</strong><div>${escapeHtml(booking.preferred_date)} at ${escapeHtml(booking.preferred_time)} · ${escapeHtml(booking.dose_label || 'Dose 1')}</div></div>
               <span class="booking-status status-${escapeHtml(booking.status || 'pending')}">${booking.status === 'confirmed' ? 'Confirmed' : booking.status === 'completed' ? 'Completed' : booking.status === 'declined' ? 'Declined' : 'Pending clinic review'}</span>
             </div>
+            <button type="button" class="view-record-button" data-record-id="${escapeHtml(booking.id)}">View Full Record</button>
+            <div class="full-record-details" id="full-record-${escapeHtml(booking.id)}" hidden>
+              <strong>Vaccination progress</strong>
+              <p>${completedDoseCount} of 5 doses completed.</p>
+              <p>${completedDoseCount < 5 ? `Next: Dose ${completedDoseCount + 1} (Day ${doseDayOffsets[completedDoseCount]})${firstDoseDate ? ` on ${formatScheduleDate(firstDoseDate, doseDayOffsets[completedDoseCount])}` : ''}.` : 'Vaccination schedule complete.'}</p>
+              ${completedDoseCount < 5 ? `<button type="button" class="next-dose-button" data-clinic-id="${escapeHtml(booking.clinic_id || '')}">Book Next Dose</button>` : ''}
+            </div>
             ${booking.status === 'declined' ? '<p class="booking-status-message">This appointment was declined by the clinic. Please choose another clinic or date.</p>' : `
             <div class="booking-steps">
               <div class="booking-step done"><span><i class="fa-solid fa-check"></i></span><small>Booked</small></div>
@@ -163,6 +191,14 @@ async function loadResidentBookings(uid) {
           </div>`).join('')}
       </div>`;
           container.innerHTML = bookingMarkup;
+      container.querySelectorAll('.view-record-button').forEach(button => button.addEventListener('click', () => {
+        const details = document.getElementById(`full-record-${button.dataset.recordId}`);
+        if (details) details.hidden = !details.hidden;
+      }));
+      container.querySelectorAll('.next-dose-button').forEach(button => button.addEventListener('click', () => {
+        const clinic = window.clinicDirectory?.find(item => item.id === button.dataset.clinicId);
+        openBookingModal(clinic?.name || '', clinic?.id || '');
+      }));
     }, (error) => {
       console.error('Failed to listen for resident bookings:', error);
       container.innerHTML = `
@@ -174,6 +210,23 @@ async function loadResidentBookings(uid) {
   } catch (error) {
     console.error('Failed to load resident bookings:', error);
   }
+}
+
+function toDate(value) {
+  if (!value) return null;
+  if (typeof value.toDate === 'function') return value.toDate();
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatInputDate(date, dayOffset) {
+  const scheduled = new Date(date);
+  scheduled.setDate(scheduled.getDate() + dayOffset);
+  return scheduled.toISOString().split('T')[0];
+}
+
+function formatScheduleDate(date, dayOffset) {
+  return new Date(formatInputDate(date, dayOffset) + 'T00:00:00').toLocaleDateString();
 }
 
 function escapeHtml(value = '') {
@@ -359,10 +412,18 @@ function openBookingModal(clinic, clinicId = '') {
   }
   selectedClinic = window.clinicDirectory?.find(item => item.id === sel?.value) || null;
   const dateEl = document.getElementById('modalDate');
-  if (dateEl && !dateEl.value) {
-    const today = new Date().toISOString().split('T')[0];
-    dateEl.value = today;
-    dateEl.min = today;
+  const doseSelect = document.getElementById('modalDose');
+  const nextDose = Math.min(5, completedDoseCount + 1);
+  if (doseSelect) {
+    doseSelect.value = `Dose ${nextDose} (Day ${doseDayOffsets[nextDose - 1]})`;
+    [...doseSelect.options].forEach((option, index) => { option.hidden = index + 1 !== nextDose; });
+  }
+  if (dateEl) {
+    const suggestedDate = firstDoseDate && nextDose > 1
+      ? formatInputDate(firstDoseDate, doseDayOffsets[nextDose - 1])
+      : new Date().toISOString().split('T')[0];
+    dateEl.value = suggestedDate;
+    dateEl.min = suggestedDate;
   }
   document.getElementById('bookingModal').classList.add('open');
 }
@@ -387,6 +448,19 @@ async function confirmBooking() {
     msgEl.style.color = '#ef0000';
     msgEl.style.border = '1px solid #fecaca';
     msgEl.textContent = !date ? 'Please select a preferred date.' : 'Please provide your address.';
+    return;
+  }
+
+  const nextDose = Math.min(5, completedDoseCount + 1);
+  const earliestDate = firstDoseDate && nextDose > 1
+    ? formatInputDate(firstDoseDate, doseDayOffsets[nextDose - 1])
+    : new Date().toISOString().split('T')[0];
+  if (date < earliestDate) {
+    msgEl.style.display = 'block';
+    msgEl.style.background = '#fff5f5';
+    msgEl.style.color = '#ef0000';
+    msgEl.style.border = '1px solid #fecaca';
+    msgEl.textContent = `Dose ${nextDose} should be scheduled on or after ${earliestDate}.`;
     return;
   }
 
@@ -511,6 +585,51 @@ function resApplyFilter(q = '') {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+  const profileModal = document.getElementById('profileModal');
+  const profileMessage = document.getElementById('profileMessage');
+  const openProfile = () => {
+    profileModal.classList.add('open');
+    profileModal.setAttribute('aria-hidden', 'false');
+  };
+  const closeProfile = () => {
+    profileModal.classList.remove('open');
+    profileModal.setAttribute('aria-hidden', 'true');
+  };
+  document.getElementById('profileBtn').addEventListener('click', openProfile);
+  document.getElementById('profileClose').addEventListener('click', closeProfile);
+  profileModal.addEventListener('click', event => {
+    if (event.target === profileModal) closeProfile();
+  });
+  document.getElementById('profileForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!currentUid) return;
+    const username = document.getElementById('profileUsername').value.trim();
+    if (!username) return;
+    const saveButton = event.currentTarget.querySelector('.profile-save-btn');
+    saveButton.disabled = true;
+    profileMessage.textContent = 'Saving profile...';
+    profileMessage.style.color = '#6b7280';
+    try {
+      await updateDoc(doc(db, 'residents', currentUid), {
+        username,
+        phone: document.getElementById('profilePhone').value.trim(),
+        birthday: document.getElementById('profileBirthday').value,
+        gender: document.getElementById('profileGender').value,
+        address: document.getElementById('profileAddress').value.trim()
+      });
+      currentResidentName = username;
+      const headerName = document.getElementById('headerName');
+      if (headerName) headerName.textContent = username;
+      profileMessage.textContent = 'Profile saved successfully.';
+      profileMessage.style.color = '#15803d';
+    } catch (error) {
+      profileMessage.textContent = 'Could not save profile: ' + error.message;
+      profileMessage.style.color = '#b91c1c';
+    } finally {
+      saveButton.disabled = false;
+    }
+  });
+
   document.getElementById('bookingModal').addEventListener('click', function(e) {
     if (e.target === this) closeBookingModal();
   });
@@ -537,7 +656,7 @@ document.addEventListener('DOMContentLoaded', function() {
           signOutUser().then(() => window.location.href = 'login.html');
           return;
         }
-        loadResidentDashboard(user.uid);
+        loadResidentDashboard(user.uid, profile);
       });
     } else {
       window.location.href = 'login.html';

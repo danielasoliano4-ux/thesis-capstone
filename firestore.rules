@@ -33,8 +33,14 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    match /residents/{residentId} {
+      allow create: if isResident() && request.auth.uid == residentId;
+      allow read, update, delete: if isResident() && request.auth.uid == residentId;
+      allow read: if isAdmin() || isClinicStaff();
+    }
+
     match /clinics/{clinicId} {
-      allow read: if isLoggedIn();
+      allow read: if true;
       allow create, update: if isAdmin() || belongsToClinic(clinicId);
       allow delete: if isAdmin();
     }
@@ -89,6 +95,14 @@ service cloud.firestore {
         && (resource.data.recipient_uid == request.auth.uid
           || resource.data.user_id == request.auth.uid);
       allow delete: if isAdmin();
+    }
+
+    match /vaccination_records/{recordId} {
+      allow read: if isAdmin() 
+        || (isResident() && resource.data.resident_uid == request.auth.uid)
+        || isClinicStaff();
+      allow create: if isAdmin() || isClinicStaff();
+      allow update, delete: if isAdmin() || isClinicStaff();
     }
   }
 }
