@@ -6,6 +6,113 @@ import {
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let pendingCount = 0;
+let currentClinicId = null;
+
+async function loadPatients() {
+  const grid = document.getElementById('patientsGrid');
+  grid.innerHTML = '<p style="color:#6b7280;padding:16px;">Loading patients…</p>';
+
+  try {
+    console.log('Current clinic ID:', currentClinicId);
+    
+    if (!currentClinicId) {
+      throw new Error('Clinic ID not loaded. Please refresh the page.');
+    }
+
+    const appointments = await getDocs(query(
+      collection(db, 'appointments'),
+      where('clinic_id', '==', currentClinicId)
+    ));
+
+    console.log('Appointments found:', appointments.size);
+
+    const uniqueResidents = new Map();
+    for (const apptDoc of appointments.docs) {
+      const appt = apptDoc.data();
+      console.log('Processing appointment:', appt.resident_name, appt.resident_uid);
+      
+      if (!uniqueResidents.has(appt.resident_uid)) {
+        try {
+          const vaccinationSnap = await getDocs(query(
+            collection(db, 'vaccination_records'),
+            where('resident_uid', '==', appt.resident_uid)
+          ));
+          console.log('Vaccination records for', appt.resident_uid, ':', vaccinationSnap.size);
+          const doses = Math.max(0, ...vaccinationSnap.docs.map(v => Number(v.data().dose_number || 0)));
+          uniqueResidents.set(appt.resident_uid, {
+            name: appt.resident_name,
+            uid: appt.resident_uid,
+            doses,
+            nextAppt: appt.preferred_date,
+            appointments: []
+          });
+        } catch (vaccErr) {
+          console.warn('Could not load vaccination records for', appt.resident_uid, ':', vaccErr.message);
+          uniqueResidents.set(appt.resident_uid, {
+            name: appt.resident_name,
+            uid: appt.resident_uid,
+            doses: 0,
+            nextAppt: appt.preferred_date,
+            appointments: []
+          });
+        }
+      }
+      uniqueResidents.get(appt.resident_uid).appointments.push({ id: apptDoc.id, ...appt });
+    }
+
+    if (!uniqueResidents.size) {
+      grid.innerHTML = '<p style="color:#6b7280;padding:16px;"><i class="fa-solid fa-circle-check" style="color:#22c55e;margin-right:6px;"></i>No patients with appointments.</p>';
+      return;
+    }
+
+    grid.innerHTML = '';
+    const colors = ['blue-tint', 'yellow-tint', 'green-tint', 'red-tint'];
+    let colorIndex = 0;
+    for (const resident of uniqueResidents.values()) {
+      const pct = Math.round((resident.doses / 5) * 100);
+      const tintClass = colors[colorIndex % colors.length];
+      const completedBadge = resident.doses === 5 ? '<span class="completed-badge">Completed</span>' : '';
+      const nextApptText = resident.doses < 5 ? `<div class="appointment-info"><i class="fa-regular fa-calendar"></i><span><strong>Next Appointment:</strong> ${resident.nextAppt}</span></div>` : '';
+      const card = `
+        <div class="patient-card ${tintClass}">
+          <div class="patient-header">
+            <div class="header-with-badge">
+              <h3>${resident.name}</h3>
+              ${completedBadge}
+            </div>
+          </div>
+          <div class="treatment-section">
+            <label>Treatment Progress</label>
+            <div><span class="doses-badge">${resident.doses}/5 doses</span></div>
+            <div class="progress-bar-container"><div class="progress-bar" style="width:${pct}%;"></div></div>
+            <p class="progress-text">${pct}% Complete</p>
+          </div>
+          ${nextApptText}
+          <button class="view-record-btn" data-resident-uid="${resident.uid}">View Full Record</button>
+        </div>`;
+      grid.innerHTML += card;
+      colorIndex++;
+    }
+
+
+    grid.querySelectorAll('.view-record-btn').forEach(btn => btn.addEventListener('click', () => {
+      const uid = btn.dataset.residentUid;
+      const resident = uniqueResidents.get(uid);
+      if (resident) openResidentRecord(resident);
+    }));
+  } catch (err) {
+    console.error('Failed to load patients:', err);
+    const errorMsg = err.message || err.code || 'Unknown error';
+    grid.innerHTML = `<p style="color:#ef0000;padding:16px;"><strong>Error loading patients:</strong> ${errorMsg}</p><p style="color:#666;padding:0 16px;font-size:12px;">Check browser console for details.</p>`;
+  }
+}
+
+function openResidentRecord(resident) {
+  const modal = document.getElementById('recordModal');
+  const details = document.getElementById('recordDetails');
+  details.innerHTML = `<p><strong>${resident.name}</strong><br>Doses: ${resident.doses}/5</p>`;
+  modal.style.display = 'block';
+}
 
 async function loadAppointments() {
   const list = document.getElementById('apptList');
@@ -174,39 +281,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   onAuthStateChanged(auth, async (user) => {
     if (user) {
+      const staff = await fetchUserProfile(user.uid);
+      currentClinicId = staff?.clinic_id || user.uid;
       await loadAppointments();
-      loadActivePatients();
+      await loadPatients();
     } else {
       window.location.href = 'login.html';
     }
   });
 });
-
-async function loadActivePatients() {
-  const grid = document.getElementById('patientsGrid');
-  if (!grid || !auth.currentUser) return;
-  const staff = await fetchUserProfile(auth.currentUser.uid);
-  const clinicId = staff?.clinic_id || auth.currentUser.uid;
-  const snapshot = await getDocs(query(
-    collection(db, 'appointments'),
-    where('clinic_id', '==', clinicId),
-    where('status', '==', 'confirmed')
-  ));
-  if (snapshot.empty) return;
-  grid.innerHTML = '';
-  snapshot.docs.forEach((appointmentDoc) => {
-    const appointment = appointmentDoc.data();
-    const card = document.createElement('div');
-    card.className = 'patient-card blue-tint';
-    card.innerHTML = `
-      <div class="patient-header"><h3>${escapeHtml(appointment.resident_name || 'Resident')}</h3><p class="patient-id">Appointment patient</p></div>
-      <div class="treatment-section"><label>Appointment</label><div><span class="doses-badge">${escapeHtml(appointment.dose_label || 'Dose 1')}</span></div></div>
-      <div class="appointment-info"><i class="fa-regular fa-calendar"></i><span><strong>Scheduled:</strong> ${escapeHtml(appointment.preferred_date)} at ${escapeHtml(appointment.preferred_time)}</span></div>
-      <button class="view-record-btn" type="button">View Full Record</button>`;
-    grid.appendChild(card);
-    card.querySelector('.view-record-btn').addEventListener('click', () => openRecordModal(appointmentDoc.id));
-  });
-}
 
 function displayValue(value) {
   return value === null || value === undefined || value === '' ? 'Not provided' : escapeHtml(String(value));
@@ -220,36 +303,36 @@ async function openRecordModal(id) {
       return;
     }
     const appointment = appointmentSnap.data();
-  document.getElementById('recordAppointmentId').value = id;
-  document.getElementById('recordModalTitle').textContent = `${appointment.resident_name || 'Resident'} — Full Record`;
-  document.getElementById('recordDetails').innerHTML = `
-    <div class="record-detail-grid">
-      <div><strong>Address</strong><span>${displayValue(appointment.resident_address)}</span></div>
-      <div><strong>Age</strong><span>${displayValue(appointment.patient_age)}</span></div>
-      <div><strong>Sex</strong><span>${displayValue(appointment.patient_sex)}</span></div>
-      <div><strong>Date of Bite</strong><span>${displayValue(appointment.bite_date)}</span></div>
-      <div><strong>Animal</strong><span>${displayValue(appointment.animal_type)}</span></div>
-      <div><strong>Body Part</strong><span>${displayValue(appointment.bite_body_part)}</span></div>
-      <div><strong>Appointment</strong><span>${displayValue(appointment.preferred_date)} at ${displayValue(appointment.preferred_time)}</span></div>
-      <div><strong>Dose</strong><span>${displayValue(appointment.dose_label)}</span></div>
-      <div><strong>Category of Patient</strong><span>${displayValue(appointment.patient_category)}</span></div>
-      <div><strong>Was the Bite Washed?</strong><span>${displayValue(appointment.wound_washed)}</span></div>
-      <div><strong>Type of Bite</strong><span>${displayValue(appointment.bite_type)}</span></div>
-    </div>`;
-  document.getElementById('editAddress').value = appointment.resident_address || '';
-  document.getElementById('editAge').value = appointment.patient_age ?? '';
-  document.getElementById('editSex').value = appointment.patient_sex || '';
-  document.getElementById('editBiteDate').value = appointment.bite_date || '';
-  document.getElementById('editAnimal').value = appointment.animal_type || '';
-  document.getElementById('editBitePart').value = appointment.bite_body_part || '';
-  document.getElementById('recordCategory').value = appointment.patient_category || '';
-  document.getElementById('recordWoundWashed').value = appointment.wound_washed || '';
-  document.getElementById('recordBiteType').value = appointment.bite_type || '';
-  document.getElementById('staffRecordForm').hidden = true;
-  document.getElementById('editRecordBtn').hidden = false;
-  const modal = document.getElementById('recordModal');
-  modal.style.display = 'flex';
-  modal.setAttribute('aria-hidden', 'false');
+    document.getElementById('recordAppointmentId').value = id;
+    document.getElementById('recordModalTitle').textContent = `${appointment.resident_name || 'Resident'} — Full Record`;
+    document.getElementById('recordDetails').innerHTML = `
+      <div class="record-detail-grid">
+        <div><strong>Address</strong><span>${displayValue(appointment.resident_address)}</span></div>
+        <div><strong>Age</strong><span>${displayValue(appointment.patient_age)}</span></div>
+        <div><strong>Sex</strong><span>${displayValue(appointment.patient_sex)}</span></div>
+        <div><strong>Date of Bite</strong><span>${displayValue(appointment.bite_date)}</span></div>
+        <div><strong>Animal</strong><span>${displayValue(appointment.animal_type)}</span></div>
+        <div><strong>Body Part</strong><span>${displayValue(appointment.bite_body_part)}</span></div>
+        <div><strong>Appointment</strong><span>${displayValue(appointment.preferred_date)} at ${displayValue(appointment.preferred_time)}</span></div>
+        <div><strong>Dose</strong><span>${displayValue(appointment.dose_label)}</span></div>
+        <div><strong>Category of Patient</strong><span>${displayValue(appointment.patient_category)}</span></div>
+        <div><strong>Was the Bite Washed?</strong><span>${displayValue(appointment.wound_washed)}</span></div>
+        <div><strong>Type of Bite</strong><span>${displayValue(appointment.bite_type)}</span></div>
+      </div>`;
+    document.getElementById('editAddress').value = appointment.resident_address || '';
+    document.getElementById('editAge').value = appointment.patient_age ?? '';
+    document.getElementById('editSex').value = appointment.patient_sex || '';
+    document.getElementById('editBiteDate').value = appointment.bite_date || '';
+    document.getElementById('editAnimal').value = appointment.animal_type || '';
+    document.getElementById('editBitePart').value = appointment.bite_body_part || '';
+    document.getElementById('recordCategory').value = appointment.patient_category || '';
+    document.getElementById('recordWoundWashed').value = appointment.wound_washed || '';
+    document.getElementById('recordBiteType').value = appointment.bite_type || '';
+    document.getElementById('staffRecordForm').hidden = true;
+    document.getElementById('editRecordBtn').hidden = false;
+    const modal = document.getElementById('recordModal');
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
   } catch (error) {
     alert('Failed to load patient record: ' + error.message);
   }

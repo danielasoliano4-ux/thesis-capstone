@@ -784,6 +784,12 @@ body {
 .booking-progress-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
 .booking-progress-heading strong { color: #111827; }
 .booking-progress-heading div div { margin-top: 4px; font-size: 13px; color: #6b7280; }
+.view-record-button, .next-dose-button { margin-top: 12px; padding: 8px 12px; border: 1px solid #ef0000; border-radius: 6px; background: #fff; color: #c00000; font-weight: 700; cursor: pointer; }
+.view-record-button:hover, .next-dose-button:hover { background: #fff1f1; }
+.full-record-details { margin-top: 10px; padding: 12px; border-left: 3px solid #ef0000; background: #fff8f8; color: #374151; font-size: 13px; line-height: 1.6; }
+.full-record-details p { margin: 3px 0; }
+.next-dose-button { background: #ef0000; color: #fff; }
+.next-dose-button:hover { background: #c00000; }
 .booking-status { padding: 5px 10px; border-radius: 14px; font-size: 12px; font-weight: 700; }
 .status-pending { background: #fef3c7; color: #92400e; }
 .status-confirmed { background: #dcfce7; color: #15803d; }

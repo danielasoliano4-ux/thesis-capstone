@@ -1,4 +1,4 @@
-import { auth, db, onAuthStateChanged } from './firebase.js';
+import { db } from './firebase.js';
 import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
 let CLINICS = [];
@@ -7,6 +7,7 @@ const STATUS_COLOR = { available: '#00b140', low: '#d98a00', out: '#e60000' };
 const STATUS_LABEL = { available: 'Available', low: 'Low Stock', out: 'Out of Stock' };
 
 const mapsData = [];
+let selectedDestination = null;
 
 function initMap() {
   const containers = [
@@ -27,9 +28,8 @@ function loadClinics() {
       return {
         id: clinicDoc.id,
         name: data.name || 'Unnamed Clinic',
-        lat: Number(data.lat),
-        lng: Number(data.lng),
-        status: data.stock_status || data.status || 'out',
+        ...getCoordinates(data),
+        status: normalizeStatus(data.stock_status || data.status, data.stock_total),
         address: data.address || '',
         hours: data.weekdayHours || data.hours || 'Contact clinic',
         phone: data.contact || '',
@@ -41,74 +41,87 @@ function loadClinics() {
 
     window.clinicDirectory = CLINICS;
     if (window.populateClinicOptions) window.populateClinicOptions(CLINICS);
-    mapsData.splice(0).forEach(entry => entry.markers.forEach(marker => marker.marker.setMap(null)));
+    mapsData.splice(0).forEach(entry => entry.markers.forEach(marker => marker.marker.remove()));
     mapsData.splice(0);
-    if (window.google && google.maps) initMap();
+    if (window.L) initMap();
   }, (error) => console.error('Failed to load clinics:', error));
 }
 
 function createMap(mapId, sidebarId) {
   const CABUYAO_CENTER = { lat: 14.2718, lng: 121.1246 };
-  const map = new google.maps.Map(document.getElementById(mapId), {
-    center: CABUYAO_CENTER,
-    zoom: 14,
-    styles: [
-      { featureType: 'poi',       elementType: 'labels',   stylers: [{ visibility: 'off' }] },
-      { featureType: 'transit',                            stylers: [{ visibility: 'off' }] },
-      { featureType: 'road',      elementType: 'geometry', stylers: [{ color: '#f5f5f5' }] },
-      { featureType: 'water',     elementType: 'geometry', stylers: [{ color: '#dff1f7' }] },
-      { featureType: 'landscape', elementType: 'geometry', stylers: [{ color: '#f9f9f9' }] }
-    ],
-    mapTypeControl: false,
-    streetViewControl: false,
-    fullscreenControl: false,
-    mapTypeId: 'roadmap'
-  });
+  const map = L.map(mapId, { zoomControl: false }).setView([CABUYAO_CENTER.lat, CABUYAO_CENTER.lng], 14);
+  L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+    attribution: '&copy; Google Maps', maxZoom: 20
+  }).addTo(map);
+  L.control.zoom({ position: 'topright' }).addTo(map);
 
   const entry = { mapId, sidebarId, map, markers: [] };
   entry.center = CABUYAO_CENTER;
   CLINICS.filter(clinic => Number.isFinite(clinic.lat) && Number.isFinite(clinic.lng)).forEach(clinic => {
     entry.markers.push(createMarkerForMap(map, clinic));
   });
+  addLocationControl(entry);
   mapsData.push(entry);
   buildSidebarFor(entry);
+  if (!entry.markers.length) {
+    const message = document.createElement('div');
+    message.className = 'map-empty-message';
+    message.textContent = 'No clinic locations available yet. Add numeric lat/lng fields or a location such as [14.2312° N, 121.1345° E].';
+    document.getElementById(mapId).appendChild(message);
+  }
+}
+
+function normalizeStatus(status, total) {
+  if (STATUS_COLOR[status]) return status;
+  const stock = Number(total || 0);
+  return stock === 0 ? 'out' : stock <= 15 ? 'low' : 'available';
+}
+
+function getCoordinates(data) {
+  if (Number.isFinite(Number(data.lat)) && Number.isFinite(Number(data.lng))) {
+    return { lat: Number(data.lat), lng: Number(data.lng) };
+  }
+
+  if (data.location && Number.isFinite(Number(data.location.latitude)) && Number.isFinite(Number(data.location.longitude))) {
+    return { lat: Number(data.location.latitude), lng: Number(data.location.longitude) };
+  }
+
+  if (typeof data.location === 'string') {
+    const matches = data.location.match(/-?\d+(?:\.\d+)?/g);
+    if (matches) return { lat: Number(matches[1]), lng: Number(matches[2]) };
+  }
+
+  if (Array.isArray(data.location) && data.location.length >= 2) {
+    const lat = Number(data.location[0]);
+    const lng = Number(data.location[1]);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+  }
+
+  return { lat: NaN, lng: NaN };
 }
 
 function createMarkerForMap(map, clinic) {
-  const color = STATUS_COLOR[clinic.status];
-  const svgMarker = {
-    path: google.maps.SymbolPath.CIRCLE,
-    fillColor: color, fillOpacity: 1,
-    strokeColor: '#ffffff', strokeWeight: 2.5, scale: 12
-  };
-  const marker = new google.maps.Marker({
-    position: { lat: clinic.lat, lng: clinic.lng },
-    map, title: clinic.name, icon: svgMarker,
-    zIndex: clinic.status === 'available' ? 10 : clinic.status === 'low' ? 5 : 1
+  const color = STATUS_COLOR[clinic.status] || STATUS_COLOR.out;
+  const icon = L.divIcon({ className: 'clinic-map-marker', html: `<span class="clinic-pin" style="--marker-color:${color}"><i class="fa-solid fa-hospital"></i></span>`, iconSize: [30, 38], iconAnchor: [15, 36] });
+  const marker = L.marker([clinic.lat, clinic.lng], { icon, title: clinic.name }).addTo(map);
+  const bookingButton = clinic.status === 'out'
+    ? ''
+    : `<button type="button" class="map-book-button" data-clinic-id="${escapeHtml(clinic.id)}">Book Appointment</button>`;
+  const directionsButton = '<button type="button" class="map-directions-button">Get Directions</button>';
+  marker.bindPopup(`<strong>${escapeHtml(clinic.name)}</strong><br><b style="color:${color}">${STATUS_LABEL[clinic.status]}</b><br><br><b>Address:</b> ${escapeHtml(clinic.address)}<br><b>Hours:</b> ${escapeHtml(clinic.hours)}<br><b>Phone:</b> ${escapeHtml(clinic.phone)}<br><br><b>Stock:</b> ${escapeHtml(clinic.stock)}${bookingButton}${directionsButton}<div class="route-summary" aria-live="polite"></div><br><small>&copy; Google Maps</small>`);
+  marker.on('popupopen', event => {
+    const button = event.popup.getElement()?.querySelector('.map-book-button');
+    if (button) button.addEventListener('click', () => {
+      if (window.openBookingModal) window.openBookingModal(clinic.name, clinic.id);
+    });
+    const routeButton = event.popup.getElement()?.querySelector('.map-directions-button');
+    if (routeButton) routeButton.addEventListener('click', () => {
+      selectedDestination = clinic;
+      locateUser();
+      if (userLocation) updateRoutes();
+    });
   });
-
-  const badgeBg = clinic.status === 'available' ? '#eefcf3' : clinic.status === 'low' ? '#fffbe9' : '#fff1f1';
-  const badgeColor = color;
-  const infoContent = `
-    <div style="font-family:Arial,sans-serif;padding:4px;min-width:220px;">
-      <div style="font-weight:bold;font-size:14px;color:#111827;margin-bottom:6px;">${clinic.name}</div>
-      <span style="background:${badgeBg};color:${badgeColor};padding:3px 10px;border-radius:20px;font-size:11px;font-weight:bold;display:inline-block;margin-bottom:10px;">${STATUS_LABEL[clinic.status]}</span>
-      <div style="font-size:12px;color:#374151;line-height:1.8;">
-        <div><b>Address:</b> ${clinic.address}</div>
-        <div><b>Hours:</b> ${clinic.hours}</div>
-        <div><b>Phone:</b> ${clinic.phone}</div>
-        <div style="margin-top:6px;padding:8px;background:#f9fafb;border-radius:8px;"><b>Stock:</b> ${clinic.stock}</div>
-      </div>
-      <div style="font-size:11px;color:#9ca3af;margin-top:8px;">© Google Maps</div>
-    </div>
-  `;
-  const infoWindow = new google.maps.InfoWindow({ content: infoContent });
-  marker.addListener('click', () => {
-    mapsData.forEach(d => d.markers.forEach(mm => mm.infoWindow.close()));
-    infoWindow.open(map, marker);
-    map.panTo(marker.getPosition());
-  });
-  return { marker, infoWindow, clinic };
+  return { marker, clinic };
 }
 
 function buildSidebarFor(entry) {
@@ -116,7 +129,7 @@ function buildSidebarFor(entry) {
   if (!sidebar) return;
   sidebar.innerHTML = '';
   entry.markers.forEach((mobj, index) => {
-    const color = STATUS_COLOR[mobj.clinic.status];
+    const color = STATUS_COLOR[mobj.clinic.status] || STATUS_COLOR.out;
     const row = document.createElement('div');
     row.id = `${entry.sidebarId}-row-${index}`;
     row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;background:white;border:1px solid #ddd;border-radius:12px;padding:12px 16px;cursor:pointer;transition:border-color 0.2s;gap:12px;';
@@ -138,10 +151,8 @@ function buildSidebarFor(entry) {
 
     row.addEventListener('click', (e) => {
       if (e.target && (e.target.tagName === 'BUTTON' || e.target.closest('button'))) return;
-      mapsData.forEach(d => d.markers.forEach(mm => mm.infoWindow.close()));
-      mobj.infoWindow.open(entry.map, mobj.marker);
-      entry.map.panTo(mobj.marker.getPosition());
-      entry.map.setZoom(16);
+      entry.map.setView(mobj.marker.getLatLng(), 16);
+      mobj.marker.openPopup();
       document.querySelectorAll(`#${entry.sidebarId} > div`).forEach(r => { r.style.borderColor = '#ddd'; r.style.background = 'white'; });
       row.style.borderColor = color;
       row.style.background = color === '#00b140' ? '#eefcf3' : color === '#d98a00' ? '#fffbe9' : '#fff1f1';
@@ -157,8 +168,8 @@ function filterMarkers(filter, btn) {
   mapsData.forEach(entry => {
     entry.markers.forEach((mobj, i) => {
       const show = filter === 'all' || mobj.clinic.status === filter;
-      mobj.marker.setVisible(show);
-      mobj.infoWindow.close();
+      if (show) mobj.marker.addTo(entry.map);
+      else mobj.marker.remove();
       const row = document.getElementById(`${entry.sidebarId}-row-${i}`);
       if (row) row.style.display = show ? 'flex' : 'none';
     });
@@ -167,19 +178,77 @@ function filterMarkers(filter, btn) {
 
 // Call this if a map's container was hidden during initialization
 function refreshMaps() {
-  if (!window.google || !google.maps) return;
+  if (!window.L) return;
   mapsData.forEach(entry => {
-    try {
-      google.maps.event.trigger(entry.map, 'resize');
-      if (entry.center) entry.map.setCenter(entry.center);
-    } catch (e) {
-      // ignore
-    }
+    setTimeout(() => entry.map.invalidateSize(), 0);
   });
+}
+
+function addLocationControl(entry) {
+  const control = L.control({ position: 'bottomright' });
+  control.onAdd = () => {
+    const button = L.DomUtil.create('button', 'location-control');
+    button.type = 'button';
+    button.title = 'Use my current location';
+    button.setAttribute('aria-label', 'Use my current location');
+    button.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i>';
+    L.DomEvent.on(button, 'click', locateUser);
+    return button;
+  };
+  control.addTo(entry.map);
+}
+
+let userLocation = null;
+let locationWatchId = null;
+function locateUser() {
+  if (!navigator.geolocation) return alert('Location is not supported by this browser.');
+  const updateLocation = position => {
+    userLocation = [position.coords.latitude, position.coords.longitude];
+    mapsData.forEach(entry => {
+      if (!entry.userMarker) entry.userMarker = L.circleMarker(userLocation, { radius: 8, color: '#fff', weight: 3, fillColor: '#2878e8', fillOpacity: 1 }).addTo(entry.map);
+      else entry.userMarker.setLatLng(userLocation);
+      if (!selectedDestination) entry.map.setView(userLocation, 16);
+    });
+    if (selectedDestination) updateRoutes();
+  };
+  if (locationWatchId !== null) return;
+  locationWatchId = navigator.geolocation.watchPosition(updateLocation, () => {
+    alert('Please allow location access to show your current position.');
+    locationWatchId = null;
+  }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 });
+}
+
+async function updateRoutes() {
+  if (!userLocation || !selectedDestination) return;
+  const destination = [selectedDestination.lng, selectedDestination.lat];
+  const origin = [userLocation[1], userLocation[0]];
+  const url = `https://router.project-osrm.org/route/v1/driving/${origin.join(',')};${destination.join(',')}?overview=full&geometries=geojson`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Route request failed');
+    const data = await response.json();
+    const route = data.routes?.[0];
+    if (!route) throw new Error('No route found');
+    mapsData.forEach(entry => {
+      if (entry.routeLayer) entry.routeLayer.remove();
+      entry.routeLayer = L.geoJSON(route.geometry, { style: { color: '#2878e8', weight: 5, opacity: .85 } }).addTo(entry.map);
+      entry.map.fitBounds(entry.routeLayer.getBounds(), { padding: [30, 30] });
+      const popup = entry.map.getPopup();
+      const summary = popup?.getElement()?.querySelector('.route-summary');
+      if (summary) summary.textContent = `Route: ${(route.distance / 1000).toFixed(1)} km, about ${Math.ceil(route.duration / 60)} min`;
+    });
+  } catch (error) {
+    console.error('Failed to load route:', error);
+  }
+}
+
+function escapeHtml(value = '') {
+  const element = document.createElement('div');
+  element.textContent = value;
+  return element.innerHTML;
 }
 
 window.refreshMaps = refreshMaps;
 window.initMap = initMap;
-onAuthStateChanged(auth, (user) => {
-  if (user) loadClinics();
-});
+window.filterMarkers = filterMarkers;
+loadClinics();

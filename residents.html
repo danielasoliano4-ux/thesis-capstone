@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
   <link rel="stylesheet" href="resident.css">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
  
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <style>
@@ -266,7 +267,7 @@
       </div>
     </div>
     <div class="header-right">
-      <h3 id="headerName">John Cruz</h3>
+      <h3 id="headerName">Resident</h3>
       <button type="button" class="profile-btn" id="profileBtn" aria-label="Open profile" title="Profile">
         <i class="fa-solid fa-user-circle"></i>
       </button>
@@ -937,7 +938,7 @@
 
     <div class="records-hero">
       <div>
-        <h2>Vaccination Record — <span id="recordName">John Cruz</span></h2>
+        <h2>Vaccination Record — <span id="recordName">Resident</span></h2>
         <p>ID: RES-2026-001234 &nbsp;|&nbsp; Started: <span id="recordStart">June 25, 2026</span> &nbsp;|&nbsp; Vaccine: <span id="recordVaccine">Verorab</span></p>
         <p style="margin-top:8px;"><i class="fa-solid fa-location-dot"></i> Bite Site: <span id="recordBiteSite">Left hand</span> &nbsp;|&nbsp; Animal: <span id="recordAnimal">Dog</span> &nbsp;|&nbsp; WHO Category: <span id="recordCategory">III</span></p>
       </div>
@@ -1328,30 +1329,8 @@
   </div>
 
   <script type="module" src="scripts/residents.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script type="module" src="scripts/residents-map.js"></script>
-  <script>
-    // Provide a visible error when Google Maps fails to load or auth fails
-    window.gm_authFailure = function() {
-      showMapError('Google Maps authentication failed. Check your API key and billing.');
-    };
-    function showMapError(msg) {
-      ['googleMap','googleMapNew','googleMapOverview'].forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.innerHTML = '';
-        const box = document.createElement('div');
-        box.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;background:#f3f4f6;border-radius:10px;color:#374151;height:100%;';
-        box.innerHTML = `<div style="font-size:18px;font-weight:700;margin-bottom:6px;">Oops! Something went wrong.</div><div style="font-size:13px;color:#6b7280;max-width:420px;text-align:center;">${msg}</div>`;
-        el.appendChild(box);
-      });
-      console.error('Maps error:', msg);
-    }
-    // If maps hasn't loaded after 6s, show a generic error to help debugging
-    setTimeout(() => {
-      if (!window.google || !google.maps) showMapError('Map failed to load — replace YOUR_API_KEY with a valid Maps API key and ensure billing/referrers are configured.');
-    }, 6000);
-  </script>
-  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap&loading=async" defer></script>
 
 </body>
 </html>

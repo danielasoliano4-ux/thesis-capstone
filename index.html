@@ -11,6 +11,7 @@
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
 
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 
     <style>
       /* ── PUBLIC HEALTH HUB SECTION ──────────────────────────── */
@@ -963,7 +964,7 @@
        Retrieved from https://developers.google.com/maps/
      ══════════════════════════════════════════════════════════ -->
 
-<script>
+<script type="text/plain" data-legacy-google-map>
 // ── CLINIC DATA ─────────────────────────────────────────────────────────────
 //
 // Each clinic object contains:
@@ -1230,10 +1231,8 @@ function filterMarkers(filter, btn) {
      callback=initMap tells the API to call our initMap() function once loaded.
      loading=async improves page performance (non-blocking load).
      ──────────────────────────────────────────────────────────────────────── -->
-<script
-    src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap&loading=async"
-    defer>
-</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script type="module" src="scripts/residents-map.js"></script>
 
 </body>
 </html>
