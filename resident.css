@@ -494,12 +494,26 @@ body {
 .s-red { background: #ef4444; }
 
 .book-btn {
-    padding: 6px 14px; background: #ef0000; color: white;
-    border: none; border-radius: 6px; font-size: 12px; font-weight: 600;
-    cursor: pointer; transition: background 0.2s;
+    padding: 8px 16px; background: linear-gradient(135deg, #e60000, #cc0000); color: white;
+    border: none; border-radius: 8px; font-size: 12px; font-weight: 700;
+    cursor: pointer; transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(230, 0, 0, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
-.book-btn:hover { background: #cc0000; }
-.book-btn:disabled { background: #d1d5db; cursor: not-allowed; }
+.book-btn:hover { 
+    background: linear-gradient(135deg, #cc0000, #990000);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(230, 0, 0, 0.4);
+}
+.book-btn:disabled { 
+    background: linear-gradient(135deg, #d1d5db, #bfbfbf);
+    cursor: not-allowed;
+    color: #6b7280;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
 
 /* ==========================================================================
    9. EMERGENCY FIRST AID CARD STRUCURES

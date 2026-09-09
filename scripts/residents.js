@@ -105,7 +105,10 @@ function populateClinicOptions(clinics) {
     clinics.forEach((clinic) => {
       const option = document.createElement('option');
       option.value = clinic.id;
-      option.textContent = `${clinic.name} - ${clinic.status === 'out' ? 'Out of Stock' : clinic.status === 'low' ? 'Low Stock' : 'Available'}`;
+      const optionStatus = clinic.status === 'out'
+        ? 'Out of Stock'
+        : `${clinic.status === 'low' ? 'Low Stock' : 'Available'} - ${clinic.stock_total || 0} doses available`;
+      option.textContent = `${clinic.name} (${clinic.type}) - ${optionStatus}`;
       option.dataset.name = clinic.name;
       select.appendChild(option);
     });
@@ -129,12 +132,12 @@ function renderClinicBookingList(clinics) {
     const isLow = clinic.status === 'low';
     const color = isOut ? '#ef4444' : isLow ? '#d97706' : '#16a34a';
     const background = isOut ? '#fee2e2' : isLow ? '#fef3c7' : '#dcfce7';
-    const statusText = isOut ? 'Out of stock' : isLow ? 'Low stock' : `${clinic.stock_total || 0} doses available`;
+    const statusText = isOut ? 'Out of stock' : `${isLow ? 'Low stock' : 'Available'} | ${clinic.stock_total || 0} doses available`;
     return `
       <div class="clinic-row">
         <div class="clinic-row-icon" style="background:${background};"><i class="fa-solid fa-hospital" style="color:${color};"></i></div>
         <div class="clinic-row-info">
-          <h4>${escapeHtml(clinic.name)}</h4>
+          <h4>${escapeHtml(clinic.name)} <span style="font-size:12px;color:#6b7280;font-weight:normal;">(${escapeHtml(clinic.type)})</span></h4>
           <p>${escapeHtml(clinic.address || 'Address not provided')} &nbsp;|&nbsp; ${escapeHtml(clinic.hours || 'Hours not provided')} &nbsp;|&nbsp; <strong style="color:${color};">${statusText}</strong></p>
         </div>
         <button class="book-btn dynamic-book-btn" data-clinic-id="${escapeHtml(clinic.id)}" ${isOut ? 'disabled' : ''}>${isOut ? 'Unavailable' : 'Book Now'}</button>
