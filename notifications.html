@@ -46,7 +46,7 @@
         <div class="notif-header-row">
             <div>
                 <h1><i class="fa-regular fa-bell" style="color:#ef0000;margin-right:10px;"></i>Notifications</h1>
-                <p style="font-size:13px;color:#6b7280;margin-top:4px;">You have <strong id="unreadCount">4</strong> unread notifications</p>
+                <p style="font-size:13px;color:#6b7280;margin-top:4px;">You have <strong id="unreadCount">0</strong> unread notifications</p>
             </div>
             <button class="mark-all-btn" id="markAllReadBtn">
                 <i class="fa-solid fa-check-double"></i> Mark all as read
@@ -60,103 +60,7 @@
             <button class="filter-tab" data-filter="system">System</button>
         </div>
 
-        <!-- TODAY -->
-        <div class="notif-group-label" data-group="today">Today</div>
-
-        <!-- FIRST AID QUICK ACCESS -->
-        <div class="notif-item unread" data-type="firstaid" onclick="location.href='first-aid.html'">
-            <div class="notif-icon icon-red"><i class="fa-solid fa-kit-medical"></i></div>
-            <div class="notif-body">
-                <h4>First Aid Guide — Immediate Steps</h4>
-                <p>Open the First Aid guide for bite management and next steps — view it here without leaving the page.</p>
-                <div class="notif-meta">
-                    <span class="notif-time"><i class="fa-regular fa-clock"></i> just now</span>
-                    <span class="notif-tag tag-system">First Aid</span>
-                </div>
-            </div>
-            <div class="unread-dot"></div>
-        </div>
-
-        <div class="notif-item unread" data-type="appointment">
-            <div class="notif-icon icon-blue"><i class="fa-regular fa-calendar-check"></i></div>
-            <div class="notif-body">
-                <h4>Appointment Reminder</h4>
-                <p>Your 3rd dose appointment at <strong>Cabuyao City Health Center</strong> is scheduled tomorrow, July 3 at 9:00 AM. Please bring your vaccination card.</p>
-                <div class="notif-meta">
-                    <span class="notif-time"><i class="fa-regular fa-clock"></i> 2 hours ago</span>
-                    <span class="notif-tag tag-appointment">Appointment</span>
-                </div>
-            </div>
-            <div class="unread-dot"></div>
-        </div>
-
-        <div class="notif-item unread" data-type="vaccine">
-            <div class="notif-icon icon-red"><i class="fa-solid fa-syringe"></i></div>
-            <div class="notif-body">
-                <h4>Vaccine Available at Nearby Clinic</h4>
-                <p><strong>Cabuyao City Health Center</strong> has restocked Verorab vaccines. Current stock: 45 doses. Book your appointment now.</p>
-                <div class="notif-meta">
-                    <span class="notif-time"><i class="fa-regular fa-clock"></i> 4 hours ago</span>
-                    <span class="notif-tag tag-vaccine">Vaccine Update</span>
-                </div>
-            </div>
-            <div class="unread-dot"></div>
-        </div>
-
-        <!-- YESTERDAY -->
-        <div class="notif-group-label" data-group="yesterday">Yesterday</div>
-
-        <div class="notif-item unread" data-type="appointment">
-            <div class="notif-icon icon-green"><i class="fa-solid fa-circle-check"></i></div>
-            <div class="notif-body">
-                <h4>Appointment Confirmed</h4>
-                <p>Your appointment for dose 3 at <strong>Cabuyao City Health Center</strong> on July 3, 2026 at 9:00 AM has been confirmed.</p>
-                <div class="notif-meta">
-                    <span class="notif-time"><i class="fa-regular fa-clock"></i> Yesterday, 3:15 PM</span>
-                    <span class="notif-tag tag-appointment">Appointment</span>
-                </div>
-            </div>
-            <div class="unread-dot"></div>
-        </div>
-
-        <div class="notif-item" data-type="vaccine">
-            <div class="notif-icon icon-yellow"><i class="fa-solid fa-triangle-exclamation"></i></div>
-            <div class="notif-body">
-                <h4>Low Stock Alert – St. Mary's Clinic</h4>
-                <p>Rabipur vaccines at <strong>St. Mary's Medical Clinic</strong> are running low (8 doses remaining). Consider booking at an alternative clinic.</p>
-                <div class="notif-meta">
-                    <span class="notif-time"><i class="fa-regular fa-clock"></i> Yesterday, 10:00 AM</span>
-                    <span class="notif-tag tag-stock">Stock Alert</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- EARLIER -->
-        <div class="notif-group-label" data-group="earlier">Earlier</div>
-
-        <div class="notif-item" data-type="appointment">
-            <div class="notif-icon icon-blue"><i class="fa-solid fa-syringe"></i></div>
-            <div class="notif-body">
-                <h4>Vaccination Dose 2 Completed</h4>
-                <p>Your 2nd dose was successfully recorded on June 29, 2026. Next dose (Dose 3) is scheduled for July 3, 2026.</p>
-                <div class="notif-meta">
-                    <span class="notif-time"><i class="fa-regular fa-clock"></i> June 29, 2026</span>
-                    <span class="notif-tag tag-appointment">Record</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="notif-item" data-type="system">
-            <div class="notif-icon icon-gray"><i class="fa-solid fa-shield-halved"></i></div>
-            <div class="notif-body">
-                <h4>Account Verified</h4>
-                <p>Your resident account has been successfully created and verified. You can now book appointments and track your vaccination progress.</p>
-                <div class="notif-meta">
-                    <span class="notif-time"><i class="fa-regular fa-clock"></i> June 25, 2026</span>
-                    <span class="notif-tag tag-system">System</span>
-                </div>
-            </div>
-        </div>
+        <div id="notificationsList" aria-live="polite"></div>
 
         <div class="empty-state" id="emptyState">
             <i class="fa-regular fa-bell-slash"></i>

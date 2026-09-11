@@ -262,6 +262,7 @@
     <div class="logo-section">
       <div class="logo-icon"><i class="fa-solid fa-shield-dog"></i></div>
       <div>
+
         <h2>Anti-Rabies Locator</h2>
         <p>Cabuyao, Laguna</p>
       </div>
@@ -532,71 +533,11 @@
             <h3><i class="fa-regular fa-calendar-check" style="color:#ef0000;margin-right:6px;"></i> Upcoming Appointments</h3>
             <a onclick="showTab('appointments', document.querySelectorAll('.nav-tab')[1])">View all</a>
           </div>
-          <div class="section-card-body">
-            <div class="appt-mini">
-              <div class="appt-date-box"><div class="day">29</div><div class="mon">Jun</div></div>
-              <div class="appt-info">
-                <h4>Cabuyao City Health Center</h4>
-                <p><i class="fa-regular fa-clock"></i> 9:00 AM &nbsp;|&nbsp; Dose 2 of 5</p>
-              </div>
-              <span class="dose-badge">D2</span>
-            </div>
-            <div class="appt-mini">
-              <div class="appt-date-box"><div class="day">3</div><div class="mon">Jul</div></div>
-              <div class="appt-info">
-                <h4>Cabuyao City Health Center</h4>
-                <p><i class="fa-regular fa-clock"></i> 9:00 AM &nbsp;|&nbsp; Dose 3 of 5</p>
-              </div>
-              <span class="dose-badge">D3</span>
-            </div>
-            <div class="appt-mini">
-              <div class="appt-date-box"><div class="day">10</div><div class="mon">Jul</div></div>
-              <div class="appt-info">
-                <h4>Cabuyao City Health Center</h4>
-                <p><i class="fa-regular fa-clock"></i> 10:00 AM &nbsp;|&nbsp; Dose 4 of 5</p>
-              </div>
-              <span class="dose-badge">D4</span>
-            </div>
+          <div class="section-card-body" id="upcomingAppointmentsList">
+            <p style="font-size:13px;color:#6b7280;padding:10px 0;">Loading appointments...</p>
           </div>
         </div>
 
-      </div>
-
-      <!-- MAP -->
-      <div class="map-card">
-        <div class="map-top">
-          <h3><i class="fa-solid fa-location-dot" style="color:#ef0000;margin-right:6px;"></i> Find Nearby Clinics</h3>
-          <div class="map-filter">
-            <button class="active-btn" onclick="filterMarkers('all', this)">All</button>
-            <button onclick="filterMarkers('available', this)">Available</button>
-            <button onclick="filterMarkers('low', this)">Low Stock</button>
-            <button onclick="filterMarkers('out', this)">Out of Stock</button>
-          </div>
-        </div>
-        <div class="map-box">
-          <div id="googleMap" style="width:100%;height:450px;border-radius:14px;overflow:hidden;border:1px solid #ddd;"></div>
-        </div>
-        <!-- Map Legend -->
-        <div style="display:flex;gap:18px;margin-top:14px;padding:12px 16px;background:#f9fafb;border-radius:12px;border:1px solid #ddd;flex-wrap:wrap;">
-          <span style="font-size:13px;font-weight:bold;color:#374151;align-self:center;">Legend:</span>
-          <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
-            <span style="width:14px;height:14px;background:#00b140;border-radius:50%;display:inline-block;"></span>Vaccines Available
-          </span>
-          <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
-            <span style="width:14px;height:14px;background:#d98a00;border-radius:50%;display:inline-block;"></span>Low Stock
-          </span>
-          <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
-            <span style="width:14px;height:14px;background:#e60000;border-radius:50%;display:inline-block;"></span>Out of Stock
-          </span>
-        </div>
-      </div>
-
-      <!-- Clinic Status Overview -->
-      <div style="margin-top:18px;">
-        <h4 style="font-size:14px;color:#374151;margin-bottom:10px;">
-          <i class="fa-solid fa-list"></i> Clinic Status Overview
-        </h4>
-        <div id="clinicSidebar" style="display:flex;flex-direction:column;gap:8px;"></div>
       </div>
 
     </div>
@@ -892,51 +833,13 @@
       </div>
 
       <p class="section-label">Upcoming</p>
-
-      <div class="appt-card upcoming">
-        <div class="appt-card-date"><div class="big-day">29</div><div class="month-yr">Jun 2026</div></div>
-        <div class="appt-card-body">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-            <h3>Dose 2 – Verorab Vaccination</h3>
-            <span class="appt-status status-upcoming">Upcoming</span>
-          </div>
-          <p><i class="fa-solid fa-hospital" style="color:#6b7280;"></i> Cabuyao City Health Center</p>
-          <p><i class="fa-regular fa-clock" style="color:#6b7280;"></i> 9:00 AM &nbsp;|&nbsp; Brgy. Poblacion Uno</p>
-          <div class="appt-card-actions">
-            <button class="action-btn"><i class="fa-solid fa-arrows-rotate"></i> Reschedule</button>
-            <button class="action-btn danger"><i class="fa-solid fa-xmark"></i> Cancel</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="appt-card upcoming">
-        <div class="appt-card-date"><div class="big-day">3</div><div class="month-yr">Jul 2026</div></div>
-        <div class="appt-card-body">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-            <h3>Dose 3 – Verorab Vaccination</h3>
-            <span class="appt-status status-upcoming">Upcoming</span>
-          </div>
-          <p><i class="fa-solid fa-hospital" style="color:#6b7280;"></i> Cabuyao City Health Center</p>
-          <p><i class="fa-regular fa-clock" style="color:#6b7280;"></i> 9:00 AM &nbsp;|&nbsp; Brgy. Poblacion Uno</p>
-          <div class="appt-card-actions">
-            <button class="action-btn"><i class="fa-solid fa-arrows-rotate"></i> Reschedule</button>
-            <button class="action-btn danger"><i class="fa-solid fa-xmark"></i> Cancel</button>
-          </div>
-        </div>
+      <div id="liveUpcomingAppointments">
+        <p style="font-size:13px;color:#6b7280;padding:10px 0;">Loading appointments...</p>
       </div>
 
       <p class="section-label" style="margin-top:24px;">Completed</p>
-
-      <div class="appt-card completed">
-        <div class="appt-card-date"><div class="big-day">25</div><div class="month-yr">Jun 2026</div></div>
-        <div class="appt-card-body">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-            <h3>Dose 1 – Verorab Vaccination</h3>
-            <span class="appt-status status-done">Completed</span>
-          </div>
-          <p><i class="fa-solid fa-hospital" style="color:#6b7280;"></i> Cabuyao City Health Center</p>
-          <p><i class="fa-regular fa-clock" style="color:#6b7280;"></i> 9:00 AM &nbsp;|&nbsp; Administered by: Dr. Santos</p>
-        </div>
+      <div id="liveCompletedAppointments">
+        <p style="font-size:13px;color:#6b7280;padding:10px 0;">Loading completed appointments...</p>
       </div>
 
     </div>
@@ -962,7 +865,7 @@
 
     <p class="section-label">Dose Schedule</p>
 
-    <div class="dose-record-list">
+    <div class="dose-record-list" id="liveDoseRecordList">
       <div class="dose-record">
         <div class="dose-circle done-circle"><i class="fa-solid fa-check"></i></div>
         <div class="dose-record-info"><h4>Dose 1 — Day 0</h4><p><span id="d1date">June 25, 2026</span> &nbsp;|&nbsp; Cabuyao City Health Center &nbsp;|&nbsp; Dr. Santos</p></div>
@@ -1259,6 +1162,18 @@
     </div>
   </div>
   <!-- END BOOKING RECORDS PANEL -->
+
+  <div class="modal-overlay" id="rescheduleModal">
+    <div class="modal-box">
+      <h2><i class="fa-solid fa-arrows-rotate" style="color:#ef0000;margin-right:8px;"></i>Reschedule Appointment</h2>
+      <p class="sub">You may move this appointment by up to one day.</p>
+      <input type="hidden" id="rescheduleAppointmentId">
+      <div class="modal-field"><label for="rescheduleDate">Date</label><input id="rescheduleDate" type="date" required></div>
+      <div class="modal-field"><label for="rescheduleTime">Time</label><select id="rescheduleTime"><option>8:00 AM</option><option>9:00 AM</option><option>10:00 AM</option><option>11:00 AM</option><option>1:00 PM</option><option>2:00 PM</option><option>3:00 PM</option></select></div>
+      <div id="rescheduleMsg" style="display:none;margin-top:10px;padding:10px;border-radius:8px;font-size:13px;"></div>
+      <div class="modal-actions"><button type="button" class="modal-cancel" id="closeRescheduleBtn">Cancel</button><button type="button" class="modal-submit" id="saveRescheduleBtn"><i class="fa-solid fa-check"></i> Save Changes</button></div>
+    </div>
+  </div>
 
   <!-- BOOKING MODAL -->
   <div class="modal-overlay" id="bookingModal">

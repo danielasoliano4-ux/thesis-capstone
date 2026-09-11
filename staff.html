@@ -196,6 +196,14 @@
 
                 </div>
 
+                <div class="inventory-top appointment-section-heading">
+                    <h2>Resident Appointments</h2>
+                    <button type="button" class="update-link" id="refreshAppointmentsBtn"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                </div>
+                <div id="staffAppointments" class="table-container">
+                    <p class="empty-appointments">Loading resident appointments...</p>
+                </div>
+
             </div>
 
         </section>
@@ -216,6 +224,23 @@
                 <label>Quantity (doses)<input id="vacQuantity" type="number" min="0" required></label>
                 <label>Expiry Date<input id="vacExpiry" type="date" required></label>
                 <button type="submit" class="add-btn">Save Stock</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="doseCompletionModal" class="modal" aria-hidden="true">
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="doseCompletionTitle">
+            <div class="modal-header">
+                <h2 id="doseCompletionTitle">Complete Vaccination Dose</h2>
+                <button type="button" id="closeDoseCompletionBtn" class="modal-close" aria-label="Close">&times;</button>
+            </div>
+            <form id="doseCompletionForm">
+                <input type="hidden" id="completionAppointmentId">
+                <label>Administration Date<input id="completionDate" type="date" required></label>
+                <label>Dose Number<input id="completionDose" type="number" min="1" max="5" required></label>
+                <label>Vaccine Brand / Type<input id="completionVaccine" required></label>
+                <label>Clinic Location<input id="completionLocation" required></label>
+                <button type="submit" class="add-btn"><i class="fa-solid fa-syringe"></i> Complete Dose</button>
             </form>
         </div>
     </div>

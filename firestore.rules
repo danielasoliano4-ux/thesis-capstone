@@ -76,7 +76,13 @@ service cloud.firestore {
       allow read: if isAdmin() || belongsToClinic(resource.data.clinic_id);
       allow update: if isAdmin()
         || (belongsToClinic(resource.data.clinic_id)
-          && request.resource.data.clinic_id == resource.data.clinic_id);
+          && request.resource.data.clinic_id == resource.data.clinic_id)
+        || (isResident()
+          && resource.data.resident_uid == request.auth.uid
+          && resource.data.status == 'confirmed'
+          && request.resource.data.status == 'pending'
+          && request.resource.data.reschedule_requested == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['preferred_date', 'preferred_time', 'status', 'reschedule_requested', 'rescheduled_at']));
       allow delete: if isAdmin()
         || (isResident() && resource.data.resident_uid == request.auth.uid);
     }
@@ -101,8 +107,16 @@ service cloud.firestore {
       allow read: if isAdmin() 
         || (isResident() && resource.data.resident_uid == request.auth.uid)
         || isClinicStaff();
-      allow create: if isAdmin() || isClinicStaff();
-      allow update, delete: if isAdmin() || isClinicStaff();
+      allow create: if isAdmin() || (isClinicStaff()
+        && request.resource.data.resident_uid is string
+        && request.resource.data.dose_number is number
+        && request.resource.data.vaccine_name is string
+        && request.resource.data.clinic_id is string
+        && request.resource.data.clinic_name is string
+        && request.resource.data.clinic_location is string
+        && request.resource.data.date_given is string
+        && request.resource.data.administered_by == request.auth.uid);
+      allow update, delete: if false;
     }
   }
 }

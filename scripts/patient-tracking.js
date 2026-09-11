@@ -7,6 +7,7 @@ import {
 
 let pendingCount = 0;
 let currentClinicId = null;
+let activeAppointment = null;
 
 async function loadPatients() {
   const grid = document.getElementById('patientsGrid');
@@ -98,20 +99,18 @@ async function loadPatients() {
     grid.querySelectorAll('.view-record-btn').forEach(btn => btn.addEventListener('click', () => {
       const uid = btn.dataset.residentUid;
       const resident = uniqueResidents.get(uid);
-      if (resident) openResidentRecord(resident);
+      if (resident) {
+        const appointment = resident.appointments.find(item => item.status === 'confirmed')
+          || resident.appointments.find(item => item.status === 'pending')
+          || resident.appointments[0];
+        if (appointment?.id) openRecordModal(appointment.id);
+      }
     }));
   } catch (err) {
     console.error('Failed to load patients:', err);
     const errorMsg = err.message || err.code || 'Unknown error';
     grid.innerHTML = `<p style="color:#ef0000;padding:16px;"><strong>Error loading patients:</strong> ${errorMsg}</p><p style="color:#666;padding:0 16px;font-size:12px;">Check browser console for details.</p>`;
   }
-}
-
-function openResidentRecord(resident) {
-  const modal = document.getElementById('recordModal');
-  const details = document.getElementById('recordDetails');
-  details.innerHTML = `<p><strong>${resident.name}</strong><br>Doses: ${resident.doses}/5</p>`;
-  modal.style.display = 'block';
 }
 
 async function loadAppointments() {
@@ -157,6 +156,7 @@ function buildApptCard(id, d) {
   card.dataset.clinicName = d.clinic_name || 'the clinic';
   card.dataset.date = d.preferred_date || '';
   card.dataset.time = d.preferred_time || '';
+  card.dataset.rescheduleRequested = d.reschedule_requested ? 'true' : 'false';
   card.innerHTML = `
     <div class="appt-avatar" id="apptAvatar-${id}">
       <i class="fa-solid fa-user"></i>
@@ -195,6 +195,7 @@ window.confirmAppt = async function(apptId) {
   try {
     await updateDoc(doc(db, 'appointments', apptId), {
       status: 'confirmed',
+      reschedule_requested: false,
       confirmed_at: serverTimestamp()
     });
 
@@ -203,8 +204,21 @@ window.confirmAppt = async function(apptId) {
       user_id: card.dataset.residentUid,
       appointment_id: apptId,
       type: 'appointment',
-      title: 'Appointment confirmed',
-      message: `Your appointment at ${card.dataset.clinicName} on ${card.dataset.date} at ${card.dataset.time} was confirmed.`,
+      title: card.dataset.rescheduleRequested === 'true' ? 'Reschedule Confirmed' : 'Appointment confirmed',
+      message: card.dataset.rescheduleRequested === 'true'
+        ? `Your rescheduled appointment at ${card.dataset.clinicName} on ${card.dataset.date} at ${card.dataset.time} was confirmed by the clinic.`
+        : `Your appointment at ${card.dataset.clinicName} on ${card.dataset.date} at ${card.dataset.time} was confirmed.`,
+      read: false,
+      created_at: serverTimestamp()
+    });
+
+    await addDoc(collection(db, 'notifications'), {
+      recipient_uid: card.dataset.residentUid,
+      user_id: card.dataset.residentUid,
+      appointment_id: apptId,
+      type: 'appointment',
+      title: 'Appointment Reminder',
+      message: `Reminder: your appointment at ${card.dataset.clinicName} is scheduled for ${card.dataset.date} at ${card.dataset.time}. Please bring your vaccination card.`,
       read: false,
       created_at: serverTimestamp()
     });
@@ -303,6 +317,7 @@ async function openRecordModal(id) {
       return;
     }
     const appointment = appointmentSnap.data();
+    activeAppointment = { id, ...appointment };
     document.getElementById('recordAppointmentId').value = id;
     document.getElementById('recordModalTitle').textContent = `${appointment.resident_name || 'Resident'} — Full Record`;
     document.getElementById('recordDetails').innerHTML = `
@@ -329,6 +344,13 @@ async function openRecordModal(id) {
     document.getElementById('recordWoundWashed').value = appointment.wound_washed || '';
     document.getElementById('recordBiteType').value = appointment.bite_type || '';
     document.getElementById('staffRecordForm').hidden = true;
+    const completionForm = document.getElementById('doseCompletionForm');
+    completionForm.hidden = appointment.status === 'completed' || appointment.status === 'declined';
+    document.getElementById('completionAppointmentId').value = id;
+    document.getElementById('completionDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('completionDose').value = Number(String(appointment.dose_label || '1').match(/\d+/)?.[0] || 1);
+    document.getElementById('completionVaccine').value = appointment.vaccine_name || '';
+    document.getElementById('completionLocation').value = appointment.clinic_address || '';
     document.getElementById('editRecordBtn').hidden = false;
     const modal = document.getElementById('recordModal');
     modal.style.display = 'flex';
@@ -355,12 +377,65 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('staffRecordForm').hidden = true;
     document.getElementById('editRecordBtn').hidden = false;
   });
+  document.getElementById('doseCompletionForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const appointmentId = document.getElementById('completionAppointmentId').value;
+    const vaccineName = document.getElementById('completionVaccine').value.trim();
+    const location = document.getElementById('completionLocation').value.trim();
+    const doseNumber = Number(document.getElementById('completionDose').value);
+    if (!activeAppointment || !vaccineName || !location || !Number.isInteger(doseNumber)) return;
+    try {
+      const inventorySnap = await getDocs(query(
+        collection(db, 'inventory'),
+        where('clinic_id', '==', currentClinicId)
+      ));
+      if (!inventorySnap.docs.some(item => item.data().type === vaccineName && Number(item.data().quantity || 0) > 0)) {
+        throw new Error(`This clinic has no available inventory for ${vaccineName}.`);
+      }
+      const existingRecordSnap = await getDocs(query(
+        collection(db, 'vaccination_records'),
+        where('resident_uid', '==', activeAppointment.resident_uid),
+        where('dose_number', '==', doseNumber)
+      ));
+      if (!existingRecordSnap.empty) throw new Error(`Dose ${doseNumber} is already recorded and cannot be replaced.`);
+      await addDoc(collection(db, 'vaccination_records'), {
+        resident_uid: activeAppointment.resident_uid,
+        resident_name: activeAppointment.resident_name || '',
+        appointment_id: appointmentId,
+        dose_number: doseNumber,
+        vaccine_name: vaccineName,
+        vaccine_type: vaccineName,
+        clinic_id: currentClinicId,
+        clinic_name: activeAppointment.clinic_name || '',
+        clinic_location: location,
+        date_given: document.getElementById('completionDate').value,
+        administered_by: auth.currentUser.uid,
+        recorded_at: serverTimestamp()
+      });
+      await updateDoc(doc(db, 'appointments', appointmentId), {
+        status: 'completed',
+        completed_at: serverTimestamp(),
+        completed_dose_number: doseNumber,
+        completed_vaccine_name: vaccineName
+      });
+      closeRecordModal();
+      showToast(`Dose ${doseNumber} recorded. The vaccination history is immutable.`);
+      await loadAppointments();
+      await loadPatients();
+    } catch (error) {
+      alert('Failed to record dose: ' + error.message);
+    }
+  });
   modal.addEventListener('click', event => {
     if (event.target === modal) closeRecordModal();
   });
   document.getElementById('staffRecordForm').addEventListener('submit', async event => {
     event.preventDefault();
     const appointmentId = document.getElementById('recordAppointmentId').value;
+    if (!appointmentId || appointmentId === 'appointments') {
+      alert('This patient record is missing a valid appointment ID. Please close it and open the appointment again.');
+      return;
+    }
     try {
       await updateDoc(doc(db, 'appointments', appointmentId), {
         resident_address: document.getElementById('editAddress').value.trim(),

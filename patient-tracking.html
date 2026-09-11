@@ -88,6 +88,19 @@
                 <button type="button" id="closeRecordModalBtn" class="modal-close" aria-label="Close">&times;</button>
             </div>
             <div id="recordDetails" class="record-details"></div>
+            <form id="doseCompletionForm" class="record-edit-form" hidden>
+                <input type="hidden" id="completionAppointmentId">
+                <h3>Complete Vaccination Dose</h3>
+                <div class="record-edit-grid">
+                    <label>Administration Date<input id="completionDate" type="date" required></label>
+                    <label>Dose Number<input id="completionDose" type="number" min="1" max="5" required></label>
+                    <label>Vaccine Brand / Type<input id="completionVaccine" type="text" required></label>
+                    <label>Clinic Location<input id="completionLocation" type="text" required></label>
+                </div>
+                <div class="record-edit-actions">
+                    <button type="submit" class="add-btn"><i class="fa-solid fa-syringe"></i> Record Completed Dose</button>
+                </div>
+            </form>
             <button type="button" id="editRecordBtn" class="edit-record-btn" aria-label="Edit patient record" title="Edit patient record">
                 <i class="fa-solid fa-pencil"></i>
             </button>
