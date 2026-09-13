@@ -1,14 +1,18 @@
-import { auth, db, fetchUserProfile, onAuthStateChanged, signOutUser } from './firebase.js';
+import { auth, db, storage, fetchUserProfile, onAuthStateChanged, signOutUser } from './firebase.js';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
 
 let currentUid = null;
 let currentResidentName = '';
+let residentProfile = {};
+let residentAppointments = [];
 let selectedClinic = null;
 let completedDoseCount = 0;
 let firstDoseDate = null;
 let latestVaccineBrand = '';
 let originalDoseClinicId = '';
 let residentVaccinationRecords = [];
+let bookingClinicContext = null;
 const doseDayOffsets = [0, 3, 7, 14, 28];
 
 function markAllRead() {
@@ -94,6 +98,7 @@ async function loadResidentDashboard(uid, userProfile = {}) {
   loadResidentNotifications(uid);
   const residentDoc = await getDoc(doc(db, 'residents', uid));
   const residentData = residentDoc.exists() ? residentDoc.data() : {};
+  residentProfile = residentData;
   populateResidentProfile(residentData);
 
   const residentName = [residentData.first_name, residentData.last_name].filter(Boolean).join(' ');
@@ -115,6 +120,7 @@ async function loadResidentDashboard(uid, userProfile = {}) {
   let liveBookings = [];
   onSnapshot(query(collection(db, 'appointments'), where('resident_uid', '==', uid)), snapshot => {
     liveBookings = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+    residentAppointments = liveBookings;
     renderLiveRecordHeader(residentVaccinationRecords, liveBookings);
     renderUpcomingAppointments(liveBookings);
     renderLiveAppointments(liveBookings);
@@ -535,7 +541,7 @@ function renderCasesChart() {
   window.residentMonthlyChart = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
+      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
       datasets: [
         { label: 'Rabies Cases', data: [12, 18, 15, 22, 19, 24, 17], backgroundColor: 'rgba(239,0,0,0.75)', borderRadius: 4, borderSkipped: false },
         { label: 'Vaccinations', data: [45, 62, 55, 80, 72, 95, 53], backgroundColor: 'rgba(52,211,153,0.75)', borderRadius: 4, borderSkipped: false }
@@ -613,6 +619,37 @@ function openBookingModal(clinic, clinicId = '') {
     if (option) sel.value = option.value;
   }
   selectedClinic = window.clinicDirectory?.find(item => item.id === sel?.value) || null;
+  const clinicBookings = residentAppointments
+    .filter(item => item.clinic_id === sel?.value && item.status !== 'declined')
+    .sort((first, second) => String(second.created_at?.toMillis?.() || '').localeCompare(String(first.created_at?.toMillis?.() || '')));
+  const previousBooking = clinicBookings[0];
+  const bookingWithDetails = clinicBookings.find(item => item.bite_date && item.animal_type && item.bite_body_part) || previousBooking;
+  bookingClinicContext = { clinicId: sel?.value || '', previousBooking, bookingWithDetails };
+  const returningClinic = Boolean(previousBooking);
+  const saved = {
+    address: residentProfile.address || previousBooking?.resident_address || '',
+    dateOfBirth: residentProfile.birthday || previousBooking?.date_of_birth || '',
+    sex: residentProfile.gender || previousBooking?.patient_sex || '',
+    biteDate: bookingWithDetails?.bite_date || '',
+    animal: bookingWithDetails?.animal_type || '',
+    bitePart: bookingWithDetails?.bite_body_part || ''
+  };
+  document.getElementById('modalAddress').value = saved.address;
+  document.getElementById('modalDateOfBirth').value = saved.dateOfBirth;
+  document.getElementById('modalSex').value = saved.sex;
+  document.getElementById('modalBiteDate').value = saved.biteDate;
+  document.getElementById('modalAnimal').value = saved.animal;
+  document.getElementById('modalBitePart').value = saved.bitePart;
+  document.getElementById('bookingPatientDetails').hidden = returningClinic;
+  document.getElementById('bookingIdField').hidden = returningClinic;
+  document.getElementById('returningClinicMessage').hidden = !returningClinic;
+  document.getElementById('modalAddress').readOnly = returningClinic;
+  document.getElementById('modalDateOfBirth').required = !returningClinic;
+  document.getElementById('modalSex').required = !returningClinic;
+  document.getElementById('modalBiteDate').required = !returningClinic;
+  document.getElementById('modalAnimal').required = !returningClinic;
+  document.getElementById('modalBitePart').required = !returningClinic;
+  document.getElementById('modalValidId').required = !returningClinic;
   const dateEl = document.getElementById('modalDate');
   const doseSelect = document.getElementById('modalDose');
   const nextDose = Math.min(5, completedDoseCount + 1);
@@ -634,7 +671,32 @@ function closeBookingModal() {
   document.getElementById('bookingModal').classList.remove('open');
 }
 
+function withBookingTimeout(promise, operation, timeoutMs = 30000) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`${operation} timed out. Make sure Firebase Storage is enabled in the Firebase Console, then try again.`)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
+
+function getReservationEndDate(startDate, durationDays) {
+  const endDate = new Date(`${startDate}T00:00:00`);
+  endDate.setDate(endDate.getDate() + Math.max(1, Number(durationDays || 1)) - 1);
+  return endDate.toISOString().split('T')[0];
+}
+
 async function confirmBooking() {
+  const btn = document.getElementById('confirmBookingBtn');
+  const msgEl = document.getElementById('bookingMsg');
+  if (!btn || !msgEl) return;
+  if (btn.disabled) return;
+  const resetBookingButton = () => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-check"></i> Confirm Booking';
+  };
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
+
   const clinicSelect = document.getElementById('modalClinic');
   const clinicId = clinicSelect.value;
   const clinic = window.clinicDirectory?.find(item => item.id === clinicId) || selectedClinic;
@@ -642,36 +704,85 @@ async function confirmBooking() {
   const date = document.getElementById('modalDate').value;
   const time = document.getElementById('modalTime').value;
   const address = document.getElementById('modalAddress').value.trim();
-  const msgEl = document.getElementById('bookingMsg');
+  const dateOfBirth = document.getElementById('modalDateOfBirth').value;
+  const sex = document.getElementById('modalSex').value;
+  const biteDate = document.getElementById('modalBiteDate').value;
+  const animal = document.getElementById('modalAnimal').value;
+  const bitePart = document.getElementById('modalBitePart').value.trim();
+  const returningClinic = bookingClinicContext?.clinicId === clinicId && Boolean(bookingClinicContext.previousBooking);
+  const savedBooking = bookingClinicContext?.bookingWithDetails || bookingClinicContext?.previousBooking || {};
 
-  const activeAppointments = await getDocs(query(
-    collection(db, 'appointments'),
-    where('resident_uid', '==', currentUid)
-  ));
+  if (!clinic) {
+    msgEl.style.display = 'block';
+    msgEl.style.background = '#fff5f5';
+    msgEl.style.color = '#ef0000';
+    msgEl.style.border = '1px solid #fecaca';
+    msgEl.textContent = 'Please select an available clinic before booking.';
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-check"></i> Confirm Booking';
+    return;
+  }
+
+  const reservationDays = Math.min(3, Math.max(1, Number(clinic.reservationDays || 1)));
+  const reservationEndDate = date ? getReservationEndDate(date, reservationDays) : '';
+
+  try {
+    const activeAppointments = await withBookingTimeout(getDocs(query(
+      collection(db, 'appointments'),
+      where('resident_uid', '==', currentUid)
+    )), 'Checking your existing appointments');
   if (activeAppointments.docs.some(item => ['confirmed', 'in_progress'].includes(item.data().status))) {
     msgEl.style.display = 'block';
     msgEl.style.background = '#fff5f5';
     msgEl.style.color = '#ef0000';
     msgEl.style.border = '1px solid #fecaca';
     msgEl.textContent = 'You already have an active accepted appointment. Complete that visit before booking another appointment.';
+    resetBookingButton();
     return;
   }
 
-  if (!date || !address) {
+  const idInput = document.getElementById('modalValidId');
+  const idFile = idInput?.files?.[0];
+  const allowedIdTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+  const allowedIdExtensions = ['jpg', 'jpeg', 'png', 'pdf'];
+  const maxIdSize = 5 * 1024 * 1024;
+
+  if (!date || (!returningClinic && (!address || !dateOfBirth || !sex || !biteDate || !animal || !bitePart || !idFile))) {
     msgEl.style.display = 'block';
     msgEl.style.background = '#fff5f5';
     msgEl.style.color = '#ef0000';
     msgEl.style.border = '1px solid #fecaca';
-    msgEl.textContent = !date ? 'Please select a preferred date.' : 'Please provide your address.';
+    msgEl.textContent = !date ? 'Please select a preferred date.' : !address ? 'Please provide your address.' : !dateOfBirth ? 'Please enter your date of birth.' : !sex ? 'Please select your sex.' : !biteDate ? 'Please enter the date of the bite.' : !animal ? 'Please select the animal that bit you.' : !bitePart ? 'Please enter the body part of the bite.' : 'Please upload a valid ID.';
+    resetBookingButton();
+    return;
+  }
+  const idExtension = idFile?.name?.split('.').pop()?.toLowerCase();
+  const validIdFormat = idFile && (allowedIdTypes.includes(idFile.type) || allowedIdExtensions.includes(idExtension));
+  if (idFile && (!validIdFormat || idFile.size > maxIdSize)) {
+    msgEl.style.display = 'block';
+    msgEl.style.background = '#fff5f5';
+    msgEl.style.color = '#ef0000';
+    msgEl.style.border = '1px solid #fecaca';
+    msgEl.textContent = 'The ID must be a JPG, PNG, or PDF file no larger than 5 MB.';
+    resetBookingButton();
+    return;
+  }
+  if (dateOfBirth > new Date().toISOString().split('T')[0] || biteDate > new Date().toISOString().split('T')[0]) {
+    msgEl.style.display = 'block';
+    msgEl.style.background = '#fff5f5';
+    msgEl.style.color = '#ef0000';
+    msgEl.style.border = '1px solid #fecaca';
+    msgEl.textContent = dateOfBirth > new Date().toISOString().split('T')[0] ? 'Date of birth cannot be in the future.' : 'Date of bite cannot be in the future.';
+    resetBookingButton();
     return;
   }
 
   const nextDose = Math.min(5, completedDoseCount + 1);
   if (nextDose > 1 && latestVaccineBrand && clinic.id !== originalDoseClinicId) {
-    const inventorySnap = await getDocs(query(
+    const inventorySnap = await withBookingTimeout(getDocs(query(
       collection(db, 'inventory'),
       where('clinic_id', '==', clinic.id)
-    ));
+    )), 'Checking clinic inventory');
     const hasMatchingStock = inventorySnap.docs.some(item => item.data().type === latestVaccineBrand && Number(item.data().quantity || 0) > 0);
     if (!hasMatchingStock) {
       msgEl.style.display = 'block';
@@ -679,6 +790,7 @@ async function confirmBooking() {
       msgEl.style.color = '#ef0000';
       msgEl.style.border = '1px solid #fecaca';
       msgEl.textContent = `This clinic does not carry the required ${latestVaccineBrand} vaccine for Dose ${nextDose}. Choose the original clinic or a matching clinic.`;
+      resetBookingButton();
       return;
     }
   }
@@ -691,21 +803,29 @@ async function confirmBooking() {
     msgEl.style.color = '#ef0000';
     msgEl.style.border = '1px solid #fecaca';
     msgEl.textContent = `Dose ${nextDose} should be scheduled on or after ${earliestDate}.`;
+    resetBookingButton();
     return;
   }
 
-  const btn = document.querySelector('.modal-submit');
-  btn.disabled = true;
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Booking...';
 
-  if (!clinic) {
-    msgEl.style.display = 'block';
-    msgEl.textContent = 'Please select a clinic from the map first.';
-    return;
-  }
-
-  try {
-    const appointmentRef = await addDoc(collection(db, 'appointments'), {
+    let idDownloadUrl = savedBooking.valid_id_url || '';
+    let idContentType = savedBooking.valid_id_type || '';
+    let idName = savedBooking.valid_id_name || '';
+    if (idFile) {
+      const idStorageRef = ref(storage, `id-verification/${currentUid}/${Date.now()}-${idFile.name}`);
+      idContentType = idFile.type || (idExtension === 'pdf' ? 'application/pdf' : idExtension === 'png' ? 'image/png' : 'image/jpeg');
+      msgEl.style.display = 'block';
+      msgEl.style.background = '#eff6ff';
+      msgEl.style.color = '#1d4ed8';
+      msgEl.style.border = '1px solid #bfdbfe';
+      msgEl.textContent = 'Uploading your valid ID...';
+      const idUpload = await withBookingTimeout(uploadBytes(idStorageRef, idFile, { contentType: idContentType }), 'Uploading your valid ID');
+      idDownloadUrl = await withBookingTimeout(getDownloadURL(idUpload.ref), 'Preparing your valid ID');
+      idName = idFile.name;
+    }
+    msgEl.textContent = 'Saving your appointment...';
+    const appointmentRef = await withBookingTimeout(addDoc(collection(db, 'appointments'), {
       resident_uid: currentUid,
       resident_name: currentResidentName,
       clinic_id: clinic.id,
@@ -715,22 +835,35 @@ async function confirmBooking() {
       dose_label: dose,
       vaccine_name: latestVaccineBrand || '',
       preferred_date: date,
+      reservation_days: reservationDays,
+      reservation_end_date: reservationEndDate,
       preferred_time: time,
       resident_address: address,
-      patient_age: document.getElementById('modalAge').value ? Number(document.getElementById('modalAge').value) : null,
-      patient_sex: document.getElementById('modalSex').value,
-      bite_date: document.getElementById('modalBiteDate').value,
-      animal_type: document.getElementById('modalAnimal').value.trim(),
-      bite_body_part: document.getElementById('modalBitePart').value.trim(),
+      date_of_birth: dateOfBirth || savedBooking.date_of_birth || null,
+      patient_sex: sex || savedBooking.patient_sex || '',
+      bite_date: biteDate || savedBooking.bite_date || '',
+      animal_type: animal || savedBooking.animal_type || '',
+      bite_body_part: bitePart || savedBooking.bite_body_part || '',
+      valid_id_url: idDownloadUrl,
+      valid_id_name: idName,
+      valid_id_type: idContentType,
       patient_category: '',
       wound_washed: '',
       bite_type: '',
       status: 'pending',
       created_at: serverTimestamp()
+    }), 'Saving your appointment');
+
+    await updateDoc(doc(db, 'residents', currentUid), {
+      address,
+      birthday: dateOfBirth,
+      gender: sex,
+      updated_at: serverTimestamp()
     });
+    residentProfile = { ...residentProfile, address, birthday: dateOfBirth, gender: sex };
 
     if (clinic.staff_uid) {
-      await addDoc(collection(db, 'notifications'), {
+      await withBookingTimeout(addDoc(collection(db, 'notifications'), {
         recipient_uid: clinic.staff_uid,
         user_id: clinic.staff_uid,
         clinic_id: clinic.id,
@@ -740,7 +873,7 @@ async function confirmBooking() {
         message: `${currentResidentName} requested an appointment on ${date} at ${time}.`,
         read: false,
         created_at: serverTimestamp()
-      });
+      }), 'Sending the clinic notification');
     }
 
     msgEl.style.display = 'block';
@@ -851,6 +984,14 @@ document.addEventListener('DOMContentLoaded', function() {
         gender: document.getElementById('profileGender').value,
         address: document.getElementById('profileAddress').value.trim()
       });
+      residentProfile = {
+        ...residentProfile,
+        username,
+        phone: document.getElementById('profilePhone').value.trim(),
+        birthday: document.getElementById('profileBirthday').value,
+        gender: document.getElementById('profileGender').value,
+        address: document.getElementById('profileAddress').value.trim()
+      };
       currentResidentName = username;
       const headerName = document.getElementById('headerName');
       if (headerName) headerName.textContent = username;

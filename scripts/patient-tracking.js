@@ -30,6 +30,7 @@ async function loadPatients() {
     const uniqueResidents = new Map();
     for (const apptDoc of appointments.docs) {
       const appt = apptDoc.data();
+      if (appt.status === 'pending' || appt.status === 'declined') continue;
       console.log('Processing appointment:', appt.resident_name, appt.resident_uid);
       
       if (!uniqueResidents.has(appt.resident_uid)) {
@@ -121,31 +122,53 @@ async function loadAppointments() {
   const clinicId = staff?.clinic_id || auth.currentUser.uid;
   const snap = await getDocs(query(
     collection(db, 'appointments'),
-    where('clinic_id', '==', clinicId),
-    where('status', '==', 'pending')
+    where('clinic_id', '==', clinicId)
   ));
-  const pendingAppointments = snap.docs.sort((a, b) => {
+  const today = new Date().toISOString().split('T')[0];
+  const scheduledAppointments = snap.docs.filter((appointment) => {
+    const data = appointment.data();
+    return ['confirmed', 'in_progress'].includes(data.status)
+      && data.preferred_date === today;
+  }).sort((a, b) => {
     const first = a.data().created_at?.toMillis?.() || 0;
     const second = b.data().created_at?.toMillis?.() || 0;
     return first - second;
   });
 
-  if (!pendingAppointments.length) {
-    list.innerHTML = '<p style="color:#6b7280;padding:16px;"><i class="fa-solid fa-circle-check" style="color:#22c55e;margin-right:6px;"></i>No pending appointments.</p>';
+  if (!scheduledAppointments.length) {
+    list.innerHTML = '<p style="color:#6b7280;padding:16px;"><i class="fa-solid fa-circle-check" style="color:#22c55e;margin-right:6px;"></i>No confirmed appointments scheduled for today.</p>';
     document.getElementById('pendingCount').textContent = 0;
     document.getElementById('pendingCount').style.background = '#22c55e';
     return;
   }
 
-  pendingCount = pendingAppointments.length;
+  pendingCount = scheduledAppointments.length;
   document.getElementById('pendingCount').textContent = pendingCount;
   list.innerHTML = '';
 
-  pendingAppointments.forEach(docSnap => {
+  scheduledAppointments.forEach(docSnap => {
     const d = docSnap.data();
-    const card = buildApptCard(docSnap.id, d);
+    const card = buildScheduledApptCard(docSnap.id, d);
     list.appendChild(card);
+    card.querySelector('.view-appt-details').addEventListener('click', () => openRecordModal(docSnap.id));
   });
+}
+
+function buildScheduledApptCard(id, d) {
+  const card = document.createElement('div');
+  card.className = 'appt-card';
+  card.innerHTML = `
+    <div class="appt-avatar"><i class="fa-solid fa-user"></i></div>
+    <div class="appt-info">
+      <p class="patient-name">${escapeHtml(d.resident_name || 'Unknown Resident')}</p>
+      <p class="patient-meta">${escapeHtml(d.preferred_date || '')} &nbsp;·&nbsp; ${escapeHtml(d.preferred_time || '')}</p>
+      <div class="appt-tags"><span class="tag tag-dose">${escapeHtml(d.dose_label || 'Dose 1')}</span><span class="tag tag-time"><i class="fa-regular fa-clock"></i> ${escapeHtml(d.preferred_time || '')}</span></div>
+    </div>
+    <div class="appt-status-col">
+      <span class="status-badge scheduled">${escapeHtml(d.status || 'confirmed')}</span>
+      <button class="mark-btn view-appt-details" type="button"><i class="fa-regular fa-id-card"></i> View Details</button>
+    </div>`;
+  return card;
 }
 
 function buildApptCard(id, d) {
@@ -163,7 +186,7 @@ function buildApptCard(id, d) {
     </div>
     <div class="appt-info">
       <p class="patient-name">${d.resident_name || 'Unknown Resident'}</p>
-      <p class="patient-meta">${d.preferred_date || ''} &nbsp;·&nbsp; ${d.preferred_time || ''}</p>
+      <p class="patient-meta">${d.preferred_date || ''}${d.reservation_end_date && d.reservation_end_date !== d.preferred_date ? ` to ${d.reservation_end_date}` : ''} &nbsp;·&nbsp; ${d.preferred_time || ''}</p>
       <div class="appt-tags">
         <span class="tag tag-dose">${d.dose_label || 'Dose 1'}</span>
         <span class="tag tag-time"><i class="fa-regular fa-clock"></i> ${d.preferred_time || ''}</span>
@@ -172,6 +195,9 @@ function buildApptCard(id, d) {
     </div>
     <div class="appt-status-col">
       <span class="status-badge scheduled" id="badge-${id}">Pending</span>
+      <button class="mark-btn view-appt-details" type="button" style="background:#fff;color:#2563eb;border:1px solid #2563eb;margin-bottom:4px;">
+        <i class="fa-regular fa-id-card"></i> View Details
+      </button>
       <button class="mark-btn" id="markBtn-${id}" onclick="window.confirmAppt('${id}')">
         <i class="fa-solid fa-circle-check"></i> Confirm
       </button>
@@ -299,6 +325,8 @@ document.addEventListener('DOMContentLoaded', () => {
       currentClinicId = staff?.clinic_id || user.uid;
       await loadAppointments();
       await loadPatients();
+      const appointmentId = new URLSearchParams(window.location.search).get('appointment');
+      if (appointmentId) openRecordModal(appointmentId);
     } else {
       window.location.href = 'login.html';
     }
@@ -317,32 +345,67 @@ async function openRecordModal(id) {
       return;
     }
     const appointment = appointmentSnap.data();
-    activeAppointment = { id, ...appointment };
+    const residentSnap = appointment.resident_uid
+      ? await getDoc(doc(db, 'residents', appointment.resident_uid))
+      : null;
+    const resident = residentSnap?.exists() ? residentSnap.data() : {};
+    const relatedAppointmentsSnap = appointment.resident_uid && appointment.clinic_id
+      ? await getDocs(query(
+        collection(db, 'appointments'),
+        where('clinic_id', '==', appointment.clinic_id),
+        where('resident_uid', '==', appointment.resident_uid)
+      ))
+      : { docs: [] };
+    const relatedAppointments = relatedAppointmentsSnap.docs.map(item => item.data());
+    const firstWith = field => appointment[field] || relatedAppointments.find(item => item[field])?.[field] || '';
+    const details = {
+      ...appointment,
+      resident_address: firstWith('resident_address') || resident.address,
+      date_of_birth: firstWith('date_of_birth') || resident.birthday,
+      patient_sex: firstWith('patient_sex') || resident.gender,
+      bite_date: firstWith('bite_date'),
+      animal_type: firstWith('animal_type'),
+      bite_body_part: firstWith('bite_body_part'),
+      patient_category: firstWith('patient_category'),
+      wound_washed: firstWith('wound_washed'),
+      bite_type: firstWith('bite_type'),
+      valid_id_url: firstWith('valid_id_url'),
+      valid_id_name: firstWith('valid_id_name'),
+      valid_id_type: firstWith('valid_id_type')
+    };
+    activeAppointment = { id, ...details };
     document.getElementById('recordAppointmentId').value = id;
-    document.getElementById('recordModalTitle').textContent = `${appointment.resident_name || 'Resident'} — Full Record`;
+    document.getElementById('recordModalTitle').textContent = `${details.resident_name || 'Resident'} — Full Record`;
+    const isImage = ['image/jpeg', 'image/png'].includes(details.valid_id_type) || /\.(jpe?g|png)$/i.test(details.valid_id_name || details.valid_id_url || '');
+    const validIdMarkup = details.valid_id_url
+      ? (isImage
+        ? `<a href="${escapeHtml(details.valid_id_url)}" target="_blank" rel="noopener"><img class="record-id-preview" src="${escapeHtml(details.valid_id_url)}" alt="Uploaded valid ID"></a>`
+        : `<a href="${escapeHtml(details.valid_id_url)}" target="_blank" rel="noopener">View uploaded ID${details.valid_id_name ? ` (${escapeHtml(details.valid_id_name)})` : ''}</a>`)
+      : 'Not provided';
     document.getElementById('recordDetails').innerHTML = `
       <div class="record-detail-grid">
-        <div><strong>Address</strong><span>${displayValue(appointment.resident_address)}</span></div>
-        <div><strong>Age</strong><span>${displayValue(appointment.patient_age)}</span></div>
-        <div><strong>Sex</strong><span>${displayValue(appointment.patient_sex)}</span></div>
-        <div><strong>Date of Bite</strong><span>${displayValue(appointment.bite_date)}</span></div>
-        <div><strong>Animal</strong><span>${displayValue(appointment.animal_type)}</span></div>
-        <div><strong>Body Part</strong><span>${displayValue(appointment.bite_body_part)}</span></div>
-        <div><strong>Appointment</strong><span>${displayValue(appointment.preferred_date)} at ${displayValue(appointment.preferred_time)}</span></div>
-        <div><strong>Dose</strong><span>${displayValue(appointment.dose_label)}</span></div>
-        <div><strong>Category of Patient</strong><span>${displayValue(appointment.patient_category)}</span></div>
-        <div><strong>Was the Bite Washed?</strong><span>${displayValue(appointment.wound_washed)}</span></div>
-        <div><strong>Type of Bite</strong><span>${displayValue(appointment.bite_type)}</span></div>
+        <div><strong>Address</strong><span>${displayValue(details.resident_address)}</span></div>
+        <div><strong>Date of Birth</strong><span>${displayValue(details.date_of_birth)}</span></div>
+        <div><strong>Sex</strong><span>${displayValue(details.patient_sex)}</span></div>
+        <div><strong>Date of Bite</strong><span>${displayValue(details.bite_date)}</span></div>
+        <div><strong>Animal</strong><span>${displayValue(details.animal_type)}</span></div>
+        <div><strong>Body Part</strong><span>${displayValue(details.bite_body_part)}</span></div>
+        <div><strong>Valid ID</strong><span>${validIdMarkup}</span></div>
+        <div><strong>Reservation</strong><span>${displayValue(details.preferred_date)}${details.reservation_end_date && details.reservation_end_date !== details.preferred_date ? ` to ${displayValue(details.reservation_end_date)}` : ''} at ${displayValue(details.preferred_time)}</span></div>
+        <div><strong>Dose</strong><span>${displayValue(details.dose_label)}</span></div>
+        <div><strong>Category of Patient</strong><span>${displayValue(details.patient_category)}</span></div>
+        <div><strong>Was the Bite Washed?</strong><span>${displayValue(details.wound_washed)}</span></div>
+        <div><strong>Type of Bite</strong><span>${displayValue(details.bite_type)}</span></div>
       </div>`;
-    document.getElementById('editAddress').value = appointment.resident_address || '';
-    document.getElementById('editAge').value = appointment.patient_age ?? '';
-    document.getElementById('editSex').value = appointment.patient_sex || '';
-    document.getElementById('editBiteDate').value = appointment.bite_date || '';
-    document.getElementById('editAnimal').value = appointment.animal_type || '';
-    document.getElementById('editBitePart').value = appointment.bite_body_part || '';
-    document.getElementById('recordCategory').value = appointment.patient_category || '';
-    document.getElementById('recordWoundWashed').value = appointment.wound_washed || '';
-    document.getElementById('recordBiteType').value = appointment.bite_type || '';
+    document.getElementById('editAddress').value = details.resident_address || '';
+    document.getElementById('editDateOfBirth').value = details.date_of_birth || '';
+    document.getElementById('editSex').value = details.patient_sex || '';
+    document.getElementById('editBiteDate').value = details.bite_date || '';
+    document.getElementById('editAnimal').value = details.animal_type || '';
+    document.getElementById('editBitePart').value = details.bite_body_part || '';
+    document.getElementById('recordCategory').value = details.patient_category || '';
+    document.getElementById('recordWoundWashed').value = details.wound_washed || '';
+    document.getElementById('recordBiteType').value = details.bite_type || '';
     document.getElementById('staffRecordForm').hidden = true;
     const completionForm = document.getElementById('doseCompletionForm');
     completionForm.hidden = appointment.status === 'completed' || appointment.status === 'declined';
@@ -437,9 +500,9 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     try {
-      await updateDoc(doc(db, 'appointments', appointmentId), {
+      const assessment = {
         resident_address: document.getElementById('editAddress').value.trim(),
-        patient_age: document.getElementById('editAge').value ? Number(document.getElementById('editAge').value) : null,
+        date_of_birth: document.getElementById('editDateOfBirth').value || null,
         patient_sex: document.getElementById('editSex').value,
         bite_date: document.getElementById('editBiteDate').value,
         animal_type: document.getElementById('editAnimal').value.trim(),
@@ -449,7 +512,16 @@ document.addEventListener('DOMContentLoaded', () => {
         bite_type: document.getElementById('recordBiteType').value,
         assessed_by: auth.currentUser.uid,
         assessed_at: serverTimestamp()
-      });
+      };
+      const relatedAppointments = activeAppointment?.resident_uid && activeAppointment?.clinic_id
+        ? await getDocs(query(
+          collection(db, 'appointments'),
+          where('clinic_id', '==', activeAppointment.clinic_id),
+          where('resident_uid', '==', activeAppointment.resident_uid)
+        ))
+        : { docs: [] };
+      const appointmentIds = new Set([appointmentId, ...relatedAppointments.docs.map(item => item.id)]);
+      await Promise.all([...appointmentIds].map(id => updateDoc(doc(db, 'appointments', id), assessment)));
       closeRecordModal();
       document.getElementById('staffRecordForm').hidden = true;
       document.getElementById('editRecordBtn').hidden = false;

@@ -16,13 +16,28 @@ const loginRoles = {
   admin: 'admin'
 };
 
+function showLoginMessage(message) {
+  const messageBox = document.getElementById('loginMessage');
+  const messageText = document.getElementById('loginMessageText');
+  if (messageBox && messageText) {
+    messageText.textContent = message;
+    messageBox.hidden = false;
+  }
+}
+
+function clearLoginMessage() {
+  const messageBox = document.getElementById('loginMessage');
+  if (messageBox) messageBox.hidden = true;
+}
+
 document.getElementById('loginBtn').addEventListener('click', async () => {
-  const email    = document.querySelector('.signin-section input[type="text"]').value.trim();
+  const email    = document.getElementById('emailInput').value.trim();
   const password = document.getElementById('passwordInput').value;
   const btn      = document.getElementById('loginBtn');
 
+  clearLoginMessage();
   if (!email || !password) {
-    alert('Please enter your email and password.');
+    showLoginMessage('Please enter your email and password.');
     return;
   }
 
@@ -38,7 +53,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
 
     const userDoc = await getDoc(doc(db, 'users', uid));
     if (!userDoc.exists()) {
-      alert('Account not found in database. Contact your administrator.');
+      showLoginMessage('Account not found in the system. Please contact your administrator.');
       await signOut(auth);
       btn.textContent = originalText;
       btn.disabled = false;
@@ -54,7 +69,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
         clinic_staff: 'clinic staff',
         admin: 'administrator'
       };
-      alert(`This account does not have ${roleLabels[expectedRole] || 'this'} access.`);
+      showLoginMessage(`This account does not have ${roleLabels[expectedRole] || 'this'} access.`);
       await signOut(auth);
       btn.textContent = originalText;
       btn.disabled = false;
@@ -64,7 +79,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     const page = rolePages[expectedRole];
 
     if (!page) {
-      alert('Unknown role. Contact your administrator.');
+      showLoginMessage('Unknown role. Please contact your administrator.');
       btn.textContent = originalText;
       btn.disabled = false;
       return;
@@ -77,13 +92,13 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     btn.disabled = false;
 
     if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-email') {
-      alert('No account found with that email. Please register first.');
+      showLoginMessage('The email or password is incorrect. Check your details or register for an account.');
     } else if (err.code === 'auth/wrong-password') {
-      alert('Incorrect password. Please try again.');
+      showLoginMessage('The password is incorrect. Please try again.');
     } else if (err.code === 'auth/too-many-requests') {
-      alert('Too many failed attempts. Please wait a moment and try again.');
+      showLoginMessage('Too many failed attempts. Please wait a moment before trying again.');
     } else {
-      alert('Login failed: ' + err.message);
+      showLoginMessage('Login failed. Please check your connection and try again.');
     }
   }
 });

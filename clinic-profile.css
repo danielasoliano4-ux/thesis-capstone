@@ -209,6 +209,7 @@ body {
 }
 
 .profile-field input,
+.profile-field select,
 .profile-field textarea {
     padding: 10px;
     border: 1px solid #ddd;
@@ -218,6 +219,7 @@ body {
 }
 
 .profile-field input:focus,
+.profile-field select:focus,
 .profile-field textarea:focus {
     outline: none;
     background-color: #fff;

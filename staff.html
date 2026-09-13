@@ -125,6 +125,12 @@
                     </button>
                 </a>
 
+                <a href="staff.html#resident-appointments" class="tab-link">
+                    <button>
+                        Resident Appointment <span class="appointment-badge" id="pendingAppointmentBadge" hidden>0</span>
+                    </button>
+                </a>
+
                 <a href="patient-tracking.html" class="tab-link">
                     <button>
                         Patient Tracking
@@ -137,13 +143,18 @@
                     </button>
                 </a>
 
+                <a href="history.html" class="tab-link">
+                    <button>History</button>
+                </a>
+
             </div>
 
             <!-- CONTENT -->
             <div class="inventory-content">
 
-                <!-- TOP -->
-                <div class="inventory-top">
+                <div id="inventoryPanel">
+                    <!-- TOP -->
+                    <div class="inventory-top">
 
                     <h2>Vaccine Inventory Management</h2>
 
@@ -152,10 +163,10 @@
                         Add New Stock
                     </button>
 
-                </div>
+                    </div>
 
-                <!-- ALERT -->
-                <div class="alert-box">
+                    <!-- ALERT -->
+                    <div class="alert-box">
 
                     <div class="alert-title">
 
@@ -169,10 +180,10 @@
                         1 critical and 1 low stock items require immediate attention.
                     </p>
 
-                </div>
+                    </div>
 
-                <!-- TABLE -->
-                <div class="table-container">
+                    <!-- TABLE -->
+                    <div class="table-container">
 
                     <table>
 
@@ -194,14 +205,16 @@
 
                     </table>
 
+                    </div>
                 </div>
 
+                <div id="residentAppointmentsPanel" class="resident-appointments-panel">
                 <div class="inventory-top appointment-section-heading">
                     <h2>Resident Appointments</h2>
-                    <button type="button" class="update-link" id="refreshAppointmentsBtn"><i class="fa-solid fa-rotate"></i> Refresh</button>
                 </div>
                 <div id="staffAppointments" class="table-container">
                     <p class="empty-appointments">Loading resident appointments...</p>
+                </div>
                 </div>
 
             </div>
@@ -242,6 +255,16 @@
                 <label>Clinic Location<input id="completionLocation" required></label>
                 <button type="submit" class="add-btn"><i class="fa-solid fa-syringe"></i> Complete Dose</button>
             </form>
+        </div>
+    </div>
+
+    <div id="appointmentDetailsModal" class="modal" aria-hidden="true">
+        <div class="modal-content appointment-details-modal-content" role="dialog" aria-modal="true" aria-labelledby="appointmentDetailsTitle">
+            <div class="modal-header">
+                <h2 id="appointmentDetailsTitle">Resident Appointment Details</h2>
+                <button type="button" id="closeAppointmentDetailsBtn" class="modal-close" aria-label="Close">&times;</button>
+            </div>
+            <div id="appointmentDetailsBody" class="appointment-details-body">Loading appointment details...</div>
         </div>
     </div>
 

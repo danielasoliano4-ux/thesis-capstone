@@ -103,6 +103,12 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /history/{historyId} {
+      allow read: if isAdmin() || belongsToClinic(resource.data.clinic_id);
+      allow create: if isAdmin() || belongsToClinic(request.resource.data.clinic_id);
+      allow update, delete: if isAdmin();
+    }
+
     match /vaccination_records/{recordId} {
       allow read: if isAdmin() 
         || (isResident() && resource.data.resident_uid == request.auth.uid)

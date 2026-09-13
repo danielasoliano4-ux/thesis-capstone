@@ -53,20 +53,32 @@
 <div class="tab-panel active" id="panel-analytics">
     <div class="stats-grid">
         <div class="stat-card">
-            <div><span>Total Rabies Cases</span><h2>127</h2></div>
+            <div><span>Total Rabies Cases</span><h2 id="statTotalCases">0</h2></div>
             <i class="fa-solid fa-triangle-exclamation red"></i>
         </div>
         <div class="stat-card">
-            <div><span>Total Vaccinations</span><h2>462</h2></div>
+            <div><span>Total Vaccinations</span><h2 id="statTotalVaccinations">0</h2></div>
             <i class="fa-solid fa-syringe green"></i>
         </div>
         <div class="stat-card">
-            <div><span>Active Patients</span><h2>38</h2></div>
+            <div><span>Active Patients</span><h2 id="statActivePatients">0</h2></div>
             <i class="fa-solid fa-user-group blue"></i>
         </div>
         <div class="stat-card">
-            <div><span>High-Risk Barangays</span><h2 class="red-text">5</h2></div>
+            <div><span>High-Risk Barangays</span><h2 id="statHighRiskBarangays" class="red-text">0</h2></div>
             <i class="fa-solid fa-map-location-dot purple"></i>
+        </div>
+        <div class="stat-card">
+            <div><span>Ongoing Cases</span><h2 id="statOngoingCases">0</h2></div>
+            <i class="fa-solid fa-person-running blue"></i>
+        </div>
+        <div class="stat-card">
+            <div><span>Completed Cases</span><h2 id="statCompletedCases">0</h2></div>
+            <i class="fa-solid fa-circle-check green"></i>
+        </div>
+        <div class="stat-card">
+            <div><span>Deaths</span><h2 id="statDeaths" class="red-text">0</h2></div>
+            <i class="fa-solid fa-skull-crossbones red"></i>
         </div>
     </div>
     <div class="charts-grid">
@@ -78,7 +90,7 @@
             <div class="chart-card-body">
                 <canvas id="monthlyChart" height="240"></canvas>
             </div>
-            <button type="button" class="dashboard-pencil-btn" data-edit-form="dashboardAnalyticsForm" aria-label="Edit dashboard analytics" title="Edit dashboard analytics"><i class="fa-solid fa-pencil"></i></button>
+            <span class="live-data-label"><i class="fa-solid fa-circle"></i> Live system data</span>
         </div>
         <div class="chart-card">
             <div class="chart-card-header">
@@ -88,42 +100,6 @@
                 <canvas id="stockChart" height="240"></canvas>
             </div>
         </div>
-    </div>
-    <div class="content-box animal-exposure-editor">
-        <div class="content-box-header">
-            <div>
-                <h3><i class="fa-solid fa-paw" style="color:#ef0000;margin-right:6px;"></i>Exposure by Animal Source</h3>
-                <p>Update the animal labels and percentages shown on the resident dashboard.</p>
-            </div>
-            <span id="animalExposureSaveStatus" class="status adequate">Ready</span>
-        </div>
-        <form id="animalExposureForm" class="animal-exposure-form" hidden>
-            <label>Animal 1<input id="animalName1" type="text" required></label>
-            <label>Percent<input id="animalPercent1" type="number" min="0" max="100" required></label>
-            <label>Animal 2<input id="animalName2" type="text" required></label>
-            <label>Percent<input id="animalPercent2" type="number" min="0" max="100" required></label>
-            <label>Animal 3<input id="animalName3" type="text" required></label>
-            <label>Percent<input id="animalPercent3" type="number" min="0" max="100" required></label>
-            <label>Animal 4<input id="animalName4" type="text" required></label>
-            <label>Percent<input id="animalPercent4" type="number" min="0" max="100" required></label>
-            <button class="btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save Animal Data</button>
-        </form>
-        <p id="animalExposureFormMessage" class="animal-exposure-form-message" aria-live="polite"></p>
-        <button type="button" class="analytics-edit-btn" data-edit-form="animalExposureForm" aria-label="Edit animal exposure data" title="Edit animal exposure data"><i class="fa-solid fa-pencil"></i></button>
-    </div>
-    <div class="content-box dashboard-analytics-editor">
-        <div class="content-box-header"><div><h3><i class="fa-solid fa-chart-line" style="color:#ef0000;margin-right:6px;"></i>Dashboard Analytics Data</h3><p>Edit the values displayed on public and resident dashboards. Separate values with commas.</p></div><span id="dashboardAnalyticsSaveStatus" class="status adequate">Ready</span></div>
-        <form id="dashboardAnalyticsForm" class="dashboard-analytics-form" hidden>
-            <label>Monthly Cases (Jan-Jul)<input id="monthlyCases" type="text" required></label>
-            <label>Monthly Vaccinations (Jan-Jul)<input id="monthlyVaccinations" type="text" required></label>
-            <label>Barangay Names<input id="barangayNames" type="text" required></label>
-            <label>Barangay Cases<input id="barangayCases" type="text" required></label>
-            <label>Case Trend Values<input id="caseTrendValues" type="text" required></label>
-            <label>Age Group Counts<input id="ageGroupCounts" type="text" required></label>
-            <button class="btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save Dashboard Data</button>
-        </form>
-        <p id="dashboardAnalyticsMessage" class="animal-exposure-form-message" aria-live="polite"></p>
-        <button type="button" class="analytics-edit-btn" data-edit-form="dashboardAnalyticsForm" aria-label="Edit dashboard analytics" title="Edit dashboard analytics"><i class="fa-solid fa-pencil"></i></button>
     </div>
     <div class="content-box">
         <div class="content-box-header">
@@ -137,7 +113,7 @@
                     <th>Completion Rate</th><th>Risk Level</th><th>Risk Bar</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="heatmapBody">
                 <tr>
                     <td><strong>Mamatid</strong></td><td>23</td><td>41</td><td>72%</td>
                     <td><span class="risk-badge badge-high">High</span></td>
@@ -227,32 +203,17 @@
 <!-- ===================== USERS TAB ===================== -->
 <div class="tab-panel" id="panel-users">
     <div class="stats-grid">
-        <div class="stat-card"><div><span>Total Residents</span><h2>284</h2></div><i class="fa-solid fa-user green"></i></div>
-        <div class="stat-card"><div><span>Clinic Staff</span><h2>12</h2></div><i class="fa-solid fa-user-nurse blue"></i></div>
-        <div class="stat-card"><div><span>Pending Approval</span><h2 class="red-text">2</h2></div><i class="fa-solid fa-user-clock red"></i></div>
-        <div class="stat-card"><div><span>Total Clinics</span><h2>4</h2></div><i class="fa-solid fa-hospital purple"></i></div>
+        <div class="stat-card"><div><span>Total Residents</span><h2 id="userTotalResidents">0</h2></div><i class="fa-solid fa-user green"></i></div>
+        <div class="stat-card"><div><span>Clinic Staff</span><h2 id="userClinicStaff">0</h2></div><i class="fa-solid fa-user-nurse blue"></i></div>
+        <div class="stat-card"><div><span>Pending Approval</span><h2 id="userPendingApproval" class="red-text">0</h2></div><i class="fa-solid fa-user-clock red"></i></div>
+        <div class="stat-card"><div><span>Total Clinics</span><h2 id="userTotalClinics">0</h2></div><i class="fa-solid fa-hospital purple"></i></div>
     </div>
     <div class="content-box">
         <div class="content-box-header">
             <h3>Pending Clinic Staff Approvals</h3>
             <button class="btn-primary"><i class="fa-solid fa-check-double"></i> Approve All</button>
         </div>
-        <div class="users-grid">
-            <div class="user-card">
-                <div class="user-avatar" style="background:#dbeafe;color:#2563eb;"><i class="fa-solid fa-user-nurse"></i></div>
-                <h4>Maria Reyes</h4>
-                <p>St. Mary's Medical Clinic<br>Staff registration – June 30, 2026</p>
-                <button class="approve-btn" onclick="approveUser(this)">Approve</button>
-                <button class="deny-btn">Deny</button>
-            </div>
-            <div class="user-card">
-                <div class="user-avatar" style="background:#dbeafe;color:#2563eb;"><i class="fa-solid fa-user-nurse"></i></div>
-                <h4>Carlo Bautista</h4>
-                <p>Cabuyao City Health Center<br>Staff registration – July 1, 2026</p>
-                <button class="approve-btn" onclick="approveUser(this)">Approve</button>
-                <button class="deny-btn">Deny</button>
-            </div>
-        </div>
+        <div class="users-grid" id="pendingStaffGrid"><p>Loading staff approvals...</p></div>
     </div>
     <div class="content-box">
         <div class="content-box-header">
@@ -264,23 +225,7 @@
                 <thead>
                     <tr><th>Name</th><th>Role</th><th>Clinic / Barangay</th><th>Status</th><th>Last Active</th><th>Action</th></tr>
                 </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>John Cruz</strong></td><td>Resident</td><td>Brgy. Poblacion Uno</td>
-                        <td><span class="status adequate">Active</span></td><td>July 2, 2026</td>
-                        <td><a href="#" class="update-link">View</a></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Ana Garcia</strong></td><td>Resident</td><td>Brgy. Mamatid</td>
-                        <td><span class="status adequate">Active</span></td><td>July 2, 2026</td>
-                        <td><a href="#" class="update-link">View</a></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Dr. Santos</strong></td><td>Clinic Staff</td><td>Cabuyao City Health Center</td>
-                        <td><span class="status adequate">Active</span></td><td>July 2, 2026</td>
-                        <td><a href="#" class="update-link">View</a></td>
-                    </tr>
-                </tbody>
+                <tbody id="activeUsersBody"><tr><td colspan="6">Loading users...</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -297,28 +242,7 @@
                 <thead>
                     <tr><th>Clinic Name</th><th>Type</th><th>Barangay</th><th>Vaccine Stock</th><th>Status</th><th>Last Updated</th><th>Action</th></tr>
                 </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>Cabuyao City Health Center</strong></td><td>Public</td><td>Poblacion Uno</td>
-                        <td>55 doses</td><td><span class="status adequate">Available</span></td>
-                        <td>July 2, 2026 8:00 AM</td><td><a href="#" class="update-link">Manage</a></td>
-                    </tr>
-                    <tr>
-                        <td><strong>St. Mary's Medical Clinic</strong></td><td>Private</td><td>Mamatid</td>
-                        <td>8 doses</td><td><span class="status low">Low Stock</span></td>
-                        <td>July 1, 2026 5:30 PM</td><td><a href="#" class="update-link">Manage</a></td>
-                    </tr>
-                    <tr>
-                        <td><strong>South City Animal Bite Center</strong></td><td>Private</td><td>Banlic</td>
-                        <td>0 doses</td><td><span class="status critical">Out of Stock</span></td>
-                        <td>June 30, 2026 10:00 AM</td><td><a href="#" class="update-link">Manage</a></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Laguna Medical Clinic</strong></td><td>Private</td><td>Sala</td>
-                        <td>22 doses</td><td><span class="status adequate">Available</span></td>
-                        <td>July 2, 2026 7:00 AM</td><td><a href="#" class="update-link">Manage</a></td>
-                    </tr>
-                </tbody>
+                <tbody id="clinicsBody"><tr><td colspan="7">Loading clinics...</td></tr></tbody>
             </table>
         </div>
     </div>

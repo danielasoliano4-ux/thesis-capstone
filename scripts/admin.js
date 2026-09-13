@@ -15,7 +15,7 @@ const monthCtx = document.getElementById('monthlyChart').getContext('2d');
 window.adminMonthlyChart = new Chart(monthCtx, {
     type: 'bar',
     data: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
+        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
         datasets: [
             {
                 label: 'Rabies Cases',

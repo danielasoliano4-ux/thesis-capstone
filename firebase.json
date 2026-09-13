@@ -2,8 +2,18 @@
   "firestore": {
     "rules": "firestore.rules"
   },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "hosting": {
     "public": ".",
+    "cleanUrls": true,
+    "rewrites": [
+      {
+        "source": "/",
+        "destination": "/app.html"
+      }
+    ],
     "ignore": [
       "firebase.json",
       "**/.*",
