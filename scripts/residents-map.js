@@ -2,12 +2,16 @@ import { db } from './firebase.js';
 import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
 let CLINICS = [];
+let clinicProfileData = [];
+let inventoryByClinic = new Map();
+let inventoryUnsubscribe = null;
 
 const STATUS_COLOR = { available: '#00b140', low: '#d98a00', out: '#e60000' };
 const STATUS_LABEL = { available: 'Available', low: 'Low Stock', out: 'Out of Stock' };
 
 const mapsData = [];
 let selectedDestination = null;
+let activeStockFilter = 'all';
 
 function initMap() {
   const containers = [
@@ -23,7 +27,7 @@ function initMap() {
 
 function loadClinics() {
   onSnapshot(collection(db, 'clinics'), (snapshot) => {
-    CLINICS = snapshot.docs.map(clinicDoc => {
+    clinicProfileData = snapshot.docs.map(clinicDoc => {
       const data = clinicDoc.data();
       return {
         id: clinicDoc.id,
@@ -33,13 +37,37 @@ function loadClinics() {
         status: normalizeStatus(data.stock_status || data.status, data.stock_total),
         address: data.address || '',
         hours: data.weekdayHours || data.hours || 'Contact clinic',
+        weekendHours: data.weekendHours || '',
+        barangay: extractBarangay(data.address || '', data.barangay || ''),
         phone: data.contact || '',
         priceRange: data.priceRange || data.vaccination_price_range || 'Price not provided',
+        vaccineTypes: normalizeVaccineTypes(data.vaccine_types || data.vaccines || data.services || []),
         stock: data.stock_summary || data.stock || `${Number(data.stock_total || 0)} doses`,
         stock_total: Number(data.stock_total || 0),
         staff_uid: data.staff_uid || ''
       };
     });
+    rebuildClinicDirectory();
+  }, (error) => console.error('Failed to load clinics:', error));
+
+  inventoryUnsubscribe?.();
+  inventoryUnsubscribe = onSnapshot(collection(db, 'inventory'), snapshot => {
+    inventoryByClinic = new Map();
+    snapshot.docs.forEach(item => {
+      const data = item.data();
+      const list = inventoryByClinic.get(data.clinic_id) || [];
+      if (Number(data.quantity || 0) > 0) list.push(data.type || '');
+      inventoryByClinic.set(data.clinic_id, list);
+    });
+    rebuildClinicDirectory();
+  }, error => console.error('Failed to load clinic vaccine inventory:', error));
+}
+
+function rebuildClinicDirectory() {
+    CLINICS = clinicProfileData.map(clinic => ({
+      ...clinic,
+      vaccineTypes: [...new Set([...(clinic.vaccineTypes || []), ...(inventoryByClinic.get(clinic.id) || [])])]
+    }));
 
     window.clinicDirectory = CLINICS;
     if (window.updateNearestClinicSummary) window.updateNearestClinicSummary(CLINICS);
@@ -47,7 +75,17 @@ function loadClinics() {
     mapsData.splice(0).forEach(entry => entry.markers.forEach(marker => marker.marker.remove()));
     mapsData.splice(0);
     if (window.L) initMap();
-  }, (error) => console.error('Failed to load clinics:', error));
+    populateMapDirectoryFilters();
+}
+
+function extractBarangay(value, explicitValue = '') {
+  const match = String(value).match(/(?:brgy\.?|barangay)\s+([^,]+)/i);
+  return match ? match[1].trim() : String(explicitValue).trim();
+}
+
+function normalizeVaccineTypes(value) {
+  const values = Array.isArray(value) ? value : String(value || '').split(',');
+  return values.map(item => String(item).trim()).filter(Boolean);
 }
 
 function createMap(mapId, sidebarId) {
@@ -188,18 +226,78 @@ function buildSidebarFor(entry) {
 }
 
 function filterMarkers(filter, btn) {
+  activeStockFilter = filter;
   document.querySelectorAll('.map-filter button').forEach(b => { b.classList.remove('active-btn'); b.style.fontWeight = ''; });
   if (btn) btn.classList.add('active-btn');
+  applyMapDirectoryFilters();
+}
+
+function populateMapDirectoryFilters() {
+  const barangays = [...new Set(CLINICS.map(clinic => clinic.barangay).filter(Boolean))].sort();
+  document.querySelectorAll('.map-directory-barangay').forEach(select => {
+    const currentValue = select.value;
+    select.innerHTML = '<option value="all">All barangays</option>' + barangays.map(barangay => `<option value="${escapeHtml(barangay)}">${escapeHtml(barangay)}</option>`).join('');
+    select.value = barangays.includes(currentValue) ? currentValue : 'all';
+  });
+  applyMapDirectoryFilters();
+}
+
+function applyMapDirectoryFilters() {
+  const getValue = selector => document.querySelector(selector)?.value || 'all';
+  const search = (document.querySelector('.map-directory-search')?.value || '').trim().toLowerCase();
+  const barangay = getValue('.map-directory-barangay');
+  const hours = getValue('.map-directory-hours');
+  const price = getValue('.map-directory-price');
   mapsData.forEach(entry => {
-    entry.markers.forEach((mobj, i) => {
-      const show = filter === 'all' || mobj.clinic.status === filter;
-      if (show) mobj.marker.addTo(entry.map);
+    entry.markers.forEach((mobj, index) => {
+      const clinic = mobj.clinic;
+      const haystack = `${clinic.name} ${clinic.address}`.toLowerCase();
+      const hoursText = `${clinic.hours} ${clinic.weekendHours || ''}`.toLowerCase();
+      const matches = (!search || haystack.includes(search))
+        && (barangay === 'all' || clinic.barangay === barangay)
+        && (hours === 'all' || hours === 'open' && !hoursText.includes('closed') || hours === 'weekday' && Boolean(clinic.hours) || hours === 'weekend' && Boolean(clinic.weekendHours) && !String(clinic.weekendHours).toLowerCase().includes('closed'))
+        && matchesMapPrice(clinic.priceRange, price)
+        && (activeStockFilter === 'all' || clinic.status === activeStockFilter);
+      if (matches) mobj.marker.addTo(entry.map);
       else mobj.marker.remove();
-      const row = document.getElementById(`${entry.sidebarId}-row-${i}`);
-      if (row) row.style.display = show ? 'flex' : 'none';
+      const row = document.getElementById(`${entry.sidebarId}-row-${index}`);
+      if (row) row.style.display = matches ? 'flex' : 'none';
     });
   });
 }
+
+function matchesMapPrice(value, filter) {
+  if (filter === 'all') return true;
+  const text = String(value || '').toLowerCase();
+  if (filter === 'free') return text.includes('free') || text.includes('government');
+  const amounts = [...text.matchAll(/(?:php|₱)?\s*([\d,]+)/gi)].map(match => Number(match[1].replace(/,/g, ''))).filter(Number.isFinite);
+  if (!amounts.length) return false;
+  const lowest = Math.min(...amounts);
+  const highest = Math.max(...amounts);
+  if (filter === 'under500') return lowest < 500;
+  if (filter === '500to1500') return lowest <= 1500 && highest >= 500;
+  return highest > 1500;
+}
+
+document.querySelectorAll('.map-directory-search, .map-directory-barangay, .map-directory-hours, .map-directory-price').forEach(control => {
+  control.addEventListener('input', () => {
+    document.querySelectorAll('.map-directory-search, .map-directory-barangay, .map-directory-hours, .map-directory-price').forEach(other => {
+      if (other !== control && other.className === control.className) other.value = control.value;
+    });
+    applyMapDirectoryFilters();
+  });
+  control.addEventListener('change', () => {
+    document.querySelectorAll('.map-directory-search, .map-directory-barangay, .map-directory-hours, .map-directory-price').forEach(other => {
+      if (other !== control && other.className === control.className) other.value = control.value;
+    });
+    applyMapDirectoryFilters();
+  });
+});
+document.querySelectorAll('.map-directory-clear').forEach(button => button.addEventListener('click', () => {
+  document.querySelectorAll('.map-directory-search').forEach(control => { control.value = ''; });
+  document.querySelectorAll('.map-directory-barangay, .map-directory-hours, .map-directory-price').forEach(control => { control.value = 'all'; });
+  applyMapDirectoryFilters();
+}));
 
 // Call this if a map's container was hidden during initialization
 function refreshMaps() {

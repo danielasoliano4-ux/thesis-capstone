@@ -381,6 +381,13 @@
         <button onclick="filterMarkers('out', this)">Out of Stock</button>
       </div>
     </div>
+    <div class="map-directory-filters" aria-label="Search and filter clinics on the map">
+      <label class="map-search-field"><i class="fa-solid fa-magnifying-glass"></i><span class="sr-only">Search clinics</span><input class="map-directory-search" type="search" placeholder="Search clinic or address"></label>
+      <label><span>Barangay</span><select class="map-directory-barangay"><option value="all">All barangays</option></select></label>
+      <label><span>Hours</span><select class="map-directory-hours"><option value="all">Any hours</option><option value="open">Open today</option><option value="weekday">Weekdays</option><option value="weekend">Weekends</option></select></label>
+      <label><span>Price</span><select class="map-directory-price"><option value="all">Any price</option><option value="free">Free / government</option><option value="under500">Below PHP 500</option><option value="500to1500">PHP 500 - 1,500</option><option value="over1500">Above PHP 1,500</option></select></label>
+      <button type="button" class="map-directory-clear">Clear</button>
+    </div>
     <div class="map-box">
       <div id="googleMapOverview" style="width:100%;height:450px;border-radius:14px;overflow:hidden;border:1px solid #ddd;"></div>
     </div>
@@ -419,6 +426,13 @@
               <button onclick="filterMarkers('low', this)">Low Stock</button>
               <button onclick="filterMarkers('out', this)">Out of Stock</button>
             </div>
+          </div>
+          <div class="map-directory-filters" aria-label="Search and filter clinics on the map">
+            <label class="map-search-field"><i class="fa-solid fa-magnifying-glass"></i><span class="sr-only">Search clinics</span><input class="map-directory-search" type="search" placeholder="Search clinic or address"></label>
+            <label><span>Barangay</span><select class="map-directory-barangay"><option value="all">All barangays</option></select></label>
+            <label><span>Hours</span><select class="map-directory-hours"><option value="all">Any hours</option><option value="open">Open today</option><option value="weekday">Weekdays</option><option value="weekend">Weekends</option></select></label>
+            <label><span>Price</span><select class="map-directory-price"><option value="all">Any price</option><option value="free">Free / government</option><option value="under500">Below PHP 500</option><option value="500to1500">PHP 500 - 1,500</option><option value="over1500">Above PHP 1,500</option></select></label>
+            <button type="button" class="map-directory-clear">Clear</button>
           </div>
           <div class="map-box">
             <div id="googleMapNew" style="width:100%;height:450px;border-radius:14px;overflow:hidden;border:1px solid #ddd;"></div>
@@ -812,6 +826,14 @@
 
       <div class="section-card">
         <div class="section-card-header"><h3>Select a Clinic to Book</h3></div>
+        <div class="clinic-directory-filters" aria-label="Filter clinics">
+          <label class="clinic-search-field"><i class="fa-solid fa-magnifying-glass"></i><span class="sr-only">Search clinics</span><input id="clinicSearch" type="search" placeholder="Search clinic name or address"></label>
+          <label><span>Barangay</span><select id="clinicBarangayFilter"><option value="all">All barangays</option></select></label>
+          <label><span>Operating hours</span><select id="clinicHoursFilter"><option value="all">Any operating hours</option><option value="open">Open today</option><option value="weekday">Weekdays</option><option value="weekend">Weekends</option></select></label>
+          <label><span>Price range</span><select id="clinicPriceFilter"><option value="all">Any price</option><option value="free">Free / government</option><option value="under500">Below PHP 500</option><option value="500to1500">PHP 500 - 1,500</option><option value="over1500">Above PHP 1,500</option></select></label>
+          <button type="button" id="clearClinicFilters" class="clear-clinic-filters">Clear filters</button>
+        </div>
+        <p id="clinicFilterSummary" class="clinic-filter-summary" aria-live="polite"></p>
         <div class="clinic-list" id="clinicBookingList">
           <p style="padding:16px;color:#6b7280;">Loading clinics...</p>
         </div>

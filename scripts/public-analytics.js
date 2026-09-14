@@ -16,7 +16,7 @@ function renderAnimalExposure(data = {}) {
   const chart = document.getElementById('animalExposureChart');
   if (!chart) return;
   const colors = ['#e60000', '#d98a00', '#00b140', '#6b7280'];
-  const animals = Array.isArray(data.animals) && data.animals.length ? data.animals : defaultAnimals;
+  const animals = normalizeAnimals(Array.isArray(data.animals) && data.animals.length ? data.animals : defaultAnimals);
   let offset = 0;
   const stops = animals.map((animal, index) => {
     const start = offset;
@@ -54,4 +54,20 @@ function renderList(id, values, renderItem) {
 function setText(id, value) {
   const element = document.getElementById(id);
   if (element) element.textContent = value;
+}
+
+function normalizeAnimals(animals) {
+  const counts = new Map();
+  animals.forEach(animal => {
+    const rawName = String(animal.name || 'Others').trim().toLowerCase();
+    const name = rawName === 'dog' ? 'Dog'
+      : rawName === 'cat' ? 'Cat'
+        : rawName === 'bat' ? 'Bat'
+          : rawName ? rawName.charAt(0).toUpperCase() + rawName.slice(1) : 'Others';
+    counts.set(name, (counts.get(name) || 0) + Number(animal.percent || 0));
+  });
+  const total = [...counts.values()].reduce((sum, value) => sum + value, 0);
+  return [...counts.entries()]
+    .sort((first, second) => second[1] - first[1])
+    .map(([name, value]) => ({ name, percent: total ? Math.round(value / total * 100) : 0 }));
 }

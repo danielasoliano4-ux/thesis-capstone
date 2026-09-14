@@ -212,6 +212,7 @@ function populateClinicOptions(clinics) {
     });
   }
   renderClinicBookingList(orderedClinics);
+  populateClinicFilters(clinics);
 }
 
 window.populateClinicOptions = populateClinicOptions;
@@ -249,6 +250,61 @@ function renderClinicBookingList(clinics) {
     });
   });
 }
+
+function populateClinicFilters(clinics) {
+  const barangayFilter = document.getElementById('clinicBarangayFilter');
+  if (!barangayFilter) return;
+  const barangays = [...new Set(clinics.map(clinic => clinic.barangay).filter(Boolean))].sort();
+  const currentValue = barangayFilter.value;
+  barangayFilter.innerHTML = '<option value="all">All barangays</option>' + barangays.map(barangay => `<option value="${escapeHtml(barangay)}">${escapeHtml(barangay)}</option>`).join('');
+  barangayFilter.value = barangays.includes(currentValue) ? currentValue : 'all';
+  applyClinicFilters();
+}
+
+function applyClinicFilters() {
+  const clinics = window.clinicDirectory || [];
+  const search = (document.getElementById('clinicSearch')?.value || '').trim().toLowerCase();
+  const barangay = document.getElementById('clinicBarangayFilter')?.value || 'all';
+  const hours = document.getElementById('clinicHoursFilter')?.value || 'all';
+  const price = document.getElementById('clinicPriceFilter')?.value || 'all';
+  const filtered = clinics.filter(clinic => {
+    const haystack = `${clinic.name} ${clinic.address}`.toLowerCase();
+    const hoursText = `${clinic.hours} ${clinic.weekendHours || ''}`.toLowerCase();
+    return (!search || haystack.includes(search))
+      && (barangay === 'all' || clinic.barangay === barangay)
+      && (hours === 'all' || hours === 'open' && !hoursText.includes('closed') || hours === 'weekday' && Boolean(clinic.hours) || hours === 'weekend' && Boolean(clinic.weekendHours) && !String(clinic.weekendHours).toLowerCase().includes('closed'))
+      && matchesPrice(clinic.priceRange, price)
+      ;
+  });
+  renderClinicBookingList(filtered);
+  const summary = document.getElementById('clinicFilterSummary');
+  if (summary) summary.textContent = `${filtered.length} of ${clinics.length} clinic${clinics.length === 1 ? '' : 's'} shown`;
+}
+
+function matchesPrice(value, filter) {
+  if (filter === 'all') return true;
+  const text = String(value || '').toLowerCase();
+  if (filter === 'free') return text.includes('free') || text.includes('government');
+  const amounts = [...text.matchAll(/(?:php|₱)?\s*([\d,]+)/gi)].map(match => Number(match[1].replace(/,/g, ''))).filter(Number.isFinite);
+  if (!amounts.length) return false;
+  const lowest = Math.min(...amounts);
+  const highest = Math.max(...amounts);
+  if (filter === 'under500') return lowest < 500;
+  if (filter === '500to1500') return lowest <= 1500 && highest >= 500;
+  return highest > 1500;
+}
+
+['clinicSearch', 'clinicBarangayFilter', 'clinicHoursFilter', 'clinicPriceFilter'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', applyClinicFilters);
+  document.getElementById(id)?.addEventListener('change', applyClinicFilters);
+});
+document.getElementById('clearClinicFilters')?.addEventListener('click', () => {
+  ['clinicSearch', 'clinicBarangayFilter', 'clinicHoursFilter', 'clinicPriceFilter'].forEach(id => {
+    const element = document.getElementById(id);
+    if (element) element.value = element.tagName === 'SELECT' ? 'all' : '';
+  });
+  applyClinicFilters();
+});
 
 async function loadResidentBookings(uid) {
   const container = document.getElementById('bookingRecords');
@@ -701,7 +757,7 @@ function renderAnimalExposure(data = {}) {
   const chart = document.getElementById('animalExposureChart');
   if (!chart) return;
   const colors = ['#e60000', '#d98a00', '#00b140', '#6b7280'];
-  const animals = Array.isArray(data.animals) && data.animals.length ? data.animals : [];
+  const animals = normalizeAnimalExposure(Array.isArray(data.animals) && data.animals.length ? data.animals : []);
   if (!animals.length) {
     chart.innerHTML = '<p class="analytics-empty-state">No exposure records have been collected yet.</p>';
     return;
@@ -713,6 +769,22 @@ function renderAnimalExposure(data = {}) {
     return `${colors[index % colors.length]} ${start}% ${offset}%`;
   }).join(', ');
   chart.innerHTML = `<div class="animal-donut" style="background:conic-gradient(${stops});"><div><strong>${escapeHtml(animals[0].percent)}%</strong><small>${escapeHtml(animals[0].name)}</small></div></div><div class="donut-legend">${animals.map((animal, index) => `<div class="donut-legend-item"><span class="donut-dot" style="background:${colors[index % colors.length]};"></span> ${escapeHtml(animal.name)} — ${escapeHtml(animal.percent)}%</div>`).join('')}</div>`;
+}
+
+function normalizeAnimalExposure(animals) {
+  const counts = new Map();
+  animals.forEach(animal => {
+    const rawName = String(animal.name || 'Others').trim().toLowerCase();
+    const name = rawName === 'dog' ? 'Dog'
+      : rawName === 'cat' ? 'Cat'
+        : rawName === 'bat' ? 'Bat'
+          : rawName ? rawName.charAt(0).toUpperCase() + rawName.slice(1) : 'Others';
+    counts.set(name, (counts.get(name) || 0) + Number(animal.percent || 0));
+  });
+  const total = [...counts.values()].reduce((sum, value) => sum + value, 0);
+  return [...counts.entries()]
+    .sort((first, second) => second[1] - first[1])
+    .map(([name, value]) => ({ name, percent: total ? Math.round(value / total * 100) : 0 }));
 }
 
 function listenToAnimalExposure() {

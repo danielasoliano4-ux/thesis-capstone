@@ -91,7 +91,7 @@ function renderAnalytics() {
   cases.forEach(item => {
     const date = recordDate(item);
     if (date) monthlyCases[date.getMonth()]++;
-    const animal = String(item.animal_type || 'Others').trim() || 'Others';
+    const animal = normalizeAnimalSource(item.animal_type);
     animalCounts.set(animal, (animalCounts.get(animal) || 0) + 1);
     const barangay = barangayFor(item);
     const row = barangayMap.get(barangay) || { name: barangay, cases: 0, vaccinations: 0, completed: 0 };
@@ -141,6 +141,14 @@ function renderAnalytics() {
   };
   updateDashboard(summary, maxCases);
   setDoc(doc(db, 'system_settings', 'live_analytics'), { ...summary, updated_at: serverTimestamp() }, { merge: true }).catch(reportError);
+}
+
+function normalizeAnimalSource(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'dog') return 'Dog';
+  if (normalized === 'cat') return 'Cat';
+  if (normalized === 'bat') return 'Bat';
+  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : 'Others';
 }
 
 function updateDashboard(data, maxCases) {
