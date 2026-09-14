@@ -562,6 +562,35 @@ tbody tr:last-child td {
 
 .report-card h4 { font-size: 14px; font-weight: 600; color: #111; margin-bottom: 4px; }
 .report-card p { font-size: 12px; color: #6b7280; margin-bottom: 10px; }
+.report-filters { display:flex; flex-wrap:wrap; gap:10px; align-items:end; }
+.report-filters label { display:grid; gap:4px; color:#4b5563; font-size:12px; font-weight:600; }
+.report-filters input { min-height:36px; padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; font:inherit; }
+
+/* Consistent actions for Clinic and User Management tables. */
+.table-action-group { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.table-action {
+    align-items: center;
+    background: #fff;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    gap: 6px;
+    justify-content: center;
+    min-height: 32px;
+    padding: 7px 10px;
+    transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease;
+}
+.table-action:hover { transform: translateY(-1px); }
+.table-action:focus-visible { outline: 3px solid rgba(239, 0, 0, .22); outline-offset: 2px; }
+.table-action-edit { border-color: #fecaca; color: #dc2626; }
+.table-action-edit:hover { background: #fff1f2; border-color: #ef4444; }
+.table-action-delete { background: #ef0000; border-color: #ef0000; color: #fff; }
+.table-action-delete:hover { background: #c90000; border-color: #c90000; }
+@media (max-width: 700px) { .table-action { flex: 1 1 auto; } .table-action-group { min-width: 150px; } }
 
 /* UI Helpers / Colors */
 .blue { color: #2563eb; }

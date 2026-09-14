@@ -35,6 +35,7 @@ onSnapshot(doc(db, 'system_settings', 'live_analytics'), snapshot => {
   setText('publicDeaths', values.deaths || 0);
   setText('publicVaccinations', values.totalVaccinations || 0);
   setText('publicHighRiskBarangays', values.highRiskBarangays || 0);
+  renderPublicRecords(Array.isArray(values.publicRecords) ? values.publicRecords : []);
   if (window.monthlyChart) {
     window.monthlyChart.data.datasets[0].data = values.monthlyCases;
     window.monthlyChart.data.datasets[1].data = values.monthlyVaccinations;
@@ -71,3 +72,58 @@ function normalizeAnimals(animals) {
     .sort((first, second) => second[1] - first[1])
     .map(([name, value]) => ({ name, percent: total ? Math.round(value / total * 100) : 0 }));
 }
+
+function outcomeLabel(outcome) {
+  return outcome === 'death' ? 'Death' : outcome === 'recovered' ? 'Recovered' : 'Ongoing';
+}
+
+function renderPublicRecords(records) {
+  const body = document.getElementById('recordsTbody');
+  if (!body) return;
+  body.innerHTML = records.length ? records.map(record => {
+    const severity = String(record.severity || 'Low').toLowerCase();
+    const outcome = String(record.outcome || 'ongoing').toLowerCase();
+    const pep = outcome === 'recovered' ? 'Full 5-dose course completed' : outcome === 'death' ? 'Reported fatal outcome' : `${Number(record.doseCount || 0)} of 5 doses recorded`;
+    return `<tr class="accordion-row" data-outcome="${escapeHtml(outcome)}" tabindex="0"><td><strong>${escapeHtml(record.caseId)}</strong></td><td>${escapeHtml(record.year)}</td><td>${escapeHtml(record.barangay)}</td><td>${escapeHtml(record.animal)}</td><td>${escapeHtml(record.category)}</td><td><span class="severity-badge sev-${severity}">${escapeHtml(record.severity)}</span></td><td><span class="outcome-badge out-${outcome}">${outcomeLabel(outcome)}</span></td><td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td></tr><tr class="accordion-detail" hidden><td colspan="8"><div class="accordion-detail-grid"><div class="detail-item"><label>Case date</label><span>${escapeHtml(record.date)}</span></div><div class="detail-item"><label>PEP progress</label><span>${escapeHtml(pep)}</span></div><div class="detail-item"><label>Vaccine used</label><span>${escapeHtml(record.vaccine)}</span></div><div class="detail-item"><label>Reporting facility</label><span>${escapeHtml(record.clinic)}</span></div><div class="detail-item"><label>Status</label><span style="font-weight:700;">${outcomeLabel(outcome)}</span></div></div></td></tr>`;
+  }).join('') : '<tr><td colspan="8">No anonymized records are available yet.</td></tr>';
+  body.querySelectorAll('.accordion-row').forEach(row => {
+    row.addEventListener('click', () => toggleRecordRow(row));
+    row.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleRecordRow(row); } });
+  });
+  updateRecordCount();
+}
+
+function toggleRecordRow(row) {
+  const detail = row.nextElementSibling;
+  if (!detail?.classList.contains('accordion-detail')) return;
+  detail.hidden = !detail.hidden;
+  row.classList.toggle('expanded', !detail.hidden);
+}
+
+function updateRecordCount() {
+  const rows = [...document.querySelectorAll('#recordsTbody .accordion-row')];
+  const shown = rows.filter(row => row.style.display !== 'none').length;
+  setText('recordsCount', `Showing ${shown} of ${rows.length} records`);
+}
+
+window.toggleRow = toggleRecordRow;
+window.setFilter = (filter, button) => {
+  document.querySelectorAll('.records-filter-btn').forEach(item => item.classList.toggle('active-filter', item === button));
+  document.querySelectorAll('#recordsTbody .accordion-row').forEach(row => {
+    const show = filter === 'all' || row.dataset.outcome === filter;
+    row.style.display = show ? '' : 'none';
+    const detail = row.nextElementSibling;
+    if (detail?.classList.contains('accordion-detail')) { detail.style.display = show ? '' : 'none'; if (!show) detail.hidden = true; }
+  });
+  updateRecordCount();
+};
+window.filterRecords = query => {
+  const needle = String(query || '').trim().toLowerCase();
+  document.querySelectorAll('#recordsTbody .accordion-row').forEach(row => {
+    const show = !needle || row.textContent.toLowerCase().includes(needle);
+    row.style.display = show ? '' : 'none';
+    const detail = row.nextElementSibling;
+    if (detail?.classList.contains('accordion-detail')) { detail.style.display = show ? '' : 'none'; if (!show) detail.hidden = true; }
+  });
+  updateRecordCount();
+};

@@ -921,6 +921,8 @@ body {
 .previous-document-preview strong, .previous-document-preview a { display: block; font-size: 11px; }
 .previous-document-preview strong { color: #374151; }
 .previous-document-preview a { color: #b00000; margin-top: 4px; text-decoration: none; }
+.previous-document-delete-button { margin-top: 7px; padding: 4px 8px; border: 0; border-radius: 4px; background: #ef0000; color: #fff; font-size: 11px; cursor: pointer; }
+.previous-document-delete-button:hover { background: #b00000; }
 
 /* Document Upload Targets */
 .upload-section { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
@@ -946,8 +948,8 @@ body {
 .vaccination-document { border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 10px; padding: 10px; background: #fff; }
 .document-preview-wrap { position: relative; min-height: 80px; display: flex; align-items: center; justify-content: center; background: #f9fafb; border-radius: 6px; overflow: hidden; }
 .document-file-icon { color: #ef0000; font-size: 42px; }
-.document-edit-button { position: absolute; right: 8px; bottom: 8px; width: 32px; height: 32px; border: 0; border-radius: 50%; background: #ef0000; color: #fff; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.18); }
-.document-edit-button:hover { background: #b00000; }
+.document-delete-button { position: absolute; right: 8px; bottom: 8px; width: 32px; height: 32px; border: 0; border-radius: 50%; background: #ef0000; color: #fff; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.18); }
+.document-delete-button:hover { background: #b00000; }
 .document-summary-text { display: block; min-width: 0; padding: 8px 2px 2px; }
 .document-summary-text strong, .document-summary-text small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .document-summary-text strong { color: #374151; font-size: 13px; }

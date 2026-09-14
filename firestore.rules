@@ -91,6 +91,7 @@ service cloud.firestore {
           && request.resource.data.cancellation_reason.size() > 0
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancellation_reason', 'cancelled_at', 'cancelled_by']));
       allow delete: if isAdmin()
+        || belongsToClinic(resource.data.clinic_id)
         || (isResident() && resource.data.resident_uid == request.auth.uid);
     }
 

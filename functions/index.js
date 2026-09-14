@@ -12,6 +12,7 @@ const admin = require('firebase-admin');
 const sgMail = require('@sendgrid/mail');
 const { onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 
 // For cost control, you can set the maximum number of containers that can be
@@ -123,7 +124,7 @@ exports.sendAppointmentReminders = onSchedule(
 	}
 );
 
-	exports.expireAppointments = onSchedule(
+exports.expireAppointments = onSchedule(
 		{
 			schedule: '0 * * * *',
 			timeZone: 'Asia/Manila'
@@ -148,6 +149,36 @@ exports.sendAppointmentReminders = onSchedule(
 			if (expiredCount) await batch.commit();
 		}
 	);
+
+// Account lifecycle operations must run with the Admin SDK. Keeping these out
+// of the browser prevents an administrator from accidentally creating a user
+// profile that has no corresponding Firebase Authentication account.
+exports.manageUserAccount = onCall(async request => {
+	if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
+	const requester = await db.collection('users').doc(request.auth.uid).get();
+	if (!['admin', 'administrator'].includes(requester.data()?.role)) throw new HttpsError('permission-denied', 'Administrator access is required.');
+	const { action, uid, email, password, profile = {} } = request.data || {};
+	if (action === 'create') {
+		if (!email || !password || password.length < 6) throw new HttpsError('invalid-argument', 'Email and a password of at least 6 characters are required.');
+		const user = await admin.auth().createUser({ email, password, displayName: profile.full_name || profile.username || undefined, disabled: false });
+		await db.collection('users').doc(user.uid).set({ email, role: profile.role || 'resident', is_active: true, created_at: admin.firestore.FieldValue.serverTimestamp(), updated_at: admin.firestore.FieldValue.serverTimestamp(), ...profile });
+		return { uid: user.uid };
+	}
+	if (!uid) throw new HttpsError('invalid-argument', 'A user id is required.');
+	if (action === 'update') {
+		const allowed = ['full_name', 'username', 'role', 'clinic_id', 'clinic_name', 'is_active', 'approval_status', 'status'];
+		const changes = Object.fromEntries(Object.entries(profile).filter(([key]) => allowed.includes(key)));
+		await db.collection('users').doc(uid).set({ ...changes, updated_at: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+		return { uid };
+	}
+	if (action === 'delete') {
+		if (uid === request.auth.uid) throw new HttpsError('failed-precondition', 'You cannot delete your own administrator account.');
+		await admin.auth().deleteUser(uid);
+		await db.collection('users').doc(uid).delete();
+		return { uid };
+	}
+	throw new HttpsError('invalid-argument', 'Unsupported account action.');
+});
 
 // Create and deploy your first functions
 // https://firebase.google.com/docs/functions/get-started

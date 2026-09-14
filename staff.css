@@ -296,7 +296,8 @@ body {
     font-weight: 600;
 }
 
-#vaccineForm input {
+#vaccineForm input,
+#vaccineForm select {
     width: 100%;
     padding: 11px;
     border: 1px solid #d1d5db;
@@ -391,11 +392,37 @@ tbody td {
     color: red;
     text-decoration: none;
     font-weight: 600;
+    border-radius: 4px;
+    font-size: 13px; 
+    padding: 6px 10px; 
+    display: inline-block; 
+    background-color: #fff6f6; 
 }
 
 .update-link i {
     margin-right: 5px;
 }
+
+/* Dose completion form */
+.dose-completion-modal-content { width: min(560px, 100%); padding: 28px; }
+.dose-completion-modal-content .modal-header { margin-bottom: 8px; }
+.dose-completion-modal-content .modal-header h2 { color: #111827; font-size: 24px; }
+.dose-completion-intro { color: #6b7280; font-size: 14px; line-height: 1.5; margin: 0 0 22px; }
+#doseCompletionForm { display: grid; gap: 20px; }
+.dose-completion-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.dose-completion-grid label { color: #374151; display: grid; font-size: 13px; font-weight: 700; gap: 7px; }
+.dose-completion-grid .full-field { grid-column: 1 / -1; }
+.dose-completion-grid input { background: #fff; border: 1px solid #d1d5db; border-radius: 8px; color: #111827; font: inherit; font-size: 14px; min-height: 44px; outline: none; padding: 10px 12px; transition: border-color .18s ease, box-shadow .18s ease; width: 100%; }
+.dose-completion-grid input:focus { border-color: #ef0000; box-shadow: 0 0 0 3px rgba(239, 0, 0, .12); }
+.dose-completion-submit { justify-content: center; margin-top: 2px; min-height: 46px; width: 100%; }
+@media (max-width: 520px) { .dose-completion-modal-content { padding: 22px 18px; } .dose-completion-grid { grid-template-columns: 1fr; } .dose-completion-grid .full-field { grid-column: auto; } }
+.inventory-controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.inventory-controls select { min-height:40px; padding:8px 10px; border:1px solid #d1d5db; border-radius:7px; background:#fff; font:inherit; }
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.inventory-warning { color:#b45309; font-size:12px; font-weight:700; margin-top:4px; }
+.inventory-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.inventory-action { border:0; background:transparent; color:#b91c1c; cursor:pointer; font:inherit; font-weight:700; padding:4px; }
+.inventory-action.secondary { color:#2563eb; }
 
 /* RESPONSIVE */
 
@@ -461,14 +488,20 @@ tbody td {
 .view-appointment-btn { background: #fff; border: 1px solid #2563eb; color: #2563eb; }
 .confirm-appointment-btn { background: #ef0000; border: 1px solid #ef0000; color: #fff; }
 .decline-appointment-btn { background: #fff; border: 1px solid #ef0000; color: #ef0000; }
-.appointment-details-modal-content { max-width: 760px; }
-.appointment-details-body { color: #374151; font-size: 14px; }
-.appointment-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.appointment-detail-grid > div { display: flex; flex-direction: column; gap: 5px; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
+.delete-expired-appointment-btn { background: #fff; border: 1px solid #6b7280; color: #4b5563; }
+.delete-expired-appointment-btn:hover { background: #f9fafb; border-color: #ef0000; color: #b91c1c; }
+.appointment-details-modal-content { display: flex; flex-direction: column; max-height: calc(100vh - 40px); max-width: 760px; overflow: hidden; padding: 28px 30px; }
+.appointment-details-modal-content .modal-header { flex: 0 0 auto; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #e5e7eb; }
+.appointment-details-body { color: #374151; font-size: 14px; max-height: calc(100vh - 170px); overflow-y: auto; overscroll-behavior: contain; padding: 2px 10px 8px 0; scrollbar-gutter: stable; }
+.appointment-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 22px; row-gap: 8px; }
+.appointment-detail-grid > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
+.appointment-detail-grid > .full-field { grid-column: 1 / -1; }
 .appointment-detail-grid strong { color: #6b7280; font-size: 12px; text-transform: uppercase; }
 .appointment-detail-grid span { color: #111827; word-break: break-word; }
-.appointment-id-preview { display: block; max-width: 220px; max-height: 180px; object-fit: contain; border: 1px solid #d1d5db; border-radius: 6px; }
+.appointment-id-preview { display: block; max-width: 100%; max-height: 220px; object-fit: contain; border: 1px solid #d1d5db; border-radius: 6px; }
+.appointment-course-history { display: grid; gap: 6px; margin: 2px 0 0; padding-left: 22px; }
+.appointment-course-history li { line-height: 1.45; }
 .appointment-file-link { color: #2563eb; font-weight: 700; text-decoration: none; }
 .appointment-details-error { color: #b91c1c; }
-@media (max-width: 700px) { .appointment-detail-grid { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .appointment-details-modal-content { max-height: calc(100vh - 24px); padding: 22px 18px; } .appointment-details-body { max-height: calc(100vh - 135px); } .appointment-detail-grid { grid-template-columns: 1fr; } .appointment-detail-grid > .full-field { grid-column: auto; } }
 @media (max-width: 700px) { .resident-appointment-card { align-items: flex-start; flex-wrap: wrap; } .resident-appointment-actions { align-items: stretch; margin-left: 64px; width: calc(100% - 64px); } .resident-appointment-actions button { width: 100%; } }

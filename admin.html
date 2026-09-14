@@ -7,8 +7,8 @@
     <link rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
     <link rel="stylesheet" href="admin.css"/>
-    <script src="scripts/admin.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script defer src="scripts/admin.js"></script>
 </head>
 <body>
 
@@ -27,11 +27,9 @@
             <a href="#" class="sidebar-link">
                 <i class="fa-solid fa-gauge-high"></i> Admin Dashboard
             </a>
-            <a href="index.html" style="text-decoration:none;">
-                <button class="signout-btn">
+                <button id="adminSignOutBtn" type="button" class="signout-btn">
                     <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
                 </button>
-            </a>
         </div>
     </header>
 <!-- NAV TABS -->
@@ -84,8 +82,8 @@
     <div class="charts-grid">
         <div class="chart-card">
             <div class="chart-card-header">
-                <h3>Monthly Rabies Cases &amp; Vaccinations (2026)</h3>
-                <select><option>2026</option><option>2025</option></select>
+                <h3 id="analyticsChartTitle">Monthly Rabies Cases &amp; Vaccinations</h3>
+                <select id="analyticsYear" aria-label="Analytics year"></select>
             </div>
             <div class="chart-card-body">
                 <canvas id="monthlyChart" height="240"></canvas>
@@ -104,12 +102,12 @@
     <div class="content-box">
         <div class="content-box-header">
             <h3><i class="fa-solid fa-map-location-dot" style="color:#ef0000;margin-right:6px;"></i> High-Risk Barangay Heatmap</h3>
-            <button class="btn-outline"><i class="fa-solid fa-download"></i> Export</button>
+            <button id="addUserBtn" type="button" class="btn-outline"><i class="fa-solid fa-plus"></i> Add User</button>
         </div>
         <table class="heatmap-table" style="border-radius:0;box-shadow:none;">
             <thead>
                 <tr>
-                    <th>Barangay</th><th>Cases (2026)</th><th>Vaccinations</th>
+                    <th>Barangay</th><th id="heatmapCasesHeader">Cases</th><th>Vaccinations</th>
                     <th>Completion Rate</th><th>Risk Level</th><th>Risk Bar</th>
                 </tr>
             </thead>
@@ -155,13 +153,13 @@
     <div class="content-box">
         <div class="content-box-header">
             <h3>System Metrics &amp; Alerts</h3>
-            <button class="btn-primary"><i class="fa-solid fa-file-chart-column"></i> View Full Reports</button>
+            <button type="button" class="btn-primary" onclick="showTab('reports',document.querySelectorAll('.admin-tab')[3])"><i class="fa-solid fa-file-chart-column"></i> View Full Reports</button>
         </div>
         <div class="alert-box">
             <i class="fa-solid fa-triangle-exclamation"></i>
             <div>
                 <h4>Attention Required</h4>
-                <p>2 staff account approvals pending. 4 inventory checks overdue. 1 clinic has been out of stock for 3 days.</p>
+                <p id="systemAlertText">Loading live system checks…</p>
             </div>
         </div>
         <div class="table-container">
@@ -169,33 +167,7 @@
                 <thead>
                     <tr><th>Metric</th><th>Value</th><th>Status</th><th>Action</th></tr>
                 </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>System Uptime</strong></td><td>99.8%</td>
-                        <td><span class="status good">Good</span></td>
-                        <td><a href="#" class="update-link">Review</a></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Staff Account Approvals</strong></td><td>2 pending</td>
-                        <td><span class="status low">Pending</span></td>
-                        <td><a href="#" class="update-link" onclick="showTab('users',document.querySelectorAll('.admin-tab')[1])">Approve</a></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Inventory Checks Overdue</strong></td><td>4 overdue</td>
-                        <td><span class="status critical">Critical</span></td>
-                        <td><a href="#" class="update-link">Inspect</a></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Clinics Out of Stock</strong></td><td>1 clinic</td>
-                        <td><span class="status critical">Critical</span></td>
-                        <td><a href="#" class="update-link">Notify</a></td>
-                    </tr>
-                    <tr>
-                        <td><strong>Active User Sessions</strong></td><td>14</td>
-                        <td><span class="status good">Normal</span></td>
-                        <td><a href="#" class="update-link">Monitor</a></td>
-                    </tr>
-                </tbody>
+                <tbody id="systemMetricsBody"><tr><td colspan="4">Loading live system metrics…</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -235,7 +207,7 @@
     <div class="content-box">
         <div class="content-box-header">
             <h3>ABTC Clinic Management</h3>
-            <button class="btn-primary"><i class="fa-solid fa-plus"></i> Add Clinic</button>
+            <button id="addClinicBtn" type="button" class="btn-primary"><i class="fa-solid fa-plus"></i> Add Clinic</button>
         </div>
         <div class="table-container">
             <table>
@@ -252,7 +224,11 @@
     <div class="content-box">
         <div class="content-box-header">
             <h3>Available Reports</h3>
-            <button class="btn-outline"><i class="fa-solid fa-calendar"></i> Filter by Date</button>
+            <div class="report-filters" aria-label="Report date range">
+                <label>From <input id="reportStartDate" type="date"></label>
+                <label>To <input id="reportEndDate" type="date"></label>
+                <button id="clearReportDates" type="button" class="btn-outline">Clear</button>
+            </div>
         </div>
         <div class="reports-grid">
             <div class="report-card">
@@ -260,7 +236,7 @@
                 <div>
                     <h4>Monthly Rabies Cases Report</h4>
                     <p>Comprehensive breakdown of rabies cases by barangay for the current month.</p>
-                    <button class="dl-btn"><i class="fa-solid fa-download"></i> Download PDF</button>
+                    <button class="dl-btn" data-report="cases"><i class="fa-solid fa-download"></i> Download PDF</button>
                 </div>
             </div>
             <div class="report-card">
@@ -268,7 +244,7 @@
                 <div>
                     <h4>Vaccination Status Report</h4>
                     <p>List of all active patients, their dose completion status and next appointment dates.</p>
-                    <button class="dl-btn"><i class="fa-solid fa-download"></i> Download PDF</button>
+                    <button class="dl-btn" data-report="vaccinations"><i class="fa-solid fa-download"></i> Download PDF</button>
                 </div>
             </div>
             <div class="report-card">
@@ -276,7 +252,7 @@
                 <div>
                     <h4>Vaccine Inventory Report</h4>
                     <p>City-wide vaccine stock levels across all clinics, including expiry dates and batch numbers.</p>
-                    <button class="dl-btn"><i class="fa-solid fa-download"></i> Download PDF</button>
+                    <button class="dl-btn" data-report="inventory"><i class="fa-solid fa-download"></i> Download PDF</button>
                 </div>
             </div>
             <div class="report-card">
@@ -284,7 +260,7 @@
                 <div>
                     <h4>Barangay Risk Assessment</h4>
                     <p>Heat map and risk classification of all barangays based on case rates and vaccination coverage.</p>
-                    <button class="dl-btn"><i class="fa-solid fa-download"></i> Download PDF</button>
+                    <button class="dl-btn" data-report="risk"><i class="fa-solid fa-download"></i> Download PDF</button>
                 </div>
             </div>
         </div>
@@ -295,5 +271,6 @@
     protectPage('admin');
 </script>
 <script type="module" src="scripts/admin-analytics.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 </body> 
-</html> 
+</html>

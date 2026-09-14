@@ -1,4 +1,4 @@
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp, orderBy, runTransaction, setDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp, runTransaction, setDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 import { auth, db, fetchUserProfile } from './firebase.js';
 import { signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
 import { protectPage } from './role-guard.js';
@@ -10,8 +10,23 @@ let appointmentsUnsubscribe = null;
 let appointmentSourceUnsubscribes = [];
 let pendingBadgeUnsubscribe = null;
 let pendingBadgeSourceUnsubscribes = [];
+let inventoryUnsubscribe = null;
+let inventoryItems = [];
 const modal = document.getElementById('vaccineModal');
 const vaccineForm = document.getElementById('vaccineForm');
+
+const VACCINE_NAME_ALIASES = {
+    'verorab': 'Verorab (PVRV)', 'verorab pvrv': 'Verorab (PVRV)', 'verovab': 'Verorab (PVRV)',
+    'rabipur': 'Rabipur (PCECV)', 'rabipub': 'Rabipur (PCECV)',
+    'speeda': 'Speeda (PVRV)', 'vaxirab': 'VaxiRab N (PCECV)', 'vaxirab n': 'VaxiRab N (PCECV)',
+    'rabivax': 'Rabivax-S (PVRV)', 'rabivax s': 'Rabivax-S (PVRV)',
+    'imovax': 'Imovax (HDCV)', 'rabavert': 'RabAvert (PCECV)', 'rab avert': 'RabAvert (PCECV)'
+};
+const LOW_STOCK_THRESHOLD = 15;
+function canonicalVaccineName(value) {
+    const key = String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    return VACCINE_NAME_ALIASES[key] || value || '';
+}
 
 function manilaToday() {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -90,8 +105,8 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
     const renderAppointments = () => {
         const appointments = [...new Map([...appointmentSources.values()].flat().map(item => [item.id, item])).values()]
             .map(appointment => isReservationExpired(appointment) ? { ...appointment, status: 'expired' } : appointment)
-            .filter(appointment => appointment.status === 'pending' || appointment.status === 'expired')
-            .sort((first, second) => `${first.preferred_date || ''} ${first.preferred_time || ''}`.localeCompare(`${second.preferred_date || ''} ${second.preferred_time || ''}`));
+            .filter(appointment => ['pending', 'confirmed', 'expired'].includes(appointment.status))
+            .sort((first, second) => `${second.preferred_date || ''} ${second.preferred_time || ''}`.localeCompare(`${first.preferred_date || ''} ${first.preferred_time || ''}`));
         if (!appointments.length) {
             container.innerHTML = '<p class="empty-appointments">No resident appointments for this clinic.</p>';
             return;
@@ -106,8 +121,9 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
                             </div>
                             <div class="resident-appointment-actions">
                                 <span class="appointment-status appointment-${escapeHtml(appointment.status || 'pending')}">${escapeHtml(appointment.status || 'pending')}</span>
-                                ${appointment.status === 'pending' ? `<button type="button" class="view-appointment-btn" data-view-id="${appointment.id}"><i class="fa-regular fa-id-card"></i> View Details</button><button type="button" class="confirm-appointment-btn" data-confirm-id="${appointment.id}"><i class="fa-solid fa-circle-check"></i> Confirm</button><button type="button" class="decline-appointment-btn" data-decline-id="${appointment.id}"><i class="fa-solid fa-xmark"></i> Decline</button>` : ''}
-                                ${appointment.status === 'expired' ? '<span class="appointment-expired-label"><i class="fa-regular fa-clock"></i> Reservation expired</span>' : ''}
+                                <button type="button" class="view-appointment-btn" data-view-id="${appointment.id}"><i class="fa-regular fa-id-card"></i> View Course Record</button>
+                                ${appointment.status === 'pending' ? `<button type="button" class="confirm-appointment-btn" data-confirm-id="${appointment.id}"><i class="fa-solid fa-circle-check"></i> Confirm</button><button type="button" class="decline-appointment-btn" data-decline-id="${appointment.id}"><i class="fa-solid fa-xmark"></i> Decline</button>` : ''}
+                                ${appointment.status === 'expired' ? `<span class="appointment-expired-label"><i class="fa-regular fa-clock"></i> Reservation expired</span><button type="button" class="delete-expired-appointment-btn" data-delete-expired-id="${appointment.id}"><i class="fa-solid fa-trash"></i> Delete</button>` : ''}
                                 ${appointment.status === 'confirmed' ? `<button type="button" class="confirm-appointment-btn" data-complete-id="${appointment.id}"><i class="fa-solid fa-syringe"></i> Complete Dose</button>` : ''}
                                 ${appointment.status === 'completed' ? '<span class="dose-completed-label"><i class="fa-solid fa-circle-check"></i> Dose recorded</span>' : ''}
                             </div>
@@ -116,6 +132,7 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
         container.querySelectorAll('[data-confirm-id]').forEach(button => button.addEventListener('click', () => acceptStaffAppointment(button.dataset.confirmId)));
                 container.querySelectorAll('[data-decline-id]').forEach(button => button.addEventListener('click', () => declineStaffAppointment(button.dataset.declineId)));
                 container.querySelectorAll('[data-complete-id]').forEach(button => button.addEventListener('click', () => openDoseCompletion(button.dataset.completeId, appointments.find(item => item.id === button.dataset.completeId))));
+                container.querySelectorAll('[data-delete-expired-id]').forEach(button => button.addEventListener('click', () => deleteExpiredAppointment(button.dataset.deleteExpiredId)));
     };
     const listenToSource = (sourceKey, appointmentQuery) => {
         const unsubscribe = onSnapshot(appointmentQuery, snapshot => {
@@ -188,7 +205,7 @@ function openDoseCompletion(appointmentId, appointment) {
 async function completeStaffDose(event) {
     event.preventDefault();
     const appointmentId = document.getElementById('completionAppointmentId').value;
-    const vaccineName = document.getElementById('completionVaccine').value.trim();
+    const vaccineName = canonicalVaccineName(document.getElementById('completionVaccine').value.trim());
     const location = document.getElementById('completionLocation').value.trim();
     const doseNumber = Number(document.getElementById('completionDose').value);
     try {
@@ -196,16 +213,17 @@ async function completeStaffDose(event) {
         const appointment = appointmentSnap.exists() ? appointmentSnap.data() : null;
         if (!appointment) throw new Error('Appointment was not found.');
         const inventorySnap = await getDocs(query(collection(db, 'inventory'), where('clinic_id', '==', currentClinicId)));
-        const inventoryItem = inventorySnap.docs.find(item => item.data().type === vaccineName && Number(item.data().quantity || 0) > 0);
+        const inventoryItem = inventorySnap.docs.filter(item => canonicalVaccineName(item.data().type) === vaccineName && !item.data().archived && item.data().expiry >= manilaToday() && Number(item.data().quantity || 0) > 0).sort((a, b) => String(a.data().expiry).localeCompare(String(b.data().expiry)))[0];
         if (!inventoryItem) throw new Error(`No available ${vaccineName} stock at this clinic.`);
         const existing = await getDocs(query(collection(db, 'vaccination_records'), where('appointment_id', '==', appointmentId)));
+        if (!existing.empty) throw new Error('This appointment already has a completed dose.');
         await runTransaction(db, async transaction => {
             const currentInventory = await transaction.get(inventoryItem.ref);
-            const quantity = Number(currentInventory.data()?.quantity || 0);
-            if (quantity <= 0) throw new Error(`No available ${vaccineName} stock at this clinic.`);
+            const item = currentInventory.data();
+            const quantity = Number(item?.quantity || 0);
+            if (quantity <= 0 || item?.archived || item?.expiry < manilaToday()) throw new Error(`No usable ${vaccineName} stock at this clinic.`);
             transaction.update(inventoryItem.ref, { quantity: quantity - 1 });
         });
-        if (!existing.empty) throw new Error('This appointment already has a completed dose.');
         await addDoc(collection(db, 'vaccination_records'), {
             resident_uid: appointment.resident_uid, resident_name: appointment.resident_name || '', appointment_id: appointmentId,
             vaccination_session_id: appointment.vaccination_session_id || 'legacy',
@@ -233,6 +251,15 @@ async function completeStaffDose(event) {
 // --- INVENTORY MANAGEMENT (Real-Time) ---
 function listenToInventory(clinicId) {
     const inventoryQuery = query(collection(db, 'inventory'), where('clinic_id', '==', clinicId));
+    inventoryUnsubscribe?.();
+    inventoryUnsubscribe = onSnapshot(inventoryQuery, snapshot => {
+        inventoryItems = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+        renderInventory();
+    }, error => {
+        console.error('Failed to load inventory:', error);
+        alert('Failed to load vaccine inventory.');
+    });
+    return;
     onSnapshot(inventoryQuery, (snapshot) => {
         const tbody = document.getElementById('inventoryTableBody');
         tbody.innerHTML = '';
@@ -276,6 +303,72 @@ function listenToInventory(clinicId) {
     });
 }
 
+async function deleteExpiredAppointment(appointmentId) {
+    if (!confirm('Delete this expired reservation? This cannot be undone.')) return;
+    try {
+        const appointmentSnap = await getDoc(doc(db, 'appointments', appointmentId));
+        if (!appointmentSnap.exists()) throw new Error('This reservation no longer exists.');
+        const appointment = appointmentSnap.data();
+        if (!isReservationExpired(appointment)) throw new Error('Only expired reservations can be deleted.');
+        await addDoc(collection(db, 'history'), {
+            clinic_id: currentClinicId, type: 'appointment', action: 'expired_reservation_deleted',
+            appointment_id: appointmentId, resident_name: appointment.resident_name || 'Resident',
+            performed_by: auth.currentUser.uid, created_at: serverTimestamp()
+        });
+        await deleteDoc(doc(db, 'appointments', appointmentId));
+    } catch (error) {
+        alert('Could not delete expired reservation: ' + error.message);
+    }
+}
+
+function expiryState(expiry) {
+    if (!expiry || expiry < manilaToday()) return ['expired', 'Expired'];
+    const days = Math.ceil((new Date(`${expiry}T00:00:00`) - new Date(`${manilaToday()}T00:00:00`)) / 86400000);
+    return days <= 30 ? ['expiring', `Expires in ${days} day${days === 1 ? '' : 's'}`] : ['', ''];
+}
+
+function inventoryCategory(item) {
+    const quantity = Number(item.quantity || 0);
+    const [expiry] = expiryState(item.expiry);
+    const expired = expiry === 'expired';
+    const archived = Boolean(item.archived) || quantity <= 0;
+    const usable = !archived && !expired && quantity > 0;
+    return { quantity, expired, archived, usable, low: usable && quantity < LOW_STOCK_THRESHOLD, adequate: usable && quantity >= LOW_STOCK_THRESHOLD };
+}
+
+function renderInventory() {
+    const tbody = document.getElementById('inventoryTableBody');
+    if (!tbody) return;
+    const filter = document.getElementById('inventoryFilter')?.value || 'active';
+    const active = inventoryItems.filter(item => inventoryCategory(item).usable);
+    const items = inventoryItems.filter(item => {
+        const category = inventoryCategory(item);
+        if (filter === 'all') return true;
+        if (filter === 'active') return category.adequate;
+        if (filter === 'low') return category.low;
+        if (filter === 'expired') return category.expired;
+        if (filter === 'archived') return category.archived;
+        return false;
+    });
+    let lowCount = 0, expiryCount = 0;
+    tbody.innerHTML = items.map(item => {
+        const category = inventoryCategory(item), [expiryClass, expiryLabel] = expiryState(item.expiry);
+        const status = category.expired ? 'critical' : category.archived ? 'archived' : category.low ? 'low' : 'adequate';
+        if (category.low) lowCount++;
+        if (category.expired) expiryCount++;
+        const statusLabel = category.expired ? 'expired' : category.archived ? (category.quantity <= 0 ? 'zeroed out' : 'archived') : category.low ? 'low' : 'adequate';
+        return `<tr><td><strong>${escapeHtml(item.type)}</strong></td><td>${escapeHtml(item.manufacturer)}</td><td>${escapeHtml(item.batch)}</td><td><strong>${category.quantity} doses</strong></td><td>${escapeHtml(item.expiry)}${expiryLabel ? `<div class="inventory-warning">${escapeHtml(expiryLabel)}</div>` : ''}</td><td><span class="status ${status}">${statusLabel}</span></td><td><div class="inventory-actions"><button type="button" class="update-link" data-edit-id="${item.id}">Update</button><button type="button" class="inventory-action secondary" data-archive-id="${item.id}">${item.archived ? 'Restore' : 'Archive'}</button><button type="button" class="inventory-action" data-delete-id="${item.id}">Delete</button></div></td></tr>`;
+    }).join('') || '<tr><td colspan="7">No inventory batches match this filter.</td></tr>';
+    tbody.querySelectorAll('[data-edit-id]').forEach(button => button.addEventListener('click', () => openModal(button.dataset.editId, inventoryItems.find(item => item.id === button.dataset.editId))));
+    tbody.querySelectorAll('[data-archive-id]').forEach(button => button.addEventListener('click', () => updateDoc(doc(db, 'inventory', button.dataset.archiveId), { archived: !inventoryItems.find(item => item.id === button.dataset.archiveId)?.archived, updated_at: serverTimestamp() })));
+    tbody.querySelectorAll('[data-delete-id]').forEach(button => button.addEventListener('click', async () => { if (confirm('Delete this batch permanently?')) await deleteDoc(doc(db, 'inventory', button.dataset.deleteId)); }));
+    const total = active.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+    document.getElementById('statTotalStock').textContent = total;
+    document.getElementById('statLowStock').textContent = lowCount;
+    document.querySelector('.alert-box p').textContent = `${lowCount} usable batch${lowCount === 1 ? ' is' : 'es are'} below ${LOW_STOCK_THRESHOLD} doses.${expiryCount ? ` ${expiryCount} batch${expiryCount === 1 ? ' is' : 'es are'} expired.` : ''}`;
+    setDoc(doc(db, 'clinics', currentClinicId), { stock_total: total, stock_status: total === 0 ? 'out' : lowCount ? 'low' : 'available', stock_summary: active.map(item => `${item.type || 'Vaccine'} (${item.batch || 'No batch'}): ${Number(item.quantity || 0)}`).join(' · '), updated_at: serverTimestamp() }, { merge: true }).catch(console.error);
+}
+
 function escapeHtml(value = '') {
     const element = document.createElement('div');
     element.textContent = value;
@@ -285,7 +378,7 @@ function escapeHtml(value = '') {
 function openModal(docId = '', data = {}) {
     document.getElementById('modalTitle').textContent = docId ? 'Update Stock' : 'Add New Stock';
     document.getElementById('vaccineDocId').value = docId;
-    document.getElementById('vacType').value = data.type || '';
+    document.getElementById('vacType').value = canonicalVaccineName(data.type);
     document.getElementById('vacManufacturer').value = data.manufacturer || '';
     document.getElementById('vacBatch').value = data.batch || '';
     document.getElementById('vacQuantity').value = data.quantity ?? '';
@@ -301,6 +394,7 @@ function closeModal() {
 }
 
 document.querySelector('.add-btn').addEventListener('click', () => openModal());
+document.getElementById('inventoryFilter')?.addEventListener('change', renderInventory);
 document.getElementById('closeModalBtn').addEventListener('click', closeModal);
 modal.addEventListener('click', (event) => {
     if (event.target === modal) closeModal();
@@ -319,8 +413,17 @@ vaccineForm.addEventListener('submit', async (event) => {
         manufacturer: document.getElementById('vacManufacturer').value.trim(),
         batch: document.getElementById('vacBatch').value.trim(),
         quantity: Number(document.getElementById('vacQuantity').value),
-        expiry: document.getElementById('vacExpiry').value
+        expiry: document.getElementById('vacExpiry').value,
+        archived: docId ? Boolean(inventoryItems.find(item => item.id === docId)?.archived) : false,
+        updated_at: serverTimestamp()
     };
+
+    if (payload.expiry < manilaToday()) {
+        if (!confirm('This batch is already expired. Save it as an archived record?')) return;
+        payload.archived = true;
+    }
+    const duplicate = inventoryItems.find(item => item.id !== docId && !item.archived && item.batch?.toLowerCase() === payload.batch.toLowerCase());
+    if (duplicate) { alert('This clinic already has an active record for that batch number. Update the existing batch instead.'); return; }
 
     try {
         if (docId) await updateDoc(doc(db, 'inventory', docId), payload);
@@ -349,6 +452,11 @@ async function openAppointmentDetails(appointmentId) {
         const snapshot = await getDoc(doc(db, 'appointments', appointmentId));
         if (!snapshot.exists()) throw new Error('This appointment is no longer available.');
         const appointment = snapshot.data();
+        const intake = appointment.course_intake_data || appointment;
+        const priorDoses = Array.isArray(appointment.course_vaccination_history) ? appointment.course_vaccination_history : [];
+        const historyMarkup = priorDoses.length
+            ? `<ol class="appointment-course-history">${priorDoses.map(record => `<li><strong>Dose ${displayStaffValue(record.dose_number)}</strong> — ${displayStaffValue(record.date_given)} | ${displayStaffValue(record.vaccine_name)} | ${displayStaffValue(record.clinic_name)}</li>`).join('')}</ol>`
+            : '<span>No previous administered doses recorded yet.</span>';
         const isImage = ['image/jpeg', 'image/png'].includes(appointment.valid_id_type) || /\.(jpe?g|png)$/i.test(appointment.valid_id_name || appointment.valid_id_url || '');
         const idMarkup = appointment.valid_id_url
             ? (isImage
@@ -358,16 +466,22 @@ async function openAppointmentDetails(appointmentId) {
         body.innerHTML = `<div class="appointment-detail-grid">
             <div><strong>Resident</strong><span>${displayStaffValue(appointment.resident_name)}</span></div>
             <div><strong>Status</strong><span>${displayStaffValue(appointment.status)}</span></div>
-            <div><strong>Address</strong><span>${displayStaffValue(appointment.resident_address)}</span></div>
-            <div><strong>Date of Birth</strong><span>${displayStaffValue(appointment.date_of_birth)}</span></div>
-            <div><strong>Sex</strong><span>${displayStaffValue(appointment.patient_sex)}</span></div>
-            <div><strong>Date of Bite</strong><span>${displayStaffValue(appointment.bite_date)}</span></div>
-            <div><strong>Animal</strong><span>${displayStaffValue(appointment.animal_type)}</span></div>
-            <div><strong>Bite Body Part</strong><span>${displayStaffValue(appointment.bite_body_part)}</span></div>
+            <div><strong>Primary Clinic</strong><span>${displayStaffValue(appointment.primary_clinic_name || appointment.clinic_name)}</span></div>
+            <div><strong>Clinic Transfer</strong><span>${appointment.clinic_changed_for_dose ? 'Yes — resident confirmed change' : 'No'}</span></div>
+            <div><strong>Address (locked intake)</strong><span>${displayStaffValue(intake.resident_address)}</span></div>
+            <div><strong>Date of Birth (locked intake)</strong><span>${displayStaffValue(intake.date_of_birth)}</span></div>
+            <div><strong>Sex (locked intake)</strong><span>${displayStaffValue(intake.patient_sex)}</span></div>
+            <div><strong>Date of Bite (locked intake)</strong><span>${displayStaffValue(intake.bite_date)}</span></div>
+            <div><strong>Animal (locked intake)</strong><span>${displayStaffValue(intake.animal_type)}</span></div>
+            <div><strong>Bite Body Part (locked intake)</strong><span>${displayStaffValue(intake.bite_body_part)}</span></div>
+            <div><strong>Exposure Category</strong><span>${displayStaffValue(intake.patient_category)}</span></div>
+            <div><strong>Wound Washed</strong><span>${displayStaffValue(intake.wound_washed)}</span></div>
+            <div><strong>Exposure Type</strong><span>${displayStaffValue(intake.bite_type)}</span></div>
             <div><strong>Dose</strong><span>${displayStaffValue(appointment.dose_label)}</span></div>
             <div><strong>Preferred Date</strong><span>${displayStaffValue(appointment.preferred_date)}</span></div>
             <div><strong>Preferred Time</strong><span>${displayStaffValue(appointment.preferred_time)}</span></div>
             <div><strong>Uploaded ID / Photo</strong><span>${idMarkup}</span></div>
+            <div class="full-field"><strong>Previous Vaccination History</strong><span>${historyMarkup}</span></div>
         </div>`;
     } catch (error) {
         body.innerHTML = `<p class="appointment-details-error">Could not load details: ${escapeHtml(error.message)}</p>`;

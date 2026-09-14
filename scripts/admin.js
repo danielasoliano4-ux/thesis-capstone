@@ -43,7 +43,7 @@ window.adminMonthlyChart = new Chart(monthCtx, {
     }
 });
 const stockCtx = document.getElementById('stockChart').getContext('2d');
-new Chart(stockCtx, {
+window.adminStockChart = new Chart(stockCtx, {
     type: 'doughnut',
     data: {
         labels: ['Verorab', 'Rabipur', 'Speeda', 'Out of Stock'],

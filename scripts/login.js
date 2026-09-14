@@ -1,4 +1,4 @@
-import { auth, db } from './firebase.js';
+import { auth, db, authPersistenceReady } from './firebase.js';
 import { signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
@@ -46,6 +46,7 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
   btn.disabled = true;
 
   try {
+    await authPersistenceReady;
     const userCred = await signInWithEmailAndPassword(auth, email, password);
     const uid = userCred.user.uid;
     const selectedRole = window.currentRole || 'resident';

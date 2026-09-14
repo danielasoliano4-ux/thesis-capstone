@@ -1,7 +1,7 @@
 // Central Firebase initialization (ES modules)
 // Replace the firebaseConfig values with your project's credentials.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js';
-import { getAuth, onAuthStateChanged, signOut as fbSignOut } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
+import { getAuth, onAuthStateChanged, signOut as fbSignOut, setPersistence, browserSessionPersistence } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
 import { getStorage } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js';
 import {
   getFirestore,
@@ -26,6 +26,10 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+// Do not retain authentication after the browser is closed.  Firebase defaults
+// to LOCAL persistence, which was the source of the apparent cross-session
+// "auto-login" behaviour.
+const authPersistenceReady = setPersistence(auth, browserSessionPersistence);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
@@ -60,7 +64,7 @@ async function fetchNotificationsFor(uid) {
   }
 }
 
-export { app, auth, db, storage, fetchUserProfile, fetchNotificationsFor, onAuthStateChanged };
+export { app, auth, db, storage, authPersistenceReady, fetchUserProfile, fetchNotificationsFor, onAuthStateChanged };
 
 // Sign out helper
 async function signOutUser() {

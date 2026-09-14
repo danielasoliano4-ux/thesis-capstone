@@ -917,9 +917,9 @@
       </div>
       </div>
 
-      <div class="upload-section">
+      <div class="upload-section" id="vaccinationDocumentSection">
       <h3><i class="fa-solid fa-upload" style="color:#ef0000;margin-right:8px;"></i>Upload Vaccination Documents</h3>
-      <p style="font-size:13px;color:#6b7280;margin-bottom:14px;">Upload your physical vaccination card for verification by clinic staff.</p>
+      <p id="vaccinationDocumentHelp" style="font-size:13px;color:#6b7280;margin-bottom:14px;">Your vaccination card can be uploaded after all five doses have been recorded.</p>
       <div id="vaccinationDocuments" class="vaccination-documents" aria-live="polite"></div>
       <div id="uploadDocumentControls" class="upload-document-controls">
         <div class="upload-box" onclick="document.getElementById('fileUpload').click()">
@@ -1291,6 +1291,18 @@
           <label for="modalBitePart">Body Part of the Bite</label>
           <input id="modalBitePart" type="text" placeholder="Hand, leg, arm, etc." required />
         </div>
+        <div class="modal-field">
+          <label for="modalExposureCategory">Exposure Category</label>
+          <select id="modalExposureCategory" required><option value="">Select category</option><option value="Category II">Category II</option><option value="Category III">Category III</option></select>
+        </div>
+        <div class="modal-field">
+          <label for="modalWoundWashed">Was the wound washed immediately?</label>
+          <select id="modalWoundWashed" required><option value="">Select answer</option><option value="Yes">Yes</option><option value="No">No</option></select>
+        </div>
+        <div class="modal-field">
+          <label for="modalBiteType">Exposure Type</label>
+          <input id="modalBiteType" type="text" placeholder="Bite, scratch, or saliva exposure" required />
+        </div>
       </div>
       <div id="bookingIdField" class="modal-field">
         <label for="modalValidId">Valid ID <span style="font-weight:400;color:#ef0000;">(required)</span></label>
@@ -1308,7 +1320,21 @@
     </div>
   </div>
 
+  <!-- Shown before a subsequent-dose appointment is moved away from the course's primary clinic. -->
+  <div class="modal-overlay" id="clinicChangeModal" aria-hidden="true">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="clinicChangeTitle">
+      <h2 id="clinicChangeTitle"><i class="fa-solid fa-triangle-exclamation" style="color:#d97706;margin-right:8px;"></i>Change clinic for this dose?</h2>
+      <p class="sub">Your first-dose clinic remains your primary facility and your course history will be shared with the receiving clinic.</p>
+      <p style="font-size:14px;line-height:1.55;color:#374151;">Are you sure you want to change your clinic for your next dose? Please ensure you have verified vaccine availability at this new location.</p>
+      <div class="modal-actions">
+        <button type="button" class="modal-cancel" id="cancelClinicChangeBtn">Keep primary clinic</button>
+        <button type="button" class="modal-submit" id="confirmClinicChangeBtn">Yes, change clinic</button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="scripts/residents.js"></script>
+  <script type="module" src="scripts/public-analytics.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script type="module" src="scripts/residents-map.js"></script>
 

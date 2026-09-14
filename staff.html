@@ -157,13 +157,21 @@
                     <div class="inventory-top">
 
                     <h2>Vaccine Inventory Management</h2>
-
-                    <button class="add-btn">
+                    <div class="inventory-controls">
+                    <label class="sr-only" for="inventoryFilter">Filter inventory</label>
+                    <select id="inventoryFilter">
+                        <option value="active">Active Stock</option>
+                        <option value="all">All Batches</option>
+                        <option value="low">Low Stock</option>
+                        <option value="expired">Expired</option>
+                        <option value="archived">Archived</option>
+                    </select>
+                    <button class="add-btn" type="button">
                         <i class="fa-solid fa-plus"></i>
                         Add New Stock
                     </button>
 
-                    </div>
+                    </div></div>
 
                     <!-- ALERT -->
                     <div class="alert-box">
@@ -231,7 +239,18 @@
             </div>
             <form id="vaccineForm">
                 <input type="hidden" id="vaccineDocId">
-                <label>Vaccine Type<input id="vacType" required></label>
+                <label>Anti-rabies Vaccine Brand
+                    <select id="vacType" required>
+                        <option value="" selected disabled>Select an approved vaccine brand</option>
+                        <option value="Verorab (PVRV)">Verorab (PVRV)</option>
+                        <option value="Rabipur (PCECV)">Rabipur (PCECV)</option>
+                        <option value="Speeda (PVRV)">Speeda (PVRV)</option>
+                        <option value="VaxiRab N (PCECV)">VaxiRab N (PCECV)</option>
+                        <option value="Rabivax-S (PVRV)">Rabivax-S (PVRV)</option>
+                        <option value="Imovax (HDCV)">Imovax (HDCV)</option>
+                        <option value="RabAvert (PCECV)">RabAvert (PCECV)</option>
+                    </select>
+                </label>
                 <label>Manufacturer<input id="vacManufacturer" required></label>
                 <label>Batch Number<input id="vacBatch" required></label>
                 <label>Quantity (doses)<input id="vacQuantity" type="number" min="0" required></label>
@@ -242,18 +261,21 @@
     </div>
 
     <div id="doseCompletionModal" class="modal" aria-hidden="true">
-        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="doseCompletionTitle">
+        <div class="modal-content dose-completion-modal-content" role="dialog" aria-modal="true" aria-labelledby="doseCompletionTitle">
             <div class="modal-header">
                 <h2 id="doseCompletionTitle">Complete Vaccination Dose</h2>
                 <button type="button" id="closeDoseCompletionBtn" class="modal-close" aria-label="Close">&times;</button>
             </div>
+            <p class="dose-completion-intro">Review the visit details, then record the administered vaccine dose.</p>
             <form id="doseCompletionForm">
                 <input type="hidden" id="completionAppointmentId">
-                <label>Administration Date<input id="completionDate" type="date" required></label>
-                <label>Dose Number<input id="completionDose" type="number" min="1" max="5" required></label>
-                <label>Vaccine Brand / Type<input id="completionVaccine" required></label>
-                <label>Clinic Location<input id="completionLocation" required></label>
-                <button type="submit" class="add-btn"><i class="fa-solid fa-syringe"></i> Complete Dose</button>
+                <div class="dose-completion-grid">
+                    <label>Administration Date<input id="completionDate" type="date" required></label>
+                    <label>Dose Number<input id="completionDose" type="number" min="1" max="5" required></label>
+                    <label class="full-field">Vaccine Brand / Type<input id="completionVaccine" placeholder="e.g., Verorab (PVRV)" required></label>
+                    <label class="full-field">Clinic Location<input id="completionLocation" required></label>
+                </div>
+                <button type="submit" class="add-btn dose-completion-submit"><i class="fa-solid fa-syringe"></i> Complete Dose</button>
             </form>
         </div>
     </div>
