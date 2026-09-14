@@ -23,11 +23,31 @@
 </head>
 <body>
     <iframe id="appFrame" title="Anti-Rabies Locator"></iframe>
-    <script>
-        const frame = document.getElementById('appFrame');
-        const savedPage = sessionStorage.getItem('appPage') || 'index.html';
+    <script type="module">
+        import { auth, fetchUserProfile, onAuthStateChanged } from './scripts/firebase.js';
 
-        frame.src = savedPage;
+        const frame = document.getElementById('appFrame');
+        const rolePages = {
+            resident: 'residents.html',
+            clinic_staff: 'staff.html',
+            admin: 'admin.html',
+            administrator: 'admin.html'
+        };
+        const savedPage = sessionStorage.getItem('appPage');
+
+        const loadPage = page => {
+            frame.src = page;
+        };
+
+        onAuthStateChanged(auth, async user => {
+            if (!user) {
+                loadPage(savedPage && savedPage !== 'residents.html' && savedPage !== 'staff.html' && savedPage !== 'admin.html' ? savedPage : 'index.html');
+                return;
+            }
+            const profile = await fetchUserProfile(user.uid);
+            loadPage(rolePages[profile?.role] || 'index.html');
+        });
+
         frame.addEventListener('load', () => {
             try {
                 const pageUrl = new URL(frame.contentWindow.location.href);

@@ -1,6 +1,6 @@
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp, orderBy, runTransaction, setDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 import { auth, db, fetchUserProfile } from './firebase.js';
 import { signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
-import { addDoc, collection, doc, getDoc, onSnapshot, query, setDoc, updateDoc, where, getDocs, serverTimestamp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 import { protectPage } from './role-guard.js';
 
 protectPage('clinic_staff');
@@ -12,6 +12,16 @@ let pendingBadgeUnsubscribe = null;
 let pendingBadgeSourceUnsubscribes = [];
 const modal = document.getElementById('vaccineModal');
 const vaccineForm = document.getElementById('vaccineForm');
+
+function manilaToday() {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+
+function isReservationExpired(appointment) {
+    return appointment.status === 'confirmed'
+        && appointment.reservation_end_date
+        && appointment.reservation_end_date < manilaToday();
+}
 
 function applyStaffTab() {
     const inventoryPanel = document.getElementById('inventoryPanel');
@@ -79,7 +89,8 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
     const appointmentSources = new Map();
     const renderAppointments = () => {
         const appointments = [...new Map([...appointmentSources.values()].flat().map(item => [item.id, item])).values()]
-            .filter(appointment => appointment.status === 'pending')
+            .map(appointment => isReservationExpired(appointment) ? { ...appointment, status: 'expired' } : appointment)
+            .filter(appointment => appointment.status === 'pending' || appointment.status === 'expired')
             .sort((first, second) => `${first.preferred_date || ''} ${first.preferred_time || ''}`.localeCompare(`${second.preferred_date || ''} ${second.preferred_time || ''}`));
         if (!appointments.length) {
             container.innerHTML = '<p class="empty-appointments">No resident appointments for this clinic.</p>';
@@ -96,6 +107,7 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
                             <div class="resident-appointment-actions">
                                 <span class="appointment-status appointment-${escapeHtml(appointment.status || 'pending')}">${escapeHtml(appointment.status || 'pending')}</span>
                                 ${appointment.status === 'pending' ? `<button type="button" class="view-appointment-btn" data-view-id="${appointment.id}"><i class="fa-regular fa-id-card"></i> View Details</button><button type="button" class="confirm-appointment-btn" data-confirm-id="${appointment.id}"><i class="fa-solid fa-circle-check"></i> Confirm</button><button type="button" class="decline-appointment-btn" data-decline-id="${appointment.id}"><i class="fa-solid fa-xmark"></i> Decline</button>` : ''}
+                                ${appointment.status === 'expired' ? '<span class="appointment-expired-label"><i class="fa-regular fa-clock"></i> Reservation expired</span>' : ''}
                                 ${appointment.status === 'confirmed' ? `<button type="button" class="confirm-appointment-btn" data-complete-id="${appointment.id}"><i class="fa-solid fa-syringe"></i> Complete Dose</button>` : ''}
                                 ${appointment.status === 'completed' ? '<span class="dose-completed-label"><i class="fa-solid fa-circle-check"></i> Dose recorded</span>' : ''}
                             </div>
@@ -184,11 +196,19 @@ async function completeStaffDose(event) {
         const appointment = appointmentSnap.exists() ? appointmentSnap.data() : null;
         if (!appointment) throw new Error('Appointment was not found.');
         const inventorySnap = await getDocs(query(collection(db, 'inventory'), where('clinic_id', '==', currentClinicId)));
-        if (!inventorySnap.docs.some(item => item.data().type === vaccineName && Number(item.data().quantity || 0) > 0)) throw new Error(`No available ${vaccineName} stock at this clinic.`);
+        const inventoryItem = inventorySnap.docs.find(item => item.data().type === vaccineName && Number(item.data().quantity || 0) > 0);
+        if (!inventoryItem) throw new Error(`No available ${vaccineName} stock at this clinic.`);
         const existing = await getDocs(query(collection(db, 'vaccination_records'), where('appointment_id', '==', appointmentId)));
+        await runTransaction(db, async transaction => {
+            const currentInventory = await transaction.get(inventoryItem.ref);
+            const quantity = Number(currentInventory.data()?.quantity || 0);
+            if (quantity <= 0) throw new Error(`No available ${vaccineName} stock at this clinic.`);
+            transaction.update(inventoryItem.ref, { quantity: quantity - 1 });
+        });
         if (!existing.empty) throw new Error('This appointment already has a completed dose.');
         await addDoc(collection(db, 'vaccination_records'), {
             resident_uid: appointment.resident_uid, resident_name: appointment.resident_name || '', appointment_id: appointmentId,
+            vaccination_session_id: appointment.vaccination_session_id || 'legacy',
             dose_number: doseNumber, vaccine_name: vaccineName, vaccine_type: vaccineName, clinic_id: currentClinicId,
             clinic_name: appointment.clinic_name || '', clinic_location: location, date_given: document.getElementById('completionDate').value,
             administered_by: auth.currentUser.uid, recorded_at: serverTimestamp()

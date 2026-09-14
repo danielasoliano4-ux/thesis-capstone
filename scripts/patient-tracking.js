@@ -2,7 +2,7 @@ import { auth, db, fetchUserProfile } from './firebase.js';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 import {
   collection, query, where, orderBy, getDocs,
-  doc, updateDoc, addDoc, serverTimestamp, getDoc
+  doc, updateDoc, addDoc, serverTimestamp, getDoc, runTransaction
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 
 let pendingCount = 0;
@@ -28,23 +28,33 @@ async function loadPatients() {
     console.log('Appointments found:', appointments.size);
 
     const uniqueResidents = new Map();
-    for (const apptDoc of appointments.docs) {
+    const clinicVaccinationSnap = await getDocs(query(
+      collection(db, 'vaccination_records'),
+      where('clinic_id', '==', currentClinicId)
+    ));
+    const clinicVaccinationRecords = clinicVaccinationSnap.docs.map(item => item.data());
+    const appointmentDocs = [...appointments.docs].sort((first, second) => {
+      const priority = { pending: 0, confirmed: 1, in_progress: 2, completed: 3, cancelled: 4, declined: 5 };
+      return (priority[first.data().status] ?? 6) - (priority[second.data().status] ?? 6);
+    });
+    for (const apptDoc of appointmentDocs) {
       const appt = apptDoc.data();
-      if (appt.status === 'pending' || appt.status === 'declined') continue;
+      if (['pending', 'declined', 'cancelled'].includes(appt.status)) continue;
       console.log('Processing appointment:', appt.resident_name, appt.resident_uid);
       
       if (!uniqueResidents.has(appt.resident_uid)) {
         try {
-          const vaccinationSnap = await getDocs(query(
-            collection(db, 'vaccination_records'),
-            where('resident_uid', '==', appt.resident_uid)
-          ));
-          console.log('Vaccination records for', appt.resident_uid, ':', vaccinationSnap.size);
-          const doses = Math.max(0, ...vaccinationSnap.docs.map(v => Number(v.data().dose_number || 0)));
+          const recordsForAppointment = clinicVaccinationRecords.filter(record => record.resident_uid === appt.resident_uid
+            && (!appt.vaccination_session_id || record.vaccination_session_id === appt.vaccination_session_id));
+          const completedDoses = new Set(recordsForAppointment
+            .map(record => Number(record.dose_number || 0))
+            .filter(doseNumber => doseNumber >= 1 && doseNumber <= 5));
+          const doses = completedDoses.size;
           uniqueResidents.set(appt.resident_uid, {
             name: appt.resident_name,
             uid: appt.resident_uid,
             doses,
+            vaccinationSessionId: appt.vaccination_session_id || 'legacy',
             nextAppt: appt.preferred_date,
             appointments: []
           });
@@ -54,6 +64,7 @@ async function loadPatients() {
             name: appt.resident_name,
             uid: appt.resident_uid,
             doses: 0,
+            vaccinationSessionId: appt.vaccination_session_id || 'legacy',
             nextAppt: appt.preferred_date,
             appointments: []
           });
@@ -452,7 +463,8 @@ document.addEventListener('DOMContentLoaded', () => {
         collection(db, 'inventory'),
         where('clinic_id', '==', currentClinicId)
       ));
-      if (!inventorySnap.docs.some(item => item.data().type === vaccineName && Number(item.data().quantity || 0) > 0)) {
+      const inventoryItem = inventorySnap.docs.find(item => item.data().type === vaccineName && Number(item.data().quantity || 0) > 0);
+      if (!inventoryItem) {
         throw new Error(`This clinic has no available inventory for ${vaccineName}.`);
       }
       const existingRecordSnap = await getDocs(query(
@@ -460,11 +472,23 @@ document.addEventListener('DOMContentLoaded', () => {
         where('resident_uid', '==', activeAppointment.resident_uid),
         where('dose_number', '==', doseNumber)
       ));
-      if (!existingRecordSnap.empty) throw new Error(`Dose ${doseNumber} is already recorded and cannot be replaced.`);
+      const matchingExistingRecord = existingRecordSnap.docs.some(recordDoc => {
+        const record = recordDoc.data();
+        return record.clinic_id === currentClinicId
+          && (!activeAppointment.vaccination_session_id || record.vaccination_session_id === activeAppointment.vaccination_session_id);
+      });
+      if (matchingExistingRecord) throw new Error(`Dose ${doseNumber} is already recorded and cannot be replaced.`);
+      await runTransaction(db, async transaction => {
+        const currentInventory = await transaction.get(inventoryItem.ref);
+        const quantity = Number(currentInventory.data()?.quantity || 0);
+        if (quantity <= 0) throw new Error(`This clinic has no available inventory for ${vaccineName}.`);
+        transaction.update(inventoryItem.ref, { quantity: quantity - 1 });
+      });
       await addDoc(collection(db, 'vaccination_records'), {
         resident_uid: activeAppointment.resident_uid,
         resident_name: activeAppointment.resident_name || '',
         appointment_id: appointmentId,
+        vaccination_session_id: activeAppointment.vaccination_session_id || 'legacy',
         dose_number: doseNumber,
         vaccine_name: vaccineName,
         vaccine_type: vaccineName,

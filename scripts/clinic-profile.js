@@ -14,6 +14,7 @@ const defaultProfile = {
     address: document.getElementById('profileAddress').value,
     contact: document.getElementById('profileContact').value,
     email: document.getElementById('profileEmail').value,
+    priceRange: document.getElementById('profilePriceRange').value,
     weekdayHours: document.getElementById('profileWeekdayHours').value,
     weekendHours: document.getElementById('profileWeekendHours').value,
     reservationDays: document.getElementById('profileReservationDays').value,
@@ -42,6 +43,7 @@ async function loadProfile(clinicId) {
         document.getElementById('profileAddress').value = profile.address || '';
         document.getElementById('profileContact').value = profile.contact || '';
         document.getElementById('profileEmail').value = profile.email || '';
+        document.getElementById('profilePriceRange').value = profile.priceRange || '';
         document.getElementById('profileWeekdayHours').value = profile.weekdayHours || '';
         document.getElementById('profileWeekendHours').value = profile.weekendHours || '';
         document.getElementById('profileReservationDays').value = ['1', '2', '3'].includes(String(profile.reservationDays))
@@ -65,6 +67,7 @@ form.addEventListener('submit', async (event) => {
         address: document.getElementById('profileAddress').value.trim(),
         contact: document.getElementById('profileContact').value.trim(),
         email: document.getElementById('profileEmail').value.trim(),
+        priceRange: document.getElementById('profilePriceRange').value.trim(),
         weekdayHours: document.getElementById('profileWeekdayHours').value.trim(),
         weekendHours: document.getElementById('profileWeekendHours').value.trim(),
         reservationDays: Number(document.getElementById('profileReservationDays').value),
@@ -90,7 +93,7 @@ form.addEventListener('submit', async (event) => {
 
 function getProfileChanges(before, after) {
     const labels = {
-        name: 'Clinic name', type: 'Clinic type', address: 'Address', contact: 'Contact', email: 'Email',
+        name: 'Clinic name', type: 'Clinic type', address: 'Address', contact: 'Contact', email: 'Email', priceRange: 'Vaccination price range',
         weekdayHours: 'Weekday operating hours', weekendHours: 'Weekend operating hours', reservationDays: 'Reservation days', services: 'Services offered'
     };
     return Object.keys(labels).reduce((changes, field) => {

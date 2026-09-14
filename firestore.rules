@@ -82,7 +82,14 @@ service cloud.firestore {
           && resource.data.status == 'confirmed'
           && request.resource.data.status == 'pending'
           && request.resource.data.reschedule_requested == true
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['preferred_date', 'preferred_time', 'status', 'reschedule_requested', 'rescheduled_at']));
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['preferred_date', 'preferred_time', 'status', 'reschedule_requested', 'rescheduled_at']))
+        || (isResident()
+          && resource.data.resident_uid == request.auth.uid
+          && resource.data.status in ['pending', 'confirmed']
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.cancellation_reason is string
+          && request.resource.data.cancellation_reason.size() > 0
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancellation_reason', 'cancelled_at', 'cancelled_by']));
       allow delete: if isAdmin()
         || (isResident() && resource.data.resident_uid == request.auth.uid);
     }
@@ -123,6 +130,12 @@ service cloud.firestore {
         && request.resource.data.date_given is string
         && request.resource.data.administered_by == request.auth.uid);
       allow update, delete: if false;
+    }
+
+    match /vaccination_documents/{documentId} {
+      allow read: if isResident() && resource.data.resident_uid == request.auth.uid;
+      allow create: if isResident() && request.resource.data.resident_uid == request.auth.uid;
+      allow update, delete: if isResident() && resource.data.resident_uid == request.auth.uid;
     }
   }
 }

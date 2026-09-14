@@ -34,6 +34,7 @@ function loadClinics() {
         address: data.address || '',
         hours: data.weekdayHours || data.hours || 'Contact clinic',
         phone: data.contact || '',
+        priceRange: data.priceRange || data.vaccination_price_range || 'Price not provided',
         stock: data.stock_summary || data.stock || `${Number(data.stock_total || 0)} doses`,
         stock_total: Number(data.stock_total || 0),
         staff_uid: data.staff_uid || ''
@@ -41,6 +42,7 @@ function loadClinics() {
     });
 
     window.clinicDirectory = CLINICS;
+    if (window.updateNearestClinicSummary) window.updateNearestClinicSummary(CLINICS);
     if (window.populateClinicOptions) window.populateClinicOptions(CLINICS);
     mapsData.splice(0).forEach(entry => entry.markers.forEach(marker => marker.marker.remove()));
     mapsData.splice(0);
@@ -120,7 +122,7 @@ function createMarkerForMap(map, clinic, mapId) {
     ? ''
     : `<button type="button" class="map-book-button" data-clinic-id="${escapeHtml(clinic.id)}">Book Appointment</button>`;
   const directionsButton = '<button type="button" class="map-directions-button">Get Directions</button>';
-  marker.bindPopup(`<strong>${escapeHtml(clinic.name)}</strong><br><b>${escapeHtml(clinic.type)}</b><br><b style="color:${color}">${STATUS_LABEL[clinic.status]}</b><br><br><b>Address:</b> ${escapeHtml(clinic.address)}<br><b>Hours:</b> ${escapeHtml(clinic.hours)}<br><b>Phone:</b> ${escapeHtml(clinic.phone)}<br><br><b>Stock:</b> ${escapeHtml(clinic.stock)}${bookingButton}${directionsButton}<div class="route-summary" aria-live="polite"></div><br><small>&copy; Google Maps</small>`);
+  marker.bindPopup(`<strong>${escapeHtml(clinic.name)}</strong><br><b>${escapeHtml(clinic.type)}</b><br><b style="color:${color}">${STATUS_LABEL[clinic.status]}</b><br><br><b>Address:</b> ${escapeHtml(clinic.address)}<br><b>Hours:</b> ${escapeHtml(clinic.hours)}<br><b>Phone:</b> ${escapeHtml(clinic.phone)}<br><b>Vaccination price:</b> ${escapeHtml(clinic.priceRange)}<br><br><b>Stock:</b> ${escapeHtml(clinic.stock)}${bookingButton}${directionsButton}<div class="route-summary" aria-live="polite"></div><br><small>&copy; Google Maps</small>`);
   marker.on('popupopen', event => {
     const button = event.popup.getElement()?.querySelector('.map-book-button');
     if (button) button.addEventListener('click', () => {
@@ -159,6 +161,7 @@ function buildSidebarFor(entry) {
           <span style="font-size:11px;color:#6b7280;">(${mobj.clinic.type})</span>
         </div>
         <div style="font-size:12px;color:#6b7280;">${mobj.clinic.address} &nbsp;|&nbsp; ${mobj.clinic.hours}</div>
+        <div style="font-size:12px;color:#374151;"><strong>Vaccination price:</strong> ${mobj.clinic.priceRange}</div>
       </div>
     `;
 
@@ -240,6 +243,45 @@ function locateUser() {
   }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 });
 }
 
+function focusNearestClinic() {
+  if (window.showTab) window.showTab('overview', document.querySelectorAll('.nav-tab')[0]);
+  const fallback = { latitude: 14.2718, longitude: 121.1246 };
+  const showNearest = position => {
+    const origin = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+    let nearest = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    CLINICS.filter(clinic => Number.isFinite(clinic.lat) && Number.isFinite(clinic.lng)).forEach(clinic => {
+      const distance = mapDistanceInKm(origin.latitude, origin.longitude, clinic.lat, clinic.lng);
+      if (distance < nearestDistance) {
+        nearest = clinic;
+        nearestDistance = distance;
+      }
+    });
+    if (!nearest) return;
+    selectedDestination = nearest;
+    mapsData.forEach(entry => {
+      const markerEntry = entry.markers.find(item => item.clinic.id === nearest.id);
+      if (markerEntry) {
+        entry.map.setView(markerEntry.marker.getLatLng(), 16);
+        markerEntry.marker.openPopup();
+      }
+    });
+  };
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(showNearest, () => showNearest({ coords: fallback }), { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 });
+  } else {
+    showNearest({ coords: fallback });
+  }
+}
+
+function mapDistanceInKm(latitude, longitude, clinicLatitude, clinicLongitude) {
+  const earthRadius = 6371;
+  const latDelta = (clinicLatitude - latitude) * Math.PI / 180;
+  const lngDelta = (clinicLongitude - longitude) * Math.PI / 180;
+  const value = Math.sin(latDelta / 2) ** 2 + Math.cos(latitude * Math.PI / 180) * Math.cos(clinicLatitude * Math.PI / 180) * Math.sin(lngDelta / 2) ** 2;
+  return earthRadius * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+}
+
 async function updateRoutes() {
   if (!userLocation || !selectedDestination) return;
   const destination = [selectedDestination.lng, selectedDestination.lat];
@@ -273,4 +315,5 @@ function escapeHtml(value = '') {
 window.refreshMaps = refreshMaps;
 window.initMap = initMap;
 window.filterMarkers = filterMarkers;
+window.focusNearestClinic = focusNearestClinic;
 loadClinics();

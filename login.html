@@ -320,6 +320,10 @@
     </script>
 
     <script type="module" src="scripts/login.js"></script>
+    <script type="module">
+        import { redirectActiveUserFromPublicPage } from './scripts/auth-route-guard.js';
+        redirectActiveUserFromPublicPage();
+    </script>
 
 </body>
 </html>

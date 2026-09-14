@@ -1393,6 +1393,10 @@ function filterMarkers(filter, btn) {
     });
   };
 </script>
+<script type="module">
+  import { redirectActiveUserFromPublicPage } from './scripts/auth-route-guard.js';
+  redirectActiveUserFromPublicPage();
+</script>
 
 </body>
 </html>

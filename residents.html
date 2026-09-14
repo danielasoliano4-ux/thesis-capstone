@@ -476,16 +476,16 @@
           <div><span>Doses Completed</span><h2 id="activeDosesCount">1</h2></div>
           <i class="fa-solid fa-syringe icon-red"></i>
         </div>
-        <div class="stat-box">
-          <div><span>Next Appointment</span><h2 class="medium" id="activeNextAppt">Jun 29</h2></div>
+        <div class="stat-box dashboard-stat-action" id="nextAppointmentCard" role="button" tabindex="0" title="View appointments">
+          <div><span>Next Appointment</span><h2 class="medium" id="activeNextAppt">No upcoming appointment</h2></div>
           <i class="fa-regular fa-calendar icon-blue"></i>
         </div>
-        <div class="stat-box">
-          <div><span>Nearest Clinic</span><h2 class="medium">0.8 km</h2></div>
+        <div class="stat-box dashboard-stat-action" id="nearestClinicCard" role="button" tabindex="0" title="View nearest clinic">
+          <div><span>Nearest Clinic</span><h2 class="medium" id="nearestClinicDistance">Finding nearby clinic...</h2></div>
           <i class="fa-solid fa-location-dot icon-green"></i>
         </div>
-        <div class="stat-box">
-          <div><span>Notifications</span><h2>4</h2></div>
+        <div class="stat-box dashboard-stat-action" id="notificationsCard" role="button" tabindex="0" title="View notifications">
+          <div><span>Notifications</span><h2 id="notificationTotal">0</h2></div>
           <i class="fa-regular fa-bell icon-yellow"></i>
         </div>
       </div>
@@ -863,9 +863,11 @@
       </div>
     </div>
 
-    <p class="section-label">Dose Schedule</p>
+    <details class="vaccination-record-details">
+      <summary><span><i class="fa-solid fa-list-check"></i> <span id="currentRecordDetailsLabel">Vaccination doses and uploaded documents</span></span><i class="fa-solid fa-chevron-down details-chevron"></i></summary>
+      <p class="section-label">Dose Schedule</p>
 
-    <div class="dose-record-list" id="liveDoseRecordList">
+      <div class="dose-record-list" id="liveDoseRecordList">
       <div class="dose-record">
         <div class="dose-circle done-circle"><i class="fa-solid fa-check"></i></div>
         <div class="dose-record-info"><h4>Dose 1 — Day 0</h4><p><span id="d1date">June 25, 2026</span> &nbsp;|&nbsp; Cabuyao City Health Center &nbsp;|&nbsp; Dr. Santos</p></div>
@@ -891,21 +893,26 @@
         <div class="dose-record-info"><h4>Dose 5 — Day 28</h4><p>Scheduled: July 24, 2026 at 9:00 AM &nbsp;|&nbsp; Cabuyao City Health Center</p></div>
         <div class="dose-record-status"><span class="r-pending">Pending</span></div>
       </div>
-    </div>
+      </div>
 
-    <div class="upload-section">
+      <div class="upload-section">
       <h3><i class="fa-solid fa-upload" style="color:#ef0000;margin-right:8px;"></i>Upload Vaccination Documents</h3>
       <p style="font-size:13px;color:#6b7280;margin-bottom:14px;">Upload your physical vaccination card for verification by clinic staff.</p>
-      <div class="upload-box" onclick="document.getElementById('fileUpload').click()">
-        <i class="fa-solid fa-cloud-arrow-up"></i>
-        <p>Click to upload or drag &amp; drop</p>
-        <span>PDF, JPG, PNG up to 10MB</span>
-        <input type="file" id="fileUpload" hidden accept=".pdf,.jpg,.png" onchange="handleUpload(this)">
+      <div id="vaccinationDocuments" class="vaccination-documents" aria-live="polite"></div>
+      <div id="uploadDocumentControls" class="upload-document-controls">
+        <div class="upload-box" onclick="document.getElementById('fileUpload').click()">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <p>Click to upload or drag &amp; drop</p>
+          <span>PDF, JPG, PNG up to 10MB</span>
+          <input type="file" id="fileUpload" hidden accept=".pdf,.jpg,.png" onchange="handleUpload(this)">
+        </div>
+        <button class="upload-btn" onclick="document.getElementById('fileUpload').click()">
+          <i class="fa-solid fa-paperclip"></i> Choose File
+        </button>
       </div>
-      <button class="upload-btn" onclick="document.getElementById('fileUpload').click()">
-        <i class="fa-solid fa-paperclip"></i> Choose File
-      </button>
-    </div>
+      </div>
+    </details>
+    <div id="previousVaccinationRecords" class="previous-vaccination-records" aria-live="polite"></div>
 
   </div>
   <!-- END RECORDS PANEL -->
@@ -1172,6 +1179,17 @@
       <div class="modal-field"><label for="rescheduleTime">Time</label><select id="rescheduleTime"><option>8:00 AM</option><option>9:00 AM</option><option>10:00 AM</option><option>11:00 AM</option><option>1:00 PM</option><option>2:00 PM</option><option>3:00 PM</option></select></div>
       <div id="rescheduleMsg" style="display:none;margin-top:10px;padding:10px;border-radius:8px;font-size:13px;"></div>
       <div class="modal-actions"><button type="button" class="modal-cancel" id="closeRescheduleBtn">Cancel</button><button type="button" class="modal-submit" id="saveRescheduleBtn"><i class="fa-solid fa-check"></i> Save Changes</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="cancelModal">
+    <div class="modal-box">
+      <h2><i class="fa-solid fa-calendar-xmark" style="color:#ef0000;margin-right:8px;"></i>Cancel Appointment</h2>
+      <p class="sub">Please tell us why you need to cancel this appointment.</p>
+      <input type="hidden" id="cancelAppointmentId">
+      <div class="modal-field"><label for="cancelReason">Reason for cancellation</label><textarea id="cancelReason" rows="4" maxlength="500" placeholder="Enter your reason" required></textarea></div>
+      <div id="cancelMsg" style="display:none;margin-top:10px;padding:10px;border-radius:8px;font-size:13px;"></div>
+      <div class="modal-actions"><button type="button" class="modal-cancel" id="closeCancelBtn">Keep Appointment</button><button type="button" class="modal-submit" id="saveCancelBtn"><i class="fa-solid fa-xmark"></i> Confirm Cancellation</button></div>
     </div>
   </div>
 
