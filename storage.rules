@@ -1,0 +1,35 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isLoggedIn() {
+      return request.auth != null;
+    }
+
+    function userRole() {
+      return get(/databases/(default)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isStaffOrAdmin() {
+      return isLoggedIn() && (userRole() == 'clinic_staff' || userRole() == 'admin' || userRole() == 'administrator');
+    }
+
+    match /id-verification/{residentId}/{fileName} {
+      allow write: if isLoggedIn()
+        && request.auth.uid == residentId
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType in ['image/jpeg', 'image/png', 'application/pdf'];
+      allow read: if isLoggedIn()
+        && (request.auth.uid == residentId || isStaffOrAdmin());
+    }
+
+    match /vaccination-documents/{residentId}/{fileName} {
+      allow write: if isLoggedIn()
+        && request.auth.uid == residentId
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType in ['image/jpeg', 'image/png', 'application/pdf'];
+      allow read: if isLoggedIn()
+        && (request.auth.uid == residentId || isStaffOrAdmin());
+    }
+  }
+}

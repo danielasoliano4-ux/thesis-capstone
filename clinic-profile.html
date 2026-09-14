@@ -51,11 +51,17 @@
                 <a href="staff.html" class="tab-link">
                     <button>Vaccine Inventory</button>
                 </a>
+                <a href="staff.html#resident-appointments" class="tab-link">
+                    <button>Resident Appointment</button>
+                </a>
                 <a href="patient-tracking.html" class="tab-link">
                     <button>Patient Tracking</button>
                 </a>
                 <a href="clinic-profile.html" class="tab-link">
                     <button class="active-tab">Clinic Profile</button>
+                </a>
+                <a href="history.html" class="tab-link">
+                    <button>History</button>
                 </a>
             </div>
 
@@ -71,8 +77,11 @@
                         <input id="profileName" type="text" value="Cabuyao City Health Center" required/>
                     </div>
                     <div class="profile-field">
-                        <label>Clinic Type</label>
-                        <input id="profileType" type="text" value="Public Health Center" required/>
+                        <label for="profileType">Clinic Type</label>
+                        <select id="profileType" required>
+                            <option value="Animal Bite Center">Animal Bite Center</option>
+                            <option value="Animal Bite Treatment Center">Animal Bite Treatment Center</option>
+                        </select>
                     </div>
                 </div>
 
@@ -92,6 +101,12 @@
                         <label>Email Address</label>
                         <input id="profileEmail" type="email" value="cabuyaohealth@gmail.com" required/>
                     </div>
+                </div>
+
+                <div class="profile-field full-width">
+                    <label for="profilePriceRange">Vaccination Price Range</label>
+                    <input id="profilePriceRange" type="text" value="" placeholder="Example: ₱500 - ₱1,500" />
+                    <small style="display:block;margin-top:6px;color:#6b7280;">Residents will see this price range on the clinic map.</small>
                 </div>
 
                 <!-- OPERATING HOURS -->
@@ -117,6 +132,16 @@
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div class="profile-field" style="margin-bottom: 30px;">
+                    <label for="profileReservationDays">Reservation Duration</label>
+                    <select id="profileReservationDays" required>
+                        <option value="1">1 day</option>
+                        <option value="2">2 days</option>
+                        <option value="3">3 days</option>
+                    </select>
+                    <small style="margin-top: 6px; color: #6b7280;">Choose how long a confirmed reservation remains valid.</small>
                 </div>
 
                 <!-- SERVICES OFFERED -->
@@ -146,6 +171,18 @@
                         <div class="service-item">
                             <input type="checkbox" name="services" value="Follow-up Services" checked>
                             <span>Follow-up Services</span>
+                        </div>
+                        <div class="service-item">
+                            <input type="checkbox" name="services" value="Anti-Tetanus">
+                            <span>Anti-Tetanus</span>
+                        </div>
+                        <div class="service-item">
+                            <input type="checkbox" name="services" value="ERIG">
+                            <span>ERIG</span>
+                        </div>
+                        <div class="service-item">
+                            <input type="checkbox" name="services" value="Pre-Exposure Prophylaxis">
+                            <span>Pre-Exposure Prophylaxis</span>
                         </div>
                     </div>
                 </div>

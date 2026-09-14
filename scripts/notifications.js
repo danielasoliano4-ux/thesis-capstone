@@ -1,4 +1,5 @@
-import { auth, fetchNotificationsFor, onAuthStateChanged, fetchUserProfile, signOutUser } from './firebase.js';
+import { auth, db, onAuthStateChanged, fetchUserProfile, signOutUser } from './firebase.js';
+import { collection, onSnapshot, query, where, doc, updateDoc } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
 function markAllRead() {
 
@@ -15,6 +16,11 @@ function markAllRead() {
     const unread = document.getElementById('unreadCount');
 
     if (unread) unread.textContent = '0';
+
+    document.querySelectorAll('.notif-item[data-id]').forEach(item => {
+        updateDoc(doc(db, 'notifications', item.dataset.id), { read: true })
+            .catch(error => console.warn('Could not mark notification as read:', error));
+    });
 
 }
 
@@ -104,16 +110,20 @@ function renderNotifications(list) {
 
         item.className = 'notif-item' + (n.read ? '' : ' unread');
 
+        item.dataset.id = n.id;
+
         item.dataset.type = n.type || 'general';
+
+        const icon = n.title?.toLowerCase().includes('reminder') ? 'fa-calendar-check' : n.type === 'vaccine' ? 'fa-syringe' : 'fa-circle-check';
+        const createdAt = n.created_at?.toDate ? n.created_at.toDate().toLocaleString() : 'Just now';
 
         item.innerHTML = `
 
-            <div style="flex:1">
-
-                <div style="font-weight:700">${n.title || 'Notification'}</div>
-
-                <div style="font-size:13px;color:#6b7280">${n.body || ''}</div>
-
+            <div class="notif-icon icon-blue"><i class="fa-solid ${icon}"></i></div>
+            <div class="notif-body">
+                <h4>${escapeHtml(n.title || 'Notification')}</h4>
+                <p>${escapeHtml(n.message || n.body || '')}</p>
+                <div class="notif-meta"><span class="notif-time"><i class="fa-regular fa-clock"></i> ${escapeHtml(createdAt)}</span><span class="notif-tag tag-${escapeHtml(n.type || 'system')}">${escapeHtml(n.type || 'system')}</span></div>
             </div>
 
             ${n.read ? '' : '<div class="unread-dot" style="width:10px;height:10px;background:#e60000;border-radius:50%;margin-left:12px;"></div>'}
@@ -126,6 +136,12 @@ function renderNotifications(list) {
 
 }
 
+function escapeHtml(value = '') {
+    const element = document.createElement('div');
+    element.textContent = value;
+    return element.innerHTML;
+}
+
 
 
 // Listen for auth state and load user-specific notifications
@@ -134,15 +150,20 @@ onAuthStateChanged(auth, async (user) => {
 
     if (user) {
 
-        const list = await fetchNotificationsFor(user.uid);
-
-        renderNotifications(list);
-
-        const unreadCount = list.filter(n => !n.read).length;
-
-        const unreadEl = document.getElementById('unreadCount');
-
-        if (unreadEl) unreadEl.textContent = String(unreadCount);
+        onSnapshot(query(collection(db, 'notifications'), where('recipient_uid', '==', user.uid)), snapshot => {
+            const list = snapshot.docs.map(item => ({ id: item.id, ...item.data() }))
+                .sort((first, second) => {
+                    const firstTime = first.created_at?.toMillis?.() || 0;
+                    const secondTime = second.created_at?.toMillis?.() || 0;
+                    return secondTime - firstTime;
+                });
+            renderNotifications(list);
+            const unreadEl = document.getElementById('unreadCount');
+            if (unreadEl) unreadEl.textContent = String(list.filter(n => !n.read).length);
+        }, error => {
+            console.error('Could not listen for notifications:', error);
+            renderNotifications([]);
+        });
 
                 // Set header name if present
 

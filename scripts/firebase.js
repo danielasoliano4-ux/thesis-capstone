@@ -2,6 +2,7 @@
 // Replace the firebaseConfig values with your project's credentials.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js';
 import { getAuth, onAuthStateChanged, signOut as fbSignOut } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
+import { getStorage } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js';
 import {
   getFirestore,
   doc,
@@ -26,6 +27,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 // Helper: fetch a user profile document from 'users' collection by uid
 async function fetchUserProfile(uid) {
@@ -58,7 +60,7 @@ async function fetchNotificationsFor(uid) {
   }
 }
 
-export { app, auth, db, fetchUserProfile, fetchNotificationsFor, onAuthStateChanged };
+export { app, auth, db, storage, fetchUserProfile, fetchNotificationsFor, onAuthStateChanged };
 
 // Sign out helper
 async function signOutUser() {

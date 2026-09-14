@@ -6,8 +6,9 @@
 }
 
 body {
-    background: #f5efef;
+    background: radial-gradient(circle at 15% 10%, #fff 0, #fff7f7 28%, transparent 52%), #f5efef;
     color: #111827;
+    min-height: 100vh;
 }
 
 /* HEADER */
@@ -104,7 +105,8 @@ body {
     overflow: hidden;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    box-shadow: 0 5px 18px rgba(0,0,0,0.08);
+    box-shadow: 0 18px 45px rgba(127, 29, 29, 0.12);
+    border: 1px solid rgba(239, 0, 0, 0.08);
 }
 
 /* NO ACCOUNT */
@@ -236,6 +238,7 @@ form label {
 }
 
 form input[type="text"],
+form input[type="email"],
 form input[type="password"] {
     width: 100%;
     padding: 14px;
@@ -244,11 +247,14 @@ form input[type="password"] {
     margin-bottom: 20px;
     font-size: 15px;
     outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 form input[type="text"]:focus,
+form input[type="email"]:focus,
 form input[type="password"]:focus {
-    outline: none;
+    border-color: #ef0000;
+    box-shadow: 0 0 0 4px rgba(239, 0, 0, 0.1);
 }
 
 .password-input-wrapper input[type="password"]:focus {
@@ -430,4 +436,33 @@ hr {
         gap: 10px;
         align-items: flex-start;
     }
+}
+
+.login-message {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: -4px 0 18px;
+    padding: 12px 14px;
+    border: 1px solid #fecaca;
+    border-radius: 12px;
+    background: #fff1f2;
+    color: #b42318;
+    font-size: 13px;
+    line-height: 1.45;
+    animation: message-in 0.2s ease-out;
+}
+
+.login-message[hidden] {
+    display: none;
+}
+
+.login-message i {
+    margin-top: 2px;
+    color: #e11d48;
+}
+
+@keyframes message-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
 }

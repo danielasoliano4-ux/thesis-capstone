@@ -112,12 +112,12 @@
 
                 <form>
 
-                    <label>Email or Username</label>
-                    <input type="text" value=" ">
+                    <label for="emailInput">Email</label>
+                    <input type="email" id="emailInput" autocomplete="email" spellcheck="false">
 
                     <label>Password</label>
                     <div class="password-input-wrapper">
-                        <input type="password" id="passwordInput" value=" ">
+                        <input type="password" id="passwordInput" autocomplete="current-password">
                         <button type="button" class="password-toggle" id="passwordToggle">
                             <i class="fa-solid fa-eye"></i>
                         </button>
@@ -133,6 +133,11 @@
 
                         <a href="#">Forgot password?</a>
 
+                    </div>
+
+                    <div class="login-message" id="loginMessage" role="alert" aria-live="polite" hidden>
+                        <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+                        <span id="loginMessageText"></span>
                     </div>
 
                     <!-- BUTTON -->
@@ -194,7 +199,7 @@
             resident: {
                 label: 'Resident',
                 buttonText: 'Sign In as Resident',
-                email: ' ',
+                email: '',
                 password: '',
                 features: [
                     'Book and manage appointments',
@@ -234,7 +239,7 @@
 
         const roleBoxes = document.querySelectorAll('.role-box');
         const loginBtn = document.getElementById('loginBtn');
-        const emailInput = document.querySelector('input[type="text"]');
+        const emailInput = document.getElementById('emailInput');
         const passwordInput = document.querySelector('input[type="password"]');
         const featuresHeading = document.getElementById('featuresHeading');
         const featuresList = document.getElementById('featuresList');
@@ -315,6 +320,10 @@
     </script>
 
     <script type="module" src="scripts/login.js"></script>
+    <script type="module">
+        import { redirectActiveUserFromPublicPage } from './scripts/auth-route-guard.js';
+        redirectActiveUserFromPublicPage();
+    </script>
 
 </body>
 </html>

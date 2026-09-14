@@ -40,8 +40,10 @@
 
             <div class="tabs">
                 <a href="staff.html" class="tab-link"><button>Vaccine Inventory</button></a>
+                <a href="staff.html#resident-appointments" class="tab-link"><button>Resident Appointment</button></a>
                 <a href="patient-tracking.html" class="tab-link"><button class="active-tab">Patient Tracking</button></a>
                 <a href="clinic-profile.html" class="tab-link"><button>Clinic Profile</button></a>
+                <a href="history.html" class="tab-link"><button>History</button></a>
             </div>
 
             <div style="padding: 24px;">
@@ -88,6 +90,19 @@
                 <button type="button" id="closeRecordModalBtn" class="modal-close" aria-label="Close">&times;</button>
             </div>
             <div id="recordDetails" class="record-details"></div>
+            <form id="doseCompletionForm" class="record-edit-form" hidden>
+                <input type="hidden" id="completionAppointmentId">
+                <h3>Complete Vaccination Dose</h3>
+                <div class="record-edit-grid">
+                    <label>Administration Date<input id="completionDate" type="date" required></label>
+                    <label>Dose Number<input id="completionDose" type="number" min="1" max="5" required></label>
+                    <label>Vaccine Brand / Type<input id="completionVaccine" type="text" required></label>
+                    <label>Clinic Location<input id="completionLocation" type="text" required></label>
+                </div>
+                <div class="record-edit-actions">
+                    <button type="submit" class="add-btn"><i class="fa-solid fa-syringe"></i> Record Completed Dose</button>
+                </div>
+            </form>
             <button type="button" id="editRecordBtn" class="edit-record-btn" aria-label="Edit patient record" title="Edit patient record">
                 <i class="fa-solid fa-pencil"></i>
             </button>
@@ -96,7 +111,7 @@
                 <h3>Clinic Assessment</h3>
                 <div class="record-edit-grid">
                     <label>Address<input id="editAddress" type="text"></label>
-                    <label>Age<input id="editAge" type="number" min="0" max="120"></label>
+                    <label>Date of Birth<input id="editDateOfBirth" type="date"></label>
                     <label>Sex
                         <select id="editSex">
                             <option value="">Not provided</option>
@@ -110,30 +125,32 @@
                     <label>Body Part of the Bite<input id="editBitePart" type="text"></label>
                 </div>
                 <h3>Clinic Assessment</h3>
-                <label>Category of Patient
-                    <select id="recordCategory">
-                        <option value="">Select category</option>
-                        <option value="Category I">Category I</option>
-                        <option value="Category II">Category II</option>
-                        <option value="Category III">Category III</option>
-                    </select>
-                </label>
-                <label>Was the bite washed?
-                    <select id="recordWoundWashed">
-                        <option value="">Select answer</option>
-                        <option value="Yes">Yes</option>
-                        <option value="No">No</option>
-                    </select>
-                </label>
-                <label>Type of Bite
-                    <select id="recordBiteType">
-                        <option value="">Select type</option>
-                        <option value="Bite">Bite</option>
-                        <option value="Scratch">Scratch</option>
-                        <option value="Both bite and scratch">Both bite and scratch</option>
-                        <option value="Lick on broken skin">Lick on broken skin</option>
-                    </select>
-                </label>
+                <div class="assessment-grid">
+                    <label>Category of Patient
+                        <select id="recordCategory">
+                            <option value="">Select category</option>
+                            <option value="Category I">Category I</option>
+                            <option value="Category II">Category II</option>
+                            <option value="Category III">Category III</option>
+                        </select>
+                    </label>
+                    <label>Was the bite washed?
+                        <select id="recordWoundWashed">
+                            <option value="">Select answer</option>
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                        </select>
+                    </label>
+                    <label>Type of Bite
+                        <select id="recordBiteType">
+                            <option value="">Select type</option>
+                            <option value="Bite">Bite</option>
+                            <option value="Scratch">Scratch</option>
+                            <option value="Both bite and scratch">Both bite and scratch</option>
+                            <option value="Lick on broken skin">Lick on broken skin</option>
+                        </select>
+                    </label>
+                </div>
                 <div class="record-edit-actions">
                     <button type="button" id="cancelEditBtn" class="record-cancel-btn">Cancel</button>
                     <button type="submit" class="add-btn">Save Patient Record</button>

@@ -1,114 +1,237 @@
 import { auth, db, fetchUserProfile } from './firebase.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
-import { doc, onSnapshot, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
+import {
+  collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc
+} from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
-const defaultAnimals = [
-  { name: 'Dog', percent: 68 }, { name: 'Cat', percent: 20 },
-  { name: 'Bat', percent: 8 }, { name: 'Others', percent: 4 }
-];
-const defaultAnalytics = {
-  monthlyCases: [12, 18, 15, 22, 19, 24, 17],
-  monthlyVaccinations: [45, 62, 55, 80, 72, 95, 53],
-  barangays: [{ name: 'Mamatid', cases: 32 }, { name: 'Banlic', cases: 26 }, { name: 'Pulo', cases: 19 }, { name: 'Sala', cases: 16 }, { name: 'Marinig', cases: 11 }, { name: 'Niugan', cases: 9 }, { name: 'Butong', cases: 7 }, { name: 'Poblacion Uno', cases: 7 }],
-  caseTrend: [38, 57, 47, 69, 60, 75, 53],
-  ageGroups: [18, 24, 33, 27, 13]
-};
-
-document.querySelectorAll('[data-edit-form]').forEach(button => {
-  button.addEventListener('click', () => {
-    const form = document.getElementById(button.dataset.editForm);
-    form.hidden = !form.hidden;
-    document.querySelectorAll(`[data-edit-form="${button.dataset.editForm}"]`).forEach(editButton => {
-      editButton.innerHTML = form.hidden ? '<i class="fa-solid fa-pencil"></i>' : '<i class="fa-solid fa-xmark"></i>';
-      editButton.setAttribute('aria-label', form.hidden ? 'Edit analytics data' : 'Close analytics editor');
-    });
-  });
-});
-
-function fillAnimalForm(data) {
-  const animals = data.animals || defaultAnimals;
-  animals.forEach((animal, index) => {
-    document.getElementById(`animalName${index + 1}`).value = animal.name || '';
-    document.getElementById(`animalPercent${index + 1}`).value = animal.percent ?? 0;
-  });
-}
+const YEAR = 2026;
+let appointments = [];
+let vaccinations = [];
+let residents = new Map();
+let users = [];
+let clinics = [];
+let inventory = [];
 
 onAuthStateChanged(auth, async user => {
   if (!user) return;
   const profile = await fetchUserProfile(user.uid);
   if (profile?.role !== 'admin' && profile?.role !== 'administrator') return;
-  onSnapshot(doc(db, 'system_settings', 'animal_exposure'), snapshot => fillAnimalForm(snapshot.exists() ? snapshot.data() : {}));
-  onSnapshot(doc(db, 'system_settings', 'dashboard_analytics'), snapshot => {
-    const data = snapshot.exists() ? snapshot.data() : {};
-    fillAnalyticsForm(data);
-    if (window.adminMonthlyChart) {
-      window.adminMonthlyChart.data.datasets[0].data = data.monthlyCases || defaultAnalytics.monthlyCases;
-      window.adminMonthlyChart.data.datasets[1].data = data.monthlyVaccinations || defaultAnalytics.monthlyVaccinations;
-      window.adminMonthlyChart.update();
-    }
+  onSnapshot(collection(db, 'appointments'), snapshot => {
+    appointments = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+    renderAnalytics();
+  }, reportError);
+  onSnapshot(collection(db, 'vaccination_records'), snapshot => {
+    vaccinations = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+    renderAnalytics();
+  }, reportError);
+  onSnapshot(collection(db, 'residents'), snapshot => {
+    residents = new Map(snapshot.docs.map(item => [item.id, item.data()]));
+    renderAnalytics();
+  }, reportError);
+  onSnapshot(collection(db, 'users'), snapshot => {
+    users = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+    renderManagement();
+  }, reportError);
+  onSnapshot(collection(db, 'clinics'), snapshot => {
+    clinics = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+    renderManagement();
+  }, reportError);
+  onSnapshot(collection(db, 'inventory'), snapshot => {
+    inventory = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+    renderManagement();
+  }, reportError);
+});
+
+function reportError(error) {
+  console.error('Failed to load live analytics data:', error);
+}
+
+function dateValue(value) {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    const date = new Date(`${value.slice(0, 10)}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return typeof value.toDate === 'function' ? value.toDate() : null;
+}
+
+function recordDate(record) {
+  return dateValue(record.bite_date) || dateValue(record.preferred_date)
+    || dateValue(record.date_given) || dateValue(record.created_at);
+}
+
+function currentYear(record) {
+  return recordDate(record)?.getFullYear() === YEAR;
+}
+
+function barangayFor(record) {
+  const profile = residents.get(record.resident_uid);
+  return profile?.barangay || record.barangay || record.resident_barangay || 'Unspecified';
+}
+
+function ageFor(record) {
+  const birthDate = dateValue(record.date_of_birth)
+    || dateValue(residents.get(record.resident_uid)?.date_of_birth);
+  const eventDate = recordDate(record) || new Date();
+  if (!birthDate) return null;
+  let age = eventDate.getFullYear() - birthDate.getFullYear();
+  if (eventDate < new Date(eventDate.getFullYear(), birthDate.getMonth(), birthDate.getDate())) age--;
+  return age >= 0 ? age : null;
+}
+
+function renderAnalytics() {
+  const cases = appointments.filter(item => currentYear(item) && item.status !== 'declined');
+  const yearVaccinations = vaccinations.filter(currentYear);
+  const monthlyCases = Array(12).fill(0);
+  const monthlyVaccinations = Array(12).fill(0);
+  const animalCounts = new Map();
+  const barangayMap = new Map();
+  const ageGroups = [0, 0, 0, 0, 0];
+
+  cases.forEach(item => {
+    const date = recordDate(item);
+    if (date) monthlyCases[date.getMonth()]++;
+    const animal = String(item.animal_type || 'Others').trim() || 'Others';
+    animalCounts.set(animal, (animalCounts.get(animal) || 0) + 1);
+    const barangay = barangayFor(item);
+    const row = barangayMap.get(barangay) || { name: barangay, cases: 0, vaccinations: 0, completed: 0 };
+    row.cases++;
+    if (item.status === 'completed' || item.outcome === 'completed') row.completed++;
+    barangayMap.set(barangay, row);
+    const age = ageFor(item);
+    if (age !== null) ageGroups[age < 10 ? 0 : age < 20 ? 1 : age < 40 ? 2 : age < 60 ? 3 : 4]++;
   });
-});
 
-function csvNumbers(value) {
-  return value.split(',').map(item => Number(item.trim()));
+  yearVaccinations.forEach(item => {
+    const date = recordDate(item);
+    if (date) monthlyVaccinations[date.getMonth()]++;
+    const barangay = barangayFor(item);
+    const row = barangayMap.get(barangay) || { name: barangay, cases: 0, vaccinations: 0, completed: 0 };
+    row.vaccinations++;
+    barangayMap.set(barangay, row);
+  });
+
+  const barangays = [...barangayMap.values()]
+    .filter(item => item.cases || item.vaccinations)
+    .sort((first, second) => second.cases - first.cases || second.vaccinations - first.vaccinations)
+    .map(item => ({ ...item, completionRate: item.cases ? Math.min(100, Math.round((item.completed / item.cases) * 100)) : 0 }));
+  const maxCases = Math.max(1, ...barangays.map(item => item.cases));
+  const animalTotal = [...animalCounts.values()].reduce((sum, value) => sum + value, 0);
+  const animals = [...animalCounts.entries()].sort((first, second) => second[1] - first[1])
+    .slice(0, 6).map(([name, count]) => ({ name, percent: animalTotal ? Math.round(count / animalTotal * 100) : 0 }));
+  const completed = new Set(cases.filter(item => item.status === 'completed' || item.outcome === 'completed').map(item => item.id));
+  yearVaccinations.forEach(item => { if (item.appointment_id) completed.add(item.appointment_id); });
+  const isDeath = item => ['death', 'deceased', 'fatal'].includes(String(item.outcome || item.status || '').toLowerCase());
+  const deaths = cases.filter(isDeath).length;
+  const ongoing = cases.filter(item => !isDeath(item) && !completed.has(item.id)).length;
+  const summary = {
+    monthlyCases,
+    monthlyVaccinations,
+    barangays,
+    caseTrend: monthlyCases.map(value => value ? Math.round(value / Math.max(1, ...monthlyCases) * 100) : 0),
+    ageGroups,
+    animals,
+    totalCases: cases.length,
+    totalVaccinations: yearVaccinations.length,
+    activePatients: new Set(cases.filter(item => !completed.has(item.id)).map(item => item.resident_uid)).size,
+    completed: completed.size,
+    ongoing,
+    deaths,
+    highRiskBarangays: barangays.filter(item => item.cases / maxCases >= 0.66).length
+  };
+  updateDashboard(summary, maxCases);
+  setDoc(doc(db, 'system_settings', 'live_analytics'), { ...summary, updated_at: serverTimestamp() }, { merge: true }).catch(reportError);
 }
 
-function fillAnalyticsForm(data) {
-  const values = { ...defaultAnalytics, ...data };
-  document.getElementById('monthlyCases').value = (values.monthlyCases || defaultAnalytics.monthlyCases).join(', ');
-  document.getElementById('monthlyVaccinations').value = (values.monthlyVaccinations || defaultAnalytics.monthlyVaccinations).join(', ');
-  document.getElementById('barangayNames').value = (values.barangays || defaultAnalytics.barangays).map(item => item.name).join(', ');
-  document.getElementById('barangayCases').value = (values.barangays || defaultAnalytics.barangays).map(item => item.cases).join(', ');
-  document.getElementById('caseTrendValues').value = (values.caseTrend || defaultAnalytics.caseTrend).join(', ');
-  document.getElementById('ageGroupCounts').value = (values.ageGroups || defaultAnalytics.ageGroups).join(', ');
+function updateDashboard(data, maxCases) {
+  setText('statTotalCases', data.totalCases);
+  setText('statTotalVaccinations', data.totalVaccinations);
+  setText('statActivePatients', data.activePatients);
+  setText('statHighRiskBarangays', data.highRiskBarangays);
+  setText('statOngoingCases', data.ongoing);
+  setText('statCompletedCases', data.completed);
+  setText('statDeaths', data.deaths);
+  if (window.adminMonthlyChart) {
+    window.adminMonthlyChart.data.datasets[0].data = data.monthlyCases;
+    window.adminMonthlyChart.data.datasets[1].data = data.monthlyVaccinations;
+    window.adminMonthlyChart.update();
+  }
+  const body = document.getElementById('heatmapBody');
+  if (!body) return;
+  body.innerHTML = data.barangays.map(item => {
+    const ratio = item.cases / Math.max(1, maxCases);
+    const risk = ratio >= 0.66 ? ['High', 'badge-high', 'risk-high'] : ratio >= 0.33 ? ['Medium', 'badge-med', 'risk-med'] : ['Low', 'badge-low', 'risk-low'];
+    return `<tr><td><strong>${escapeHtml(item.name)}</strong></td><td>${item.cases}</td><td>${item.vaccinations}</td><td>${item.completionRate}%</td><td><span class="risk-badge ${risk[1]}">${risk[0]}</span></td><td class="risk-bar-cell"><div class="risk-bar-wrap"><div class="risk-bar-fill ${risk[2]}" style="width:${Math.round(ratio * 100)}%;"></div></div></td></tr>`;
+  }).join('') || '<tr><td colspan="6">No live case data has been recorded yet.</td></tr>';
 }
 
-document.getElementById('animalExposureForm').addEventListener('submit', async event => {
-  event.preventDefault();
-  const message = document.getElementById('animalExposureFormMessage');
-  const status = document.getElementById('animalExposureSaveStatus');
-  const animals = [1, 2, 3, 4].map(index => ({
-    name: document.getElementById(`animalName${index}`).value.trim(),
-    percent: Number(document.getElementById(`animalPercent${index}`).value)
-  }));
-  if (animals.some(animal => !animal.name) || animals.reduce((total, animal) => total + animal.percent, 0) !== 100) {
-    message.textContent = 'Use four animal names and make the percentages total exactly 100.';
-    message.style.color = '#b91c1c';
-    return;
-  }
-  try {
-    await setDoc(doc(db, 'system_settings', 'animal_exposure'), { animals, updated_at: serverTimestamp() }, { merge: true });
-    message.textContent = 'Animal exposure data saved. Residents will see the update automatically.';
-    message.style.color = '#15803d';
-    status.textContent = 'Saved';
-  } catch (error) {
-    message.textContent = `Could not save animal exposure data: ${error.message}`;
-    message.style.color = '#b91c1c';
-  }
-});
+function setText(id, value) {
+  const element = document.getElementById(id);
+  if (element) element.textContent = value;
+}
 
-document.getElementById('dashboardAnalyticsForm').addEventListener('submit', async event => {
-  event.preventDefault();
-  const message = document.getElementById('dashboardAnalyticsMessage');
-  const status = document.getElementById('dashboardAnalyticsSaveStatus');
-  const monthlyCases = csvNumbers(document.getElementById('monthlyCases').value);
-  const monthlyVaccinations = csvNumbers(document.getElementById('monthlyVaccinations').value);
-  const names = document.getElementById('barangayNames').value.split(',').map(item => item.trim()).filter(Boolean);
-  const cases = csvNumbers(document.getElementById('barangayCases').value);
-  const caseTrend = csvNumbers(document.getElementById('caseTrendValues').value);
-  const ageGroups = csvNumbers(document.getElementById('ageGroupCounts').value);
-  if (monthlyCases.length !== 7 || monthlyVaccinations.length !== 7 || caseTrend.length !== 7 || ageGroups.length !== 5 || names.length !== cases.length || [monthlyCases, monthlyVaccinations, cases, caseTrend, ageGroups].some(values => values.some(value => !Number.isFinite(value) || value < 0))) {
-    message.textContent = 'Enter 7 monthly cases, 7 vaccinations, 7 trend values, 5 age counts, and matching barangay names/cases.';
-    message.style.color = '#b91c1c';
-    return;
+function escapeHtml(value) {
+  const element = document.createElement('div');
+  element.textContent = value;
+  return element.innerHTML;
+}
+
+function renderManagement() {
+  const staff = users.filter(user => user.role === 'clinic_staff');
+  const pending = staff.filter(user => user.is_active === false || user.approval_status === 'pending' || user.status === 'pending');
+  setText('userTotalResidents', users.filter(user => user.role === 'resident').length || residents.size);
+  setText('userClinicStaff', staff.length);
+  setText('userPendingApproval', pending.length);
+  setText('userTotalClinics', clinics.length);
+
+  const pendingGrid = document.getElementById('pendingStaffGrid');
+  if (pendingGrid) {
+    pendingGrid.innerHTML = pending.length ? pending.map(user => `<div class="user-card">
+      <div class="user-avatar" style="background:#dbeafe;color:#2563eb;"><i class="fa-solid fa-user-nurse"></i></div>
+      <h4>${escapeHtml(user.full_name || user.email || 'Clinic Staff')}</h4>
+      <p>${escapeHtml(user.clinic_name || user.clinic_id || 'Clinic not assigned')}<br>Created ${formatDate(user.created_at)}</p>
+      <button class="approve-btn" type="button" data-approve-user="${user.id}">Approve</button>
+      <button class="deny-btn" type="button" data-deny-user="${user.id}">Deny</button>
+    </div>`).join('') : '<p>No pending clinic staff approvals.</p>';
+    pendingGrid.querySelectorAll('[data-approve-user]').forEach(button => button.addEventListener('click', () => changeStaffStatus(button.dataset.approveUser, true)));
+    pendingGrid.querySelectorAll('[data-deny-user]').forEach(button => button.addEventListener('click', () => changeStaffStatus(button.dataset.denyUser, false)));
   }
+
+  const userBody = document.getElementById('activeUsersBody');
+  if (userBody) {
+    userBody.innerHTML = users.length ? users.map(user => {
+      const active = user.is_active !== false && user.status !== 'disabled';
+      const location = user.role === 'resident' ? residents.get(user.id)?.barangay || '-' : user.clinic_name || user.clinic_id || '-';
+      return `<tr><td><strong>${escapeHtml(user.full_name || user.email || 'User')}</strong></td><td>${escapeHtml(user.role || '-')}</td><td>${escapeHtml(location)}</td><td><span class="status ${active ? 'adequate' : 'critical'}">${active ? 'Active' : 'Inactive'}</span></td><td>${formatDate(user.last_active_at || user.updated_at || user.created_at)}</td><td><span class="update-link">Live</span></td></tr>`;
+    }).join('') : '<tr><td colspan="6">No users found.</td></tr>';
+  }
+
+  const clinicBody = document.getElementById('clinicsBody');
+  if (clinicBody) {
+    clinicBody.innerHTML = clinics.length ? clinics.map(clinic => {
+      const stock = inventory.filter(item => item.clinic_id === clinic.id);
+      const totalStock = stock.reduce((total, item) => total + Number(item.quantity || 0), 0);
+      const status = totalStock === 0 ? ['critical', 'Out of Stock'] : totalStock <= 15 ? ['low', 'Low Stock'] : ['adequate', 'Available'];
+      const updated = [...stock, clinic].map(item => item.updated_at || item.created_at).sort((first, second) => timestampValue(second) - timestampValue(first))[0];
+      return `<tr><td><strong>${escapeHtml(clinic.name || 'Unnamed Clinic')}</strong></td><td>${escapeHtml(clinic.type || 'ABTC')}</td><td>${escapeHtml(clinic.barangay || clinic.address || '-')}</td><td>${totalStock} doses</td><td><span class="status ${status[0]}">${status[1]}</span></td><td>${formatDate(updated)}</td><td><span class="update-link">Live</span></td></tr>`;
+    }).join('') : '<tr><td colspan="7">No clinics found.</td></tr>';
+  }
+}
+
+async function changeStaffStatus(userId, approved) {
   try {
-    await setDoc(doc(db, 'system_settings', 'dashboard_analytics'), { monthlyCases, monthlyVaccinations, barangays: names.map((name, index) => ({ name, cases: cases[index] })), caseTrend, ageGroups, updated_at: serverTimestamp() }, { merge: true });
-    message.textContent = 'Dashboard analytics saved. Public and resident dashboards will update automatically.';
-    message.style.color = '#15803d';
-    status.textContent = 'Saved';
+    await updateDoc(doc(db, 'users', userId), { is_active: approved, approval_status: approved ? 'approved' : 'denied', updated_at: serverTimestamp() });
   } catch (error) {
-    message.textContent = `Could not save dashboard analytics: ${error.message}`;
-    message.style.color = '#b91c1c';
+    console.error('Could not update staff approval:', error);
+    alert(`Could not update staff approval: ${error.message}`);
   }
-});
+}
+
+function timestampValue(value) {
+  return value?.toMillis?.() || (value ? new Date(value).getTime() : 0);
+}
+
+function formatDate(value) {
+  const time = timestampValue(value);
+  return time ? new Date(time).toLocaleDateString() : 'Not recorded';
+}

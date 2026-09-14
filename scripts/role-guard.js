@@ -1,4 +1,11 @@
-import { auth, fetchUserProfile, onAuthStateChanged, signOutUser } from './firebase.js';
+import { auth, fetchUserProfile, onAuthStateChanged } from './firebase.js';
+
+const rolePages = {
+  resident: 'residents.html',
+  clinic_staff: 'staff.html',
+  admin: 'admin.html',
+  administrator: 'admin.html'
+};
 
 export function protectPage(expectedRole, loginPage = 'login.html') {
   onAuthStateChanged(auth, async (user) => {
@@ -11,9 +18,9 @@ export function protectPage(expectedRole, loginPage = 'login.html') {
     const hasExpectedRole = profile && (profile.role === expectedRole
       || (expectedRole === 'admin' && profile.role === 'administrator'));
     if (!hasExpectedRole) {
-      alert(`This account does not have ${expectedRole === 'clinic_staff' ? 'clinic staff' : expectedRole} access.`);
-      await signOutUser();
-      window.location.href = loginPage;
+      const destination = rolePages[profile?.role] || loginPage;
+      alert(`This account is not authorized for this page. Returning to your dashboard.`);
+      window.location.replace(destination);
     }
   });
 }

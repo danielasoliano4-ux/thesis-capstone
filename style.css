@@ -262,11 +262,16 @@ body{
     padding:8px 14px;
     border-radius:20px;
     cursor:pointer;
+    color: black;
+    font-weight: 500;
+    transition: all 0.2s ease;
 }
 
 .active-btn{
     background:white !important;
     font-weight:bold;
+    color: black !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .map-box{

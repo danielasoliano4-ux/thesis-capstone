@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinic History</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="history.css">
+</head>
+<body>
+    <header class="top-header">
+        <div class="logo-section"><div class="logo-icon"><i class="fa-solid fa-location-dot"></i></div><div><h2>Anti-Rabies Locator</h2><p>Cabuyao, Laguna</p></div></div>
+        <div class="header-right"><a href="staff.html" class="sidebar-link"><i class="fa-regular fa-hospital"></i> Clinic Dashboard</a><button type="button" class="signout-btn" id="signOutBtn"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out</button></div>
+    </header>
+    <main class="main-container">
+        <div class="page-title"><h1>History</h1><p>Review clinic profile changes and appointment decisions</p></div>
+        <section class="content-box">
+            <div class="tabs">
+                <a href="staff.html" class="tab-link"><button>Vaccine Inventory</button></a>
+                <a href="staff.html#resident-appointments" class="tab-link"><button>Resident Appointment</button></a>
+                <a href="patient-tracking.html" class="tab-link"><button>Patient Tracking</button></a>
+                <a href="clinic-profile.html" class="tab-link"><button>Clinic Profile</button></a>
+                <a href="history.html" class="tab-link"><button class="active-tab">History</button></a>
+            </div>
+            <div class="history-list" id="historyList"><p class="empty-state">Loading history...</p></div>
+        </section>
+    </main>
+    <script type="module" src="scripts/history.js"></script>
+</body>
+</html>

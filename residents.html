@@ -262,6 +262,7 @@
     <div class="logo-section">
       <div class="logo-icon"><i class="fa-solid fa-shield-dog"></i></div>
       <div>
+
         <h2>Anti-Rabies Locator</h2>
         <p>Cabuyao, Laguna</p>
       </div>
@@ -383,6 +384,18 @@
     <div class="map-box">
       <div id="googleMapOverview" style="width:100%;height:450px;border-radius:14px;overflow:hidden;border:1px solid #ddd;"></div>
     </div>
+    <div style="display:flex;gap:18px;margin-top:14px;padding:12px 16px;background:#f9fafb;border-radius:12px;border:1px solid #ddd;flex-wrap:wrap;">
+      <span style="font-size:13px;font-weight:bold;color:#374151;align-self:center;">Legend:</span>
+      <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+        <span style="width:14px;height:14px;background:#00b140;border-radius:50%;display:inline-block;"></span>Vaccines Available
+      </span>
+      <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+        <span style="width:14px;height:14px;background:#d98a00;border-radius:50%;display:inline-block;"></span>Low Stock
+      </span>
+      <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+        <span style="width:14px;height:14px;background:#e60000;border-radius:50%;display:inline-block;"></span>Out of Stock
+      </span>
+    </div>
     <div style="margin-top:12px;">
       <h4 style="font-size:14px;color:#374151;margin-bottom:10px;"><i class="fa-solid fa-list"></i> Clinic Status Overview</h4>
       <div id="clinicSidebarOverview" style="display:flex;flex-direction:column;gap:8px;margin-top:6px;"></div>
@@ -410,12 +423,6 @@
           <div class="map-box">
             <div id="googleMapNew" style="width:100%;height:450px;border-radius:14px;overflow:hidden;border:1px solid #ddd;"></div>
           </div>
-          <div style="margin-top:18px;">
-            <h4 style="font-size:14px;color:#374151;margin-bottom:10px;">
-              <i class="fa-solid fa-list"></i> Clinic Status Overview
-            </h4>
-            <div id="clinicSidebarNew" style="display:flex;flex-direction:column;gap:8px;"></div>
-          </div>
           <div style="display:flex;gap:18px;margin-top:14px;padding:12px 16px;background:#f9fafb;border-radius:12px;border:1px solid #ddd;flex-wrap:wrap;">
             <span style="font-size:13px;font-weight:bold;color:#374151;align-self:center;">Legend:</span>
             <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
@@ -427,6 +434,12 @@
             <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
               <span style="width:14px;height:14px;background:#e60000;border-radius:50%;display:inline-block;"></span>Out of Stock
             </span>
+          </div>
+          <div style="margin-top:18px;">
+            <h4 style="font-size:14px;color:#374151;margin-bottom:10px;">
+              <i class="fa-solid fa-list"></i> Clinic Status Overview
+            </h4>
+            <div id="clinicSidebarNew" style="display:flex;flex-direction:column;gap:8px;"></div>
           </div>
         </div>
 
@@ -463,16 +476,16 @@
           <div><span>Doses Completed</span><h2 id="activeDosesCount">1</h2></div>
           <i class="fa-solid fa-syringe icon-red"></i>
         </div>
-        <div class="stat-box">
-          <div><span>Next Appointment</span><h2 class="medium" id="activeNextAppt">Jun 29</h2></div>
+        <div class="stat-box dashboard-stat-action" id="nextAppointmentCard" role="button" tabindex="0" title="View appointments">
+          <div><span>Next Appointment</span><h2 class="medium" id="activeNextAppt">No upcoming appointment</h2></div>
           <i class="fa-regular fa-calendar icon-blue"></i>
         </div>
-        <div class="stat-box">
-          <div><span>Nearest Clinic</span><h2 class="medium">0.8 km</h2></div>
+        <div class="stat-box dashboard-stat-action" id="nearestClinicCard" role="button" tabindex="0" title="View nearest clinic">
+          <div><span>Nearest Clinic</span><h2 class="medium" id="nearestClinicDistance">Finding nearby clinic...</h2></div>
           <i class="fa-solid fa-location-dot icon-green"></i>
         </div>
-        <div class="stat-box">
-          <div><span>Notifications</span><h2>4</h2></div>
+        <div class="stat-box dashboard-stat-action" id="notificationsCard" role="button" tabindex="0" title="View notifications">
+          <div><span>Notifications</span><h2 id="notificationTotal">0</h2></div>
           <i class="fa-regular fa-bell icon-yellow"></i>
         </div>
       </div>
@@ -520,72 +533,11 @@
             <h3><i class="fa-regular fa-calendar-check" style="color:#ef0000;margin-right:6px;"></i> Upcoming Appointments</h3>
             <a onclick="showTab('appointments', document.querySelectorAll('.nav-tab')[1])">View all</a>
           </div>
-          <div class="section-card-body">
-            <div class="appt-mini">
-              <div class="appt-date-box"><div class="day">29</div><div class="mon">Jun</div></div>
-              <div class="appt-info">
-                <h4>Cabuyao City Health Center</h4>
-                <p><i class="fa-regular fa-clock"></i> 9:00 AM &nbsp;|&nbsp; Dose 2 of 5</p>
-              </div>
-              <span class="dose-badge">D2</span>
-            </div>
-            <div class="appt-mini">
-              <div class="appt-date-box"><div class="day">3</div><div class="mon">Jul</div></div>
-              <div class="appt-info">
-                <h4>Cabuyao City Health Center</h4>
-                <p><i class="fa-regular fa-clock"></i> 9:00 AM &nbsp;|&nbsp; Dose 3 of 5</p>
-              </div>
-              <span class="dose-badge">D3</span>
-            </div>
-            <div class="appt-mini">
-              <div class="appt-date-box"><div class="day">10</div><div class="mon">Jul</div></div>
-              <div class="appt-info">
-                <h4>Cabuyao City Health Center</h4>
-                <p><i class="fa-regular fa-clock"></i> 10:00 AM &nbsp;|&nbsp; Dose 4 of 5</p>
-              </div>
-              <span class="dose-badge">D4</span>
-            </div>
+          <div class="section-card-body" id="upcomingAppointmentsList">
+            <p style="font-size:13px;color:#6b7280;padding:10px 0;">Loading appointments...</p>
           </div>
         </div>
 
-      </div>
-
-      <!-- MAP -->
-      <div class="map-card">
-        <div class="map-top">
-          <h3><i class="fa-solid fa-location-dot" style="color:#ef0000;margin-right:6px;"></i> Find Nearby Clinics</h3>
-          <div class="map-filter">
-            <button class="active-btn" onclick="filterMarkers('all', this)">All</button>
-            <button onclick="filterMarkers('available', this)">Available</button>
-            <button onclick="filterMarkers('low', this)">Low Stock</button>
-            <button onclick="filterMarkers('out', this)">Out of Stock</button>
-          </div>
-        </div>
-        <div class="map-box">
-          <div id="googleMap" style="width:100%;height:450px;border-radius:14px;overflow:hidden;border:1px solid #ddd;"></div>
-        </div>
-      </div>
-
-      <!-- Clinic Status Overview -->
-      <div style="margin-top:18px;">
-        <h4 style="font-size:14px;color:#374151;margin-bottom:10px;">
-          <i class="fa-solid fa-list"></i> Clinic Status Overview
-        </h4>
-        <div id="clinicSidebar" style="display:flex;flex-direction:column;gap:8px;"></div>
-      </div>
-
-      <!-- Map Legend -->
-      <div style="display:flex;gap:18px;margin-top:14px;padding:12px 16px;background:#f9fafb;border-radius:12px;border:1px solid #ddd;flex-wrap:wrap;">
-        <span style="font-size:13px;font-weight:bold;color:#374151;align-self:center;">Legend:</span>
-        <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
-          <span style="width:14px;height:14px;background:#00b140;border-radius:50%;display:inline-block;"></span>Vaccines Available
-        </span>
-        <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
-          <span style="width:14px;height:14px;background:#d98a00;border-radius:50%;display:inline-block;"></span>Low Stock
-        </span>
-        <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
-          <span style="width:14px;height:14px;background:#e60000;border-radius:50%;display:inline-block;"></span>Out of Stock
-        </span>
       </div>
 
     </div>
@@ -604,10 +556,10 @@
       </p>
 
       <div class="records-summary-row">
-        <div class="rec-stat"><i class="fa-solid fa-virus"></i><h3>127</h3><p>Confirmed Cases (2026)</p></div>
-        <div class="rec-stat"><i class="fa-solid fa-skull-crossbones"></i><h3>3</h3><p>Rabies-Related Deaths (2026)</p></div>
-        <div class="rec-stat"><i class="fa-solid fa-syringe"></i><h3>462</h3><p>Vaccinations Administered</p></div>
-        <div class="rec-stat"><i class="fa-solid fa-map-location-dot"></i><h3>5</h3><p>High-Risk Barangays</p></div>
+        <div class="rec-stat"><i class="fa-solid fa-virus"></i><h3 id="publicTotalCases">0</h3><p>Confirmed Cases (2026)</p></div>
+        <div class="rec-stat"><i class="fa-solid fa-skull-crossbones"></i><h3 id="publicDeaths">0</h3><p>Rabies-Related Deaths (2026)</p></div>
+        <div class="rec-stat"><i class="fa-solid fa-syringe"></i><h3 id="publicVaccinations">0</h3><p>Vaccinations Administered</p></div>
+        <div class="rec-stat"><i class="fa-solid fa-map-location-dot"></i><h3 id="publicHighRiskBarangays">0</h3><p>High-Risk Barangays</p></div>
       </div>
 
       <div class="records-controls">
@@ -744,7 +696,7 @@
               <h3><i class="fa-solid fa-chart-bar" style="color:#e60000;margin-right:6px;"></i>Monthly Rabies Cases &amp; Vaccinations</h3>
               <p>Comparative trend of exposures vs. PEP vaccinations administered</p>
             </div>
-            <span class="viz-period-tag">Jan – Jul 2026</span>
+            <span class="viz-period-tag">Jan – Dec 2026</span>
           </div>
           <div class="viz-card-body"><canvas id="monthlyChart" height="200"></canvas></div>
         </div>
@@ -795,7 +747,7 @@
         </div>
 
         <div class="viz-mini-card">
-          <h4><i class="fa-solid fa-arrow-trend-up" style="color:#e60000;margin-right:6px;"></i>Case Trend (Jan–Jul 2026)</h4>
+          <h4><i class="fa-solid fa-arrow-trend-up" style="color:#e60000;margin-right:6px;"></i>Case Trend (Jan–Dec 2026)</h4>
           <div class="trend-bars" id="caseTrendChart">
             <div class="trend-bar" style="height:38%;background:#00b140;" title="Jan: 12"></div>
             <div class="trend-bar" style="height:57%;background:#d98a00;" title="Feb: 18"></div>
@@ -881,51 +833,13 @@
       </div>
 
       <p class="section-label">Upcoming</p>
-
-      <div class="appt-card upcoming">
-        <div class="appt-card-date"><div class="big-day">29</div><div class="month-yr">Jun 2026</div></div>
-        <div class="appt-card-body">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-            <h3>Dose 2 – Verorab Vaccination</h3>
-            <span class="appt-status status-upcoming">Upcoming</span>
-          </div>
-          <p><i class="fa-solid fa-hospital" style="color:#6b7280;"></i> Cabuyao City Health Center</p>
-          <p><i class="fa-regular fa-clock" style="color:#6b7280;"></i> 9:00 AM &nbsp;|&nbsp; Brgy. Poblacion Uno</p>
-          <div class="appt-card-actions">
-            <button class="action-btn"><i class="fa-solid fa-arrows-rotate"></i> Reschedule</button>
-            <button class="action-btn danger"><i class="fa-solid fa-xmark"></i> Cancel</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="appt-card upcoming">
-        <div class="appt-card-date"><div class="big-day">3</div><div class="month-yr">Jul 2026</div></div>
-        <div class="appt-card-body">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-            <h3>Dose 3 – Verorab Vaccination</h3>
-            <span class="appt-status status-upcoming">Upcoming</span>
-          </div>
-          <p><i class="fa-solid fa-hospital" style="color:#6b7280;"></i> Cabuyao City Health Center</p>
-          <p><i class="fa-regular fa-clock" style="color:#6b7280;"></i> 9:00 AM &nbsp;|&nbsp; Brgy. Poblacion Uno</p>
-          <div class="appt-card-actions">
-            <button class="action-btn"><i class="fa-solid fa-arrows-rotate"></i> Reschedule</button>
-            <button class="action-btn danger"><i class="fa-solid fa-xmark"></i> Cancel</button>
-          </div>
-        </div>
+      <div id="liveUpcomingAppointments">
+        <p style="font-size:13px;color:#6b7280;padding:10px 0;">Loading appointments...</p>
       </div>
 
       <p class="section-label" style="margin-top:24px;">Completed</p>
-
-      <div class="appt-card completed">
-        <div class="appt-card-date"><div class="big-day">25</div><div class="month-yr">Jun 2026</div></div>
-        <div class="appt-card-body">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-            <h3>Dose 1 – Verorab Vaccination</h3>
-            <span class="appt-status status-done">Completed</span>
-          </div>
-          <p><i class="fa-solid fa-hospital" style="color:#6b7280;"></i> Cabuyao City Health Center</p>
-          <p><i class="fa-regular fa-clock" style="color:#6b7280;"></i> 9:00 AM &nbsp;|&nbsp; Administered by: Dr. Santos</p>
-        </div>
+      <div id="liveCompletedAppointments">
+        <p style="font-size:13px;color:#6b7280;padding:10px 0;">Loading completed appointments...</p>
       </div>
 
     </div>
@@ -949,9 +863,11 @@
       </div>
     </div>
 
-    <p class="section-label">Dose Schedule</p>
+    <details class="vaccination-record-details">
+      <summary><span><i class="fa-solid fa-list-check"></i> <span id="currentRecordDetailsLabel">Vaccination doses and uploaded documents</span></span><i class="fa-solid fa-chevron-down details-chevron"></i></summary>
+      <p class="section-label">Dose Schedule</p>
 
-    <div class="dose-record-list">
+      <div class="dose-record-list" id="liveDoseRecordList">
       <div class="dose-record">
         <div class="dose-circle done-circle"><i class="fa-solid fa-check"></i></div>
         <div class="dose-record-info"><h4>Dose 1 — Day 0</h4><p><span id="d1date">June 25, 2026</span> &nbsp;|&nbsp; Cabuyao City Health Center &nbsp;|&nbsp; Dr. Santos</p></div>
@@ -977,21 +893,26 @@
         <div class="dose-record-info"><h4>Dose 5 — Day 28</h4><p>Scheduled: July 24, 2026 at 9:00 AM &nbsp;|&nbsp; Cabuyao City Health Center</p></div>
         <div class="dose-record-status"><span class="r-pending">Pending</span></div>
       </div>
-    </div>
+      </div>
 
-    <div class="upload-section">
+      <div class="upload-section">
       <h3><i class="fa-solid fa-upload" style="color:#ef0000;margin-right:8px;"></i>Upload Vaccination Documents</h3>
       <p style="font-size:13px;color:#6b7280;margin-bottom:14px;">Upload your physical vaccination card for verification by clinic staff.</p>
-      <div class="upload-box" onclick="document.getElementById('fileUpload').click()">
-        <i class="fa-solid fa-cloud-arrow-up"></i>
-        <p>Click to upload or drag &amp; drop</p>
-        <span>PDF, JPG, PNG up to 10MB</span>
-        <input type="file" id="fileUpload" hidden accept=".pdf,.jpg,.png" onchange="handleUpload(this)">
+      <div id="vaccinationDocuments" class="vaccination-documents" aria-live="polite"></div>
+      <div id="uploadDocumentControls" class="upload-document-controls">
+        <div class="upload-box" onclick="document.getElementById('fileUpload').click()">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <p>Click to upload or drag &amp; drop</p>
+          <span>PDF, JPG, PNG up to 10MB</span>
+          <input type="file" id="fileUpload" hidden accept=".pdf,.jpg,.png" onchange="handleUpload(this)">
+        </div>
+        <button class="upload-btn" onclick="document.getElementById('fileUpload').click()">
+          <i class="fa-solid fa-paperclip"></i> Choose File
+        </button>
       </div>
-      <button class="upload-btn" onclick="document.getElementById('fileUpload').click()">
-        <i class="fa-solid fa-paperclip"></i> Choose File
-      </button>
-    </div>
+      </div>
+    </details>
+    <div id="previousVaccinationRecords" class="previous-vaccination-records" aria-live="polite"></div>
 
   </div>
   <!-- END RECORDS PANEL -->
@@ -1249,6 +1170,29 @@
   </div>
   <!-- END BOOKING RECORDS PANEL -->
 
+  <div class="modal-overlay" id="rescheduleModal">
+    <div class="modal-box">
+      <h2><i class="fa-solid fa-arrows-rotate" style="color:#ef0000;margin-right:8px;"></i>Reschedule Appointment</h2>
+      <p class="sub">You may move this appointment by up to one day.</p>
+      <input type="hidden" id="rescheduleAppointmentId">
+      <div class="modal-field"><label for="rescheduleDate">Date</label><input id="rescheduleDate" type="date" required></div>
+      <div class="modal-field"><label for="rescheduleTime">Time</label><select id="rescheduleTime"><option>8:00 AM</option><option>9:00 AM</option><option>10:00 AM</option><option>11:00 AM</option><option>1:00 PM</option><option>2:00 PM</option><option>3:00 PM</option></select></div>
+      <div id="rescheduleMsg" style="display:none;margin-top:10px;padding:10px;border-radius:8px;font-size:13px;"></div>
+      <div class="modal-actions"><button type="button" class="modal-cancel" id="closeRescheduleBtn">Cancel</button><button type="button" class="modal-submit" id="saveRescheduleBtn"><i class="fa-solid fa-check"></i> Save Changes</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="cancelModal">
+    <div class="modal-box">
+      <h2><i class="fa-solid fa-calendar-xmark" style="color:#ef0000;margin-right:8px;"></i>Cancel Appointment</h2>
+      <p class="sub">Please tell us why you need to cancel this appointment.</p>
+      <input type="hidden" id="cancelAppointmentId">
+      <div class="modal-field"><label for="cancelReason">Reason for cancellation</label><textarea id="cancelReason" rows="4" maxlength="500" placeholder="Enter your reason" required></textarea></div>
+      <div id="cancelMsg" style="display:none;margin-top:10px;padding:10px;border-radius:8px;font-size:13px;"></div>
+      <div class="modal-actions"><button type="button" class="modal-cancel" id="closeCancelBtn">Keep Appointment</button><button type="button" class="modal-submit" id="saveCancelBtn"><i class="fa-solid fa-xmark"></i> Confirm Cancellation</button></div>
+    </div>
+  </div>
+
   <!-- BOOKING MODAL -->
   <div class="modal-overlay" id="bookingModal">
     <div class="modal-box">
@@ -1288,40 +1232,54 @@
           <option>3:00 PM</option>
         </select>
       </div>
-      <div class="modal-field">
-        <label for="modalAddress">Address</label>
-        <input id="modalAddress" type="text" placeholder="House number, street, barangay" required />
+      <div id="bookingPatientDetails">
+        <div class="modal-field">
+          <label for="modalAddress">Address</label>
+          <input id="modalAddress" type="text" placeholder="House number, street, barangay" required />
+        </div>
+        <p style="margin:14px 0 8px;font-size:12px;color:#6b7280;">These details are saved for your future doses. Please complete them before booking.</p>
+        <div class="modal-field">
+          <label for="modalDateOfBirth">Date of Birth</label>
+          <input id="modalDateOfBirth" type="date" required />
+        </div>
+        <div class="modal-field">
+          <label for="modalSex">Sex</label>
+          <select id="modalSex" required>
+            <option value="">Select sex</option>
+            <option value="Female">Female</option>
+            <option value="Male">Male</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="modal-field">
+          <label for="modalBiteDate">Date of Bite</label>
+          <input id="modalBiteDate" type="date" required />
+        </div>
+        <div class="modal-field">
+          <label for="modalAnimal">Animal That Bit You</label>
+          <select id="modalAnimal" required>
+            <option value="">Select animal</option>
+            <option value="Dog">Dog</option>
+            <option value="Cat">Cat</option>
+            <option value="Rat">Rat</option>
+            <option value="Bat">Bat</option>
+          </select>
+        </div>
+        <div class="modal-field">
+          <label for="modalBitePart">Body Part of the Bite</label>
+          <input id="modalBitePart" type="text" placeholder="Hand, leg, arm, etc." required />
+        </div>
       </div>
-      <p style="margin:14px 0 8px;font-size:12px;color:#6b7280;">The clinic staff may complete the bite details with you during your visit.</p>
-      <div class="modal-field">
-        <label for="modalAge">Age <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
-        <input id="modalAge" type="number" min="0" max="120" placeholder="Age" />
+      <div id="bookingIdField" class="modal-field">
+        <label for="modalValidId">Valid ID <span style="font-weight:400;color:#ef0000;">(required)</span></label>
+        <input id="modalValidId" type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" required />
+        <small style="display:block;margin-top:6px;color:#6b7280;line-height:1.5;">Upload one clear JPG, PNG, or PDF (maximum 5 MB). Accepted IDs: PhilID/ePhilID, passport, driver's license, UMID, SSS, GSIS, PRC, Postal ID, Voter's ID, Senior Citizen ID, or PWD ID.</small>
       </div>
-      <div class="modal-field">
-        <label for="modalSex">Sex <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
-        <select id="modalSex">
-          <option value="">Prefer not to say / staff will ask</option>
-          <option value="Female">Female</option>
-          <option value="Male">Male</option>
-          <option value="Other">Other</option>
-        </select>
-      </div>
-      <div class="modal-field">
-        <label for="modalBiteDate">Date of Bite <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
-        <input id="modalBiteDate" type="date" />
-      </div>
-      <div class="modal-field">
-        <label for="modalAnimal">Animal That Bit You <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
-        <input id="modalAnimal" type="text" placeholder="Dog, cat, etc." />
-      </div>
-      <div class="modal-field">
-        <label for="modalBitePart">Body Part of the Bite <span style="font-weight:400;color:#9ca3af;">(optional)</span></label>
-        <input id="modalBitePart" type="text" placeholder="Hand, leg, arm, etc." />
-      </div>
+      <p id="returningClinicMessage" hidden style="margin:14px 0 8px;font-size:12px;color:#6b7280;">Your details and valid ID are already saved for this clinic. Only choose your next dose date and time.</p>
       <div id="bookingMsg" style="display:none;margin-top:10px;padding:10px;border-radius:8px;font-size:13px;"></div>
       <div class="modal-actions">
         <button class="modal-cancel" onclick="closeBookingModal()">Cancel</button>
-        <button class="modal-submit" onclick="confirmBooking()">
+        <button type="button" class="modal-submit" id="confirmBookingBtn" onclick="confirmBooking()">
           <i class="fa-solid fa-check"></i> Confirm Booking
         </button>
       </div>

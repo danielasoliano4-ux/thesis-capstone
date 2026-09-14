@@ -28,11 +28,13 @@ function loadClinics() {
       return {
         id: clinicDoc.id,
         name: data.name || 'Unnamed Clinic',
+        type: normalizeClinicType(data.type || data.clinic_type || data.facility_type, data.name),
         ...getCoordinates(data),
         status: normalizeStatus(data.stock_status || data.status, data.stock_total),
         address: data.address || '',
         hours: data.weekdayHours || data.hours || 'Contact clinic',
         phone: data.contact || '',
+        priceRange: data.priceRange || data.vaccination_price_range || 'Price not provided',
         stock: data.stock_summary || data.stock || `${Number(data.stock_total || 0)} doses`,
         stock_total: Number(data.stock_total || 0),
         staff_uid: data.staff_uid || ''
@@ -40,6 +42,7 @@ function loadClinics() {
     });
 
     window.clinicDirectory = CLINICS;
+    if (window.updateNearestClinicSummary) window.updateNearestClinicSummary(CLINICS);
     if (window.populateClinicOptions) window.populateClinicOptions(CLINICS);
     mapsData.splice(0).forEach(entry => entry.markers.forEach(marker => marker.marker.remove()));
     mapsData.splice(0);
@@ -58,7 +61,7 @@ function createMap(mapId, sidebarId) {
   const entry = { mapId, sidebarId, map, markers: [] };
   entry.center = CABUYAO_CENTER;
   CLINICS.filter(clinic => Number.isFinite(clinic.lat) && Number.isFinite(clinic.lng)).forEach(clinic => {
-    entry.markers.push(createMarkerForMap(map, clinic));
+    entry.markers.push(createMarkerForMap(map, clinic, mapId));
   });
   addLocationControl(entry);
   mapsData.push(entry);
@@ -75,6 +78,17 @@ function normalizeStatus(status, total) {
   if (STATUS_COLOR[status]) return status;
   const stock = Number(total || 0);
   return stock === 0 ? 'out' : stock <= 15 ? 'low' : 'available';
+}
+
+function normalizeClinicType(type, name = '') {
+  const value = String(type || '').toLowerCase();
+  if (value.includes('private')) return 'Private';
+  if (value.includes('public') || value.includes('government') || value.includes('treatment center')) return 'Public';
+  if (value.includes('animal bite center')) return 'Private';
+  const clinicName = String(name).toLowerCase();
+  if (clinicName.includes('animal bite treatment center')) return 'Public';
+  if (clinicName.includes('animal bite center')) return 'Private';
+  return 'Clinic type not specified';
 }
 
 function getCoordinates(data) {
@@ -100,7 +114,7 @@ function getCoordinates(data) {
   return { lat: NaN, lng: NaN };
 }
 
-function createMarkerForMap(map, clinic) {
+function createMarkerForMap(map, clinic, mapId) {
   const color = STATUS_COLOR[clinic.status] || STATUS_COLOR.out;
   const icon = L.divIcon({ className: 'clinic-map-marker', html: `<span class="clinic-pin" style="--marker-color:${color}"><i class="fa-solid fa-hospital"></i></span>`, iconSize: [30, 38], iconAnchor: [15, 36] });
   const marker = L.marker([clinic.lat, clinic.lng], { icon, title: clinic.name }).addTo(map);
@@ -108,11 +122,17 @@ function createMarkerForMap(map, clinic) {
     ? ''
     : `<button type="button" class="map-book-button" data-clinic-id="${escapeHtml(clinic.id)}">Book Appointment</button>`;
   const directionsButton = '<button type="button" class="map-directions-button">Get Directions</button>';
-  marker.bindPopup(`<strong>${escapeHtml(clinic.name)}</strong><br><b style="color:${color}">${STATUS_LABEL[clinic.status]}</b><br><br><b>Address:</b> ${escapeHtml(clinic.address)}<br><b>Hours:</b> ${escapeHtml(clinic.hours)}<br><b>Phone:</b> ${escapeHtml(clinic.phone)}<br><br><b>Stock:</b> ${escapeHtml(clinic.stock)}${bookingButton}${directionsButton}<div class="route-summary" aria-live="polite"></div><br><small>&copy; Google Maps</small>`);
+  marker.bindPopup(`<strong>${escapeHtml(clinic.name)}</strong><br><b>${escapeHtml(clinic.type)}</b><br><b style="color:${color}">${STATUS_LABEL[clinic.status]}</b><br><br><b>Address:</b> ${escapeHtml(clinic.address)}<br><b>Hours:</b> ${escapeHtml(clinic.hours)}<br><b>Phone:</b> ${escapeHtml(clinic.phone)}<br><b>Vaccination price:</b> ${escapeHtml(clinic.priceRange)}<br><br><b>Stock:</b> ${escapeHtml(clinic.stock)}${bookingButton}${directionsButton}<div class="route-summary" aria-live="polite"></div><br><small>&copy; Google Maps</small>`);
   marker.on('popupopen', event => {
     const button = event.popup.getElement()?.querySelector('.map-book-button');
     if (button) button.addEventListener('click', () => {
-      if (window.openBookingModal) window.openBookingModal(clinic.name, clinic.id);
+      if (mapId === 'googleMap') {
+        // Public map - check authentication first
+        if (window.checkAuthAndBook) window.checkAuthAndBook(clinic.name, clinic.id);
+      } else {
+        // Residents or other authenticated pages - open booking modal directly
+        if (window.openBookingModal) window.openBookingModal(clinic.name, clinic.id);
+      }
     });
     const routeButton = event.popup.getElement()?.querySelector('.map-directions-button');
     if (routeButton) routeButton.addEventListener('click', () => {
@@ -138,14 +158,19 @@ function buildSidebarFor(entry) {
       <div style="display:flex;flex-direction:column;gap:4px;">
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:13px;font-weight:bold;color:#111827;">${mobj.clinic.name}</span>
+          <span style="font-size:11px;color:#6b7280;">(${mobj.clinic.type})</span>
         </div>
         <div style="font-size:12px;color:#6b7280;">${mobj.clinic.address} &nbsp;|&nbsp; ${mobj.clinic.hours}</div>
+        <div style="font-size:12px;color:#374151;"><strong>Vaccination price:</strong> ${mobj.clinic.priceRange}</div>
       </div>
     `;
 
+    const doseLabel = `${mobj.clinic.stock_total} doses available`;
     const rightHtml = mobj.clinic.status === 'out'
       ? `<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;color:${color};font-weight:bold;">Out of Stock</span><button class="book-btn" disabled style="background:#d1d5db;border:none;color:#6b7280;cursor:not-allowed;">Out of Stock</button></div>`
-      : `<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;color:${color};font-weight:bold;">${STATUS_LABEL[mobj.clinic.status]}</span><button class="book-btn" onclick="openBookingModal('${mobj.clinic.name.replace(/'/g, "\\'")}', '${mobj.clinic.id}')">Book</button></div>`;
+      : entry.sidebarId === 'clinicSidebar'
+        ? `<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;color:${color};font-weight:bold;text-align:right;">${STATUS_LABEL[mobj.clinic.status]}<br><span style="color:#6b7280;font-weight:normal;">${doseLabel}</span></span><button class="book-btn" onclick="checkAuthAndBook('${mobj.clinic.name.replace(/'/g, "\\'")}', '${mobj.clinic.id}')">Book</button></div>`
+        : `<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;color:${color};font-weight:bold;text-align:right;">${STATUS_LABEL[mobj.clinic.status]}<br><span style="color:#6b7280;font-weight:normal;">${doseLabel}</span></span><button class="book-btn" onclick="openBookingModal('${mobj.clinic.name.replace(/'/g, "\\'")}', '${mobj.clinic.id}')">Book</button></div>`;
 
     row.innerHTML = `<div style="display:flex;align-items:center;gap:12px;flex:1;">${leftHtml}</div><div style="display:flex;align-items:center;gap:12px;">${rightHtml}</div>`;
 
@@ -218,6 +243,45 @@ function locateUser() {
   }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 });
 }
 
+function focusNearestClinic() {
+  if (window.showTab) window.showTab('overview', document.querySelectorAll('.nav-tab')[0]);
+  const fallback = { latitude: 14.2718, longitude: 121.1246 };
+  const showNearest = position => {
+    const origin = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+    let nearest = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    CLINICS.filter(clinic => Number.isFinite(clinic.lat) && Number.isFinite(clinic.lng)).forEach(clinic => {
+      const distance = mapDistanceInKm(origin.latitude, origin.longitude, clinic.lat, clinic.lng);
+      if (distance < nearestDistance) {
+        nearest = clinic;
+        nearestDistance = distance;
+      }
+    });
+    if (!nearest) return;
+    selectedDestination = nearest;
+    mapsData.forEach(entry => {
+      const markerEntry = entry.markers.find(item => item.clinic.id === nearest.id);
+      if (markerEntry) {
+        entry.map.setView(markerEntry.marker.getLatLng(), 16);
+        markerEntry.marker.openPopup();
+      }
+    });
+  };
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(showNearest, () => showNearest({ coords: fallback }), { enableHighAccuracy: true, timeout: 8000, maximumAge: 300000 });
+  } else {
+    showNearest({ coords: fallback });
+  }
+}
+
+function mapDistanceInKm(latitude, longitude, clinicLatitude, clinicLongitude) {
+  const earthRadius = 6371;
+  const latDelta = (clinicLatitude - latitude) * Math.PI / 180;
+  const lngDelta = (clinicLongitude - longitude) * Math.PI / 180;
+  const value = Math.sin(latDelta / 2) ** 2 + Math.cos(latitude * Math.PI / 180) * Math.cos(clinicLatitude * Math.PI / 180) * Math.sin(lngDelta / 2) ** 2;
+  return earthRadius * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+}
+
 async function updateRoutes() {
   if (!userLocation || !selectedDestination) return;
   const destination = [selectedDestination.lng, selectedDestination.lat];
@@ -251,4 +315,5 @@ function escapeHtml(value = '') {
 window.refreshMaps = refreshMaps;
 window.initMap = initMap;
 window.filterMarkers = filterMarkers;
+window.focusNearestClinic = focusNearestClinic;
 loadClinics();

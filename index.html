@@ -250,6 +250,35 @@
       .age-bar-fill { height: 100%; border-radius: 20px; background: #e60000; }
       .age-count { width: 26px; text-align: right; color: #6b7280; font-weight: bold; }
 
+      /* ── BOOK BUTTON STYLING ────────────────────────────────── */
+      .book-btn {
+        padding: 8px 16px;
+        background: linear-gradient(135deg, #e60000, #cc0000);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(230, 0, 0, 0.3);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .book-btn:hover {
+        background: linear-gradient(135deg, #cc0000, #990000);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(230, 0, 0, 0.4);
+      }
+      .book-btn:disabled {
+        background: linear-gradient(135deg, #d1d5db, #bfbfbf);
+        cursor: not-allowed;
+        color: #6b7280;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
       @media (max-width: 1100px) {
         .records-summary-row { grid-template-columns: repeat(2, 1fr); }
         .viz-grid { grid-template-columns: 1fr; }
@@ -408,6 +437,32 @@
               border: 1px solid #ddd;
           "></div>
 
+            <!-- ── MAP LEGEND ────────────────────────────────────────── -->
+            <div style="
+              display:flex;gap:18px;margin-top:14px;
+              padding:12px 16px;background:#f9fafb;
+              border-radius:12px;border:1px solid #ddd;
+              flex-wrap:wrap;
+            ">
+              <span style="font-size:13px;font-weight:bold;color:#374151;align-self:center;">Legend:</span>
+              <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+                <span style="width:14px;height:14px;background:#00b140;border-radius:50%;display:inline-block;"></span>
+                Vaccines Available
+              </span>
+              <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+                <span style="width:14px;height:14px;background:#d98a00;border-radius:50%;display:inline-block;"></span>
+                Low Stock
+              </span>
+              <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
+                <span style="width:14px;height:14px;background:#e60000;border-radius:50%;display:inline-block;"></span>
+                Out of Stock
+              </span>
+              <span style="font-size:13px;color:#6b7280;margin-left:auto;align-self:center;">
+                <i class="fa-brands fa-google" style="color:#4285F4;"></i>
+                Map data © Google
+              </span>
+            </div>
+
           <!-- ── CLINIC STATUS SIDEBAR ────────────────────────────── -->
           <!--
               A scrollable list below the map showing each clinic's
@@ -419,32 +474,6 @@
                   <i class="fa-solid fa-list"></i> Clinic Status Overview
               </h4>
               <div id="clinicSidebar" style="display:flex;flex-direction:column;gap:8px;"></div>
-          </div>
-
-          <!-- ── MAP LEGEND ────────────────────────────────────────── -->
-          <div style="
-              display:flex;gap:18px;margin-top:14px;
-              padding:12px 16px;background:#f9fafb;
-              border-radius:12px;border:1px solid #ddd;
-              flex-wrap:wrap;
-          ">
-              <span style="font-size:13px;font-weight:bold;color:#374151;align-self:center;">Legend:</span>
-              <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
-                  <span style="width:14px;height:14px;background:#00b140;border-radius:50%;display:inline-block;"></span>
-                  Vaccines Available
-              </span>
-              <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
-                  <span style="width:14px;height:14px;background:#d98a00;border-radius:50%;display:inline-block;"></span>
-                  Low Stock
-              </span>
-              <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
-                  <span style="width:14px;height:14px;background:#e60000;border-radius:50%;display:inline-block;"></span>
-                  Out of Stock
-              </span>
-              <span style="font-size:13px;color:#6b7280;margin-left:auto;align-self:center;">
-                  <i class="fa-brands fa-google" style="color:#4285F4;"></i>
-                  Map data © Google
-              </span>
           </div>
 
       </div>
@@ -473,22 +502,22 @@
       <div class="records-summary-row">
         <div class="rec-stat">
           <i class="fa-solid fa-virus"></i>
-          <h3>127</h3>
+          <h3 id="publicTotalCases">0</h3>
           <p>Confirmed Cases (2026)</p>
         </div>
         <div class="rec-stat">
           <i class="fa-solid fa-skull-crossbones"></i>
-          <h3>3</h3>
+          <h3 id="publicDeaths">0</h3>
           <p>Rabies-Related Deaths (2026)</p>
         </div>
         <div class="rec-stat">
           <i class="fa-solid fa-syringe"></i>
-          <h3>462</h3>
+          <h3 id="publicVaccinations">0</h3>
           <p>Vaccinations Administered</p>
         </div>
         <div class="rec-stat">
           <i class="fa-solid fa-map-location-dot"></i>
-          <h3>5</h3>
+          <h3 id="publicHighRiskBarangays">0</h3>
           <p>High-Risk Barangays</p>
         </div>
       </div>
@@ -674,7 +703,7 @@
               <h3><i class="fa-solid fa-chart-bar" style="color:#e60000;margin-right:6px;"></i>Monthly Rabies Cases &amp; Vaccinations</h3>
               <p>Comparative trend of exposures vs. PEP vaccinations administered</p>
             </div>
-            <span class="viz-period-tag">Jan – Jul 2026</span>
+            <span class="viz-period-tag">Jan – Dec 2026</span>
           </div>
           <div class="viz-card-body">
             <canvas id="monthlyChart" height="200"></canvas>
@@ -765,7 +794,7 @@
 
         <!-- MONTHLY TREND SPARKLINE -->
         <div class="viz-mini-card">
-          <h4><i class="fa-solid fa-arrow-trend-up" style="color:#e60000;margin-right:6px;"></i>Case Trend (Jan–Jul 2026)</h4>
+          <h4><i class="fa-solid fa-arrow-trend-up" style="color:#e60000;margin-right:6px;"></i>Case Trend (Jan–Dec 2026)</h4>
           <div class="trend-bars" id="caseTrendChart">
             <div class="trend-bar" style="height:38%;background:#00b140;" title="Jan: 12"></div>
             <div class="trend-bar" style="height:57%;background:#d98a00;" title="Feb: 18"></div>
@@ -837,7 +866,7 @@
       window.monthlyChart = new Chart(document.getElementById('monthlyChart'), {
         type: 'bar',
         data: {
-          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
+          labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
           datasets: [
             {
               label: 'Rabies Cases',
@@ -917,6 +946,89 @@
       }
     </script>
 
+    <!-- LOGIN PROMPT MODAL FOR PUBLIC MAP -->
+    <div id="loginPromptModal" style="
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    " class="login-modal-backdrop">
+      <div style="
+        background: white;
+        border-radius: 16px;
+        padding: 32px;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        text-align: center;
+        position: relative;
+      ">
+        <div style="font-size: 48px; margin-bottom: 16px;">
+          <i class="fa-solid fa-lock" style="color: #e60000;"></i>
+        </div>
+        <h2 style="font-size: 24px; color: #111827; margin-bottom: 12px;">
+          Sign In Required
+        </h2>
+        <p style="color: #6b7280; font-size: 14px; margin-bottom: 24px; line-height: 1.6;">
+          To book an appointment at our anti-rabies clinics, you need to have an active account. Sign in with your existing account or create a new one.
+        </p>
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+          <a href="login.html" style="
+            background: #e60000;
+            color: white;
+            padding: 12px 28px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            border: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+          ">
+            <i class="fa-solid fa-sign-in-alt"></i> Sign In
+          </a>
+          <a href="register.html" style="
+            background: #f3f4f6;
+            color: #111827;
+            padding: 12px 28px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            border: 2px solid #e5e7eb;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+          ">
+            <i class="fa-solid fa-user-plus"></i> Create Account
+          </a>
+        </div>
+        <button onclick="closeLoginPrompt()" style="
+          background: none;
+          border: none;
+          color: #9ca3af;
+          font-size: 24px;
+          cursor: pointer;
+          position: absolute;
+          top: 16px;
+          right: 16px;
+          padding: 8px;
+        ">
+          <i class="fa-solid fa-times"></i>
+        </button>
+      </div>
+    </div>
+
     <!-- FOOTER -->
     <footer class="footer">
 
@@ -979,6 +1091,7 @@
 const CLINICS = [
     {
         name: 'Cabuyao City Health Center',
+        type: 'Public',
         lat: 14.2718,
         lng: 121.1246,
         status: 'available',
@@ -989,6 +1102,7 @@ const CLINICS = [
     },
     {
         name: "St. Mary's Medical Clinic",
+        type: 'Private',
         lat: 14.2655,
         lng: 121.1189,
         status: 'low',
@@ -999,6 +1113,7 @@ const CLINICS = [
     },
     {
         name: 'South City Animal Bite Center',
+        type: 'Private',
         lat: 14.2592,
         lng: 121.1310,
         status: 'out',
@@ -1009,6 +1124,7 @@ const CLINICS = [
     },
     {
         name: 'Pulo Barangay Health Station',
+        type: 'Public',
         lat: 14.2780,
         lng: 121.1350,
         status: 'available',
@@ -1019,6 +1135,7 @@ const CLINICS = [
     },
     {
         name: 'Marinig Health Center',
+        type: 'Public',
         lat: 14.2840,
         lng: 121.1200,
         status: 'low',
@@ -1233,6 +1350,53 @@ function filterMarkers(filter, btn) {
      ──────────────────────────────────────────────────────────────────────── -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script type="module" src="scripts/residents-map.js"></script>
+
+<!-- LOGIN PROMPT AUTHENTICATION FOR PUBLIC MAP -->
+<script type="module">
+  import { auth, onAuthStateChanged } from './scripts/firebase.js';
+  
+  // Show login prompt modal
+  window.showLoginPrompt = function() {
+    const modal = document.getElementById('loginPromptModal');
+    if (modal) {
+      modal.style.display = 'flex';
+    }
+  };
+  
+  // Close login prompt modal
+  window.closeLoginPrompt = function() {
+    const modal = document.getElementById('loginPromptModal');
+    if (modal) {
+      modal.style.display = 'none';
+    }
+  };
+  
+  // Close modal when clicking outside of it
+  document.getElementById('loginPromptModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+      this.style.display = 'none';
+    }
+  });
+  
+  // Check if user is logged in and try to book
+  window.checkAuthAndBook = function(clinicName, clinicId) {
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // User is logged in, proceed with booking
+        if (window.openBookingModal) {
+          window.openBookingModal(clinicName, clinicId);
+        }
+      } else {
+        // User is not logged in, show login prompt
+        window.showLoginPrompt();
+      }
+    });
+  };
+</script>
+<script type="module">
+  import { redirectActiveUserFromPublicPage } from './scripts/auth-route-guard.js';
+  redirectActiveUserFromPublicPage();
+</script>
 
 </body>
 </html>

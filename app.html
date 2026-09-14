@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anti-Rabies Locator</title>
+    <style>
+        html, body, #appFrame {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            border: 0;
+        }
+
+        html, body {
+            overflow: hidden;
+        }
+
+        #appFrame {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <iframe id="appFrame" title="Anti-Rabies Locator"></iframe>
+    <script type="module">
+        import { auth, fetchUserProfile, onAuthStateChanged } from './scripts/firebase.js';
+
+        const frame = document.getElementById('appFrame');
+        const rolePages = {
+            resident: 'residents.html',
+            clinic_staff: 'staff.html',
+            admin: 'admin.html',
+            administrator: 'admin.html'
+        };
+        const savedPage = sessionStorage.getItem('appPage');
+
+        const loadPage = page => {
+            frame.src = page;
+        };
+
+        onAuthStateChanged(auth, async user => {
+            if (!user) {
+                loadPage(savedPage && savedPage !== 'residents.html' && savedPage !== 'staff.html' && savedPage !== 'admin.html' ? savedPage : 'index.html');
+                return;
+            }
+            const profile = await fetchUserProfile(user.uid);
+            loadPage(rolePages[profile?.role] || 'index.html');
+        });
+
+        frame.addEventListener('load', () => {
+            try {
+                const pageUrl = new URL(frame.contentWindow.location.href);
+                if (pageUrl.pathname !== '/' && !pageUrl.pathname.endsWith('/app.html')) {
+                    sessionStorage.setItem('appPage', pageUrl.pathname.slice(1) + pageUrl.search + pageUrl.hash);
+                }
+            } catch (error) {
+                sessionStorage.removeItem('appPage');
+            }
+        });
+    </script>
+</body>
+</html>
