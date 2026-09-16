@@ -23,6 +23,16 @@ service firebase.storage {
         && (request.auth.uid == residentId || isStaffOrAdmin());
     }
 
+    match /staff-certificates/{staffId}/{fileName} {
+      allow create: if isLoggedIn()
+        && request.auth.uid == staffId
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType in ['image/jpeg', 'image/png'];
+      allow read: if isLoggedIn()
+        && (request.auth.uid == staffId || userRole() == 'admin' || userRole() == 'administrator');
+      allow update, delete: if false;
+    }
+
     match /vaccination-documents/{residentId}/{fileName} {
       allow create, update: if isLoggedIn()
         && request.auth.uid == residentId

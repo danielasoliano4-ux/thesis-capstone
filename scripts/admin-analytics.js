@@ -298,7 +298,7 @@ function renderManagement() {
     pendingGrid.innerHTML = pending.length ? pending.map(user => `<div class="user-card">
       <div class="user-avatar" style="background:#dbeafe;color:#2563eb;"><i class="fa-solid fa-user-nurse"></i></div>
       <h4>${escapeHtml(user.full_name || user.email || 'Clinic Staff')}</h4>
-      <p>${escapeHtml(user.clinic_name || user.clinic_id || 'Clinic not assigned')}<br>Created ${formatDate(user.created_at)}</p>
+      <p>${escapeHtml(user.clinic_name || user.clinic_id || 'Clinic not assigned')}<br>Created ${formatDate(user.created_at)}${user.bplo_certificate_url ? `<br><a href="${escapeHtml(user.bplo_certificate_url)}" target="_blank" rel="noopener">View BPLO certificate</a>` : ''}</p>
       <button class="approve-btn" type="button" data-approve-user="${user.id}">Approve</button>
       <button class="deny-btn" type="button" data-deny-user="${user.id}">Deny</button>
     </div>`).join('') : '<p>No pending clinic staff approvals.</p>';

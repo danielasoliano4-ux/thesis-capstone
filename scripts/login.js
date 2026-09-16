@@ -61,7 +61,8 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
       return;
     }
 
-    const role = userDoc.data().role;
+    const profile = userDoc.data();
+    const role = profile.role;
     const hasExpectedRole = role === expectedRole
       || (expectedRole === 'admin' && role === 'administrator');
     if (!hasExpectedRole) {
@@ -71,6 +72,16 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
         admin: 'administrator'
       };
       showLoginMessage(`This account does not have ${roleLabels[expectedRole] || 'this'} access.`);
+      await signOut(auth);
+      btn.textContent = originalText;
+      btn.disabled = false;
+      return;
+    }
+
+    if (role === 'clinic_staff' && (profile.is_active === false || profile.approval_status !== 'approved')) {
+      showLoginMessage(profile.approval_status === 'denied'
+        ? 'Your clinic staff registration was not approved. Please contact an administrator.'
+        : 'Your clinic staff account is pending administrator approval.');
       await signOut(auth);
       btn.textContent = originalText;
       btn.disabled = false;

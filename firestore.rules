@@ -29,7 +29,17 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isLoggedIn() && (request.auth.uid == userId || isAdmin());
-      allow create: if isLoggedIn() && request.auth.uid == userId;
+      allow create: if isLoggedIn() && request.auth.uid == userId
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.role in ['resident', 'clinic_staff']
+        && ((request.resource.data.role == 'resident'
+          && request.resource.data.is_active == true
+          && request.resource.data.approval_status == 'approved')
+          || (request.resource.data.role == 'clinic_staff'
+          && request.resource.data.is_active == false
+          && request.resource.data.approval_status == 'pending'
+          && request.resource.data.bplo_certificate_url is string
+          && request.resource.data.bplo_certificate_url.size() > 0));
       allow update, delete: if isAdmin();
     }
 

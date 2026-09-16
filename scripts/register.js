@@ -1,6 +1,7 @@
-import { auth, db } from './firebase.js';
+import { auth, db, storage } from './firebase.js';
 import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 import { doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
 
 const policyModal = document.getElementById('policyModal');
 const policyTitle = document.getElementById('policyTitle');
@@ -37,6 +38,26 @@ policyModal.addEventListener('click', event => {
   if (event.target === policyModal) closePolicy();
 });
 
+const accountRole = document.getElementById('accountRole');
+const staffRegistrationFields = document.getElementById('staffRegistrationFields');
+const clinicNameInput = document.getElementById('clinicName');
+const clinicAddressInput = document.getElementById('clinicAddress');
+const certificateInput = document.getElementById('bploCertificate');
+
+function updateRegistrationFields() {
+  const isStaff = accountRole.value === 'clinic_staff';
+  staffRegistrationFields.hidden = !isStaff;
+  clinicNameInput.required = isStaff;
+  clinicAddressInput.required = isStaff;
+  certificateInput.required = isStaff;
+}
+
+accountRole.addEventListener('change', updateRegistrationFields);
+if (new URLSearchParams(window.location.search).get('role') === 'clinic_staff') {
+  accountRole.value = 'clinic_staff';
+}
+updateRegistrationFields();
+
 document.getElementById('registerForm').addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -47,6 +68,10 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
   const barangay  = document.getElementById('barangaySelect').value;
   const password  = document.getElementById('pw').value;
   const password2 = document.getElementById('pw2').value;
+  const role = accountRole.value;
+  const clinicName = clinicNameInput.value.trim();
+  const clinicAddress = clinicAddressInput.value.trim();
+  const certificate = certificateInput.files[0];
 
   if (!barangay) {
     alert('Please select your barangay.');
@@ -60,6 +85,14 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     alert('Password must be at least 8 characters.');
     return;
   }
+  if (role === 'clinic_staff' && (!clinicName || !clinicAddress || !certificate)) {
+    alert('Clinic staff registration requires the clinic name, address, and BPLO certificate photo.');
+    return;
+  }
+  if (certificate && (certificate.size > 5 * 1024 * 1024 || !['image/jpeg', 'image/png'].includes(certificate.type))) {
+    alert('Upload a JPG or PNG BPLO certificate image no larger than 5 MB.');
+    return;
+  }
 
   const btn = document.querySelector('.register-btn');
   btn.textContent = 'Creating account...';
@@ -68,18 +101,29 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
   try {
     const userCred = await createUserWithEmailAndPassword(auth, email, password);
     const uid = userCred.user.uid;
+    let certificateUrl = '';
+
+    if (role === 'clinic_staff') {
+      const certificateRef = ref(storage, `staff-certificates/${uid}/bplo-${Date.now()}-${certificate.name}`);
+      await uploadBytes(certificateRef, certificate, { contentType: certificate.type });
+      certificateUrl = await getDownloadURL(certificateRef);
+    }
 
     await setDoc(doc(db, 'users', uid), {
       uid,
       email,
-      role: 'resident',
+      role,
       full_name: firstName + ' ' + lastName,
       phone,
-      is_active: true,
+      clinic_name: role === 'clinic_staff' ? clinicName : '',
+      clinic_address: role === 'clinic_staff' ? clinicAddress : '',
+      bplo_certificate_url: certificateUrl,
+      is_active: role !== 'clinic_staff',
+      approval_status: role === 'clinic_staff' ? 'pending' : 'approved',
       created_at: serverTimestamp()
     });
 
-    await setDoc(doc(db, 'residents', uid), {
+    if (role === 'resident') await setDoc(doc(db, 'residents', uid), {
       uid,
       first_name: firstName,
       last_name: lastName,
@@ -89,7 +133,9 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
       created_at: serverTimestamp()
     });
 
-    alert('Account created successfully! You can now sign in.');
+    alert(role === 'clinic_staff'
+      ? 'Registration submitted. An administrator must approve your clinic staff account before you can sign in.'
+      : 'Account created successfully! You can now sign in.');
     window.location.href = 'login.html';
 
   } catch (err) {

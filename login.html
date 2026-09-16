@@ -135,7 +135,7 @@
                 <!-- BACK -->
                 <div class="auth-navigation">
                     <p class="register-text">
-                        No account? <a href="register.html" class="red-link">Register here</a>
+                        <span id="registerPrompt">No account?</span> <a id="registerLink" href="register.html" class="red-link">Register here</a>
                     </p>
                     
                     <a href="index.html" class="back-link">
@@ -231,6 +231,8 @@
         const featuresHeading = document.getElementById('featuresHeading');
         const featuresList = document.getElementById('featuresList');
         const registerText = document.querySelector('.register-text');
+        const registerPrompt = document.getElementById('registerPrompt');
+        const registerLink = document.getElementById('registerLink');
 
         let currentRole = 'resident';
 
@@ -245,9 +247,16 @@
             currentRole = role;
             window.currentRole = role;
 
-            // Hide register link for non-resident roles
             if (registerText) {
-                registerText.style.display = role === 'resident' ? 'block' : 'none';
+                const canRegister = role === 'resident' || role === 'staff';
+                registerText.style.display = canRegister ? 'block' : 'none';
+                if (role === 'staff') {
+                    registerPrompt.textContent = 'No clinic staff account?';
+                    registerLink.href = 'register.html?role=clinic_staff';
+                } else {
+                    registerPrompt.textContent = 'No account?';
+                    registerLink.href = 'register.html';
+                }
             }
 
             roleBoxes.forEach(box => {
