@@ -1,13 +1,14 @@
 import { auth, db, authPersistenceReady } from './firebase.js';
 import { signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { routes } from './routes.js';
 
 console.log('login.js loaded');
 
 const rolePages = {
   resident:     'residents.html',
   clinic_staff: 'staff.html',
-  admin:        '/admin'
+  admin:        routes.adminDashboard
 };
 
 const loginRoles = {

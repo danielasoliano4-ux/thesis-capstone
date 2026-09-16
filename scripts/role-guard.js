@@ -1,11 +1,12 @@
 import { auth, fetchUserProfile, onAuthStateChanged } from './firebase.js';
 import { signOut } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
+import { routes } from './routes.js';
 
 const rolePages = {
   resident: 'residents.html',
   clinic_staff: 'staff.html',
-  admin: '/admin',
-  administrator: '/admin'
+  admin: routes.adminDashboard,
+  administrator: routes.adminDashboard
 };
 
 export function protectPage(expectedRole, loginPage = 'login.html') {

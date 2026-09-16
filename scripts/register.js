@@ -1,5 +1,5 @@
 import { auth, db, storage } from './firebase.js';
-import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+import { createUserWithEmailAndPassword, deleteUser } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 import { doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
 
@@ -98,9 +98,11 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
   btn.textContent = 'Creating account...';
   btn.disabled = true;
 
+  let createdUser = null;
   try {
     const userCred = await createUserWithEmailAndPassword(auth, email, password);
     const uid = userCred.user.uid;
+    createdUser = userCred.user;
     let certificateUrl = '';
 
     if (role === 'clinic_staff') {
@@ -139,6 +141,9 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     window.location.href = 'login.html';
 
   } catch (err) {
+    if (createdUser) {
+      try { await deleteUser(createdUser); } catch (cleanupError) { console.error('Could not remove incomplete registration:', cleanupError); }
+    }
     btn.disabled = false;
     btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create Account';
 

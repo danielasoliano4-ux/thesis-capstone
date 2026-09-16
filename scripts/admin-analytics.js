@@ -1,5 +1,6 @@
 import { auth, db, fetchUserProfile } from './firebase.js';
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
+import { routes } from './routes.js';
 import {
   collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc
 } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
@@ -27,7 +28,7 @@ function canonicalVaccineBrand(value) {
 
 document.getElementById('adminSignOutBtn')?.addEventListener('click', async () => {
   await signOut(auth);
-  window.location.replace('/admin/login');
+  window.location.replace(routes.adminLogin);
 });
 
 document.getElementById('clearReportDates')?.addEventListener('click', () => {

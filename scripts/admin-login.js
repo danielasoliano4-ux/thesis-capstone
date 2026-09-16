@@ -1,6 +1,7 @@
 import { auth, db, authPersistenceReady, fetchUserProfile, onAuthStateChanged } from './firebase.js';
 import { signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
 import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
+import { routes } from './routes.js';
 
 const form = document.getElementById('adminLoginForm');
 const emailInput = document.getElementById('emailInput');
@@ -44,7 +45,7 @@ form.addEventListener('submit', async event => {
       showMessage('This account does not have administrator access.');
       return;
     }
-    window.location.replace('/admin');
+    window.location.replace(routes.adminDashboard);
   } catch (error) {
     showMessage(error.code === 'auth/too-many-requests'
       ? 'Too many failed attempts. Please wait a moment and try again.'
@@ -59,6 +60,6 @@ onAuthStateChanged(auth, async user => {
   if (!user) return;
   const profile = await fetchUserProfile(user.uid);
   if (profile?.role === 'admin' || profile?.role === 'administrator') {
-    window.location.replace('/admin');
+    window.location.replace(routes.adminDashboard);
   }
 });

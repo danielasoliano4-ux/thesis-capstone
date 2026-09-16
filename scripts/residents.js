@@ -209,24 +209,23 @@ function populateResidentProfile(data) {
 }
 
 function populateClinicOptions(clinics) {
+  const bookableClinics = clinics.filter(clinic => clinic.status !== 'out');
   const orderedClinics = originalDoseClinicId
-    ? [...clinics].sort((first, second) => Number(second.id === originalDoseClinicId) - Number(first.id === originalDoseClinicId))
-    : clinics;
+    ? [...bookableClinics].sort((first, second) => Number(second.id === originalDoseClinicId) - Number(first.id === originalDoseClinicId))
+    : bookableClinics;
   const select = document.getElementById('modalClinic');
   if (select) {
     select.innerHTML = '';
     orderedClinics.forEach((clinic) => {
       const option = document.createElement('option');
       option.value = clinic.id;
-      const optionStatus = clinic.status === 'out'
-        ? 'Out of Stock'
-        : `${clinic.status === 'low' ? 'Low Stock' : 'Available'} - ${clinic.stock_total || 0} doses available`;
+      const optionStatus = `${clinic.status === 'low' ? 'Low Stock' : 'Available'} - ${clinic.stock_total || 0} doses available`;
       option.textContent = `${clinic.name} (${clinic.type}) - ${optionStatus}`;
       option.dataset.name = clinic.name;
       select.appendChild(option);
     });
   }
-  renderClinicBookingList(orderedClinics);
+  renderClinicBookingList(clinics);
   populateClinicFilters(clinics);
 }
 
@@ -1365,6 +1364,15 @@ async function handleUpload(input) {
   if (new Set(residentVaccinationRecords.map(record => Number(record.dose_number || 0))).size < doseDayOffsets.length) {
     alert('You can upload a vaccination document only after all 5 doses are recorded.');
     input.value = '';
+    return;
+  }
+  if (clinic.status === 'out') {
+    msgEl.style.display = 'block';
+    msgEl.style.background = '#fff5f5';
+    msgEl.style.color = '#ef0000';
+    msgEl.style.border = '1px solid #fecaca';
+    msgEl.textContent = 'This clinic is out of stock. Please choose another clinic with vaccines available.';
+    resetBookingButton();
     return;
   }
   if (file.size > 10 * 1024 * 1024) {

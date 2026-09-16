@@ -26,13 +26,14 @@
     <iframe id="appFrame" title="Anti-Rabies Locator"></iframe>
     <script type="module">
         import { auth, fetchUserProfile, onAuthStateChanged } from './scripts/firebase.js';
+        import { routes } from './scripts/routes.js';
 
         const frame = document.getElementById('appFrame');
         const rolePages = {
             resident: 'residents.html',
             clinic_staff: 'staff.html',
-            admin: '/admin',
-            administrator: '/admin'
+            admin: routes.adminDashboard,
+            administrator: routes.adminDashboard
         };
         const savedPage = sessionStorage.getItem('appPage');
 
