@@ -6,9 +6,10 @@
     <title>Administrator Dashboard</title>
     <link rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
-    <link rel="stylesheet" href="admin.css"/>
+    <link rel="stylesheet" href="/admin.css"/>
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-    <script defer src="scripts/admin.js"></script>
+    <script defer src="/scripts/admin.js"></script>
+    <link rel="stylesheet" href="/responsive.css">
 </head>
 <body>
 
@@ -104,6 +105,7 @@
             <h3><i class="fa-solid fa-map-location-dot" style="color:#ef0000;margin-right:6px;"></i> High-Risk Barangay Heatmap</h3>
             <button id="addUserBtn" type="button" class="btn-outline"><i class="fa-solid fa-plus"></i> Add User</button>
         </div>
+        <div class="responsive-table">
         <table class="heatmap-table" style="border-radius:0;box-shadow:none;">
             <thead>
                 <tr>
@@ -149,6 +151,7 @@
                 </tr>
             </tbody>
         </table>
+        </div>
     </div>
     <div class="content-box">
         <div class="content-box-header">
@@ -267,10 +270,10 @@
     </div>
 </div>
 <script type="module">
-    import { protectPage } from './scripts/role-guard.js';
-    protectPage('admin');
+    import { protectPage } from '/scripts/role-guard.js';
+    protectPage('admin', '/admin/login');
 </script>
-<script type="module" src="scripts/admin-analytics.js"></script>
+<script type="module" src="/scripts/admin-analytics.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 </body> 
 </html>

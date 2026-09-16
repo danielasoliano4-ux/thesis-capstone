@@ -16,8 +16,7 @@ let activeStockFilter = 'all';
 function initMap() {
   const containers = [
     { mapId: 'googleMapOverview', sidebarId: 'clinicSidebarOverview' },
-    { mapId: 'googleMap',         sidebarId: 'clinicSidebar'         },
-    { mapId: 'googleMapNew',      sidebarId: 'clinicSidebarNew'      }
+    { mapId: 'googleMap',         sidebarId: 'clinicSidebar'         }
   ];
   if (!CLINICS.length) return;
   containers.forEach(c => {

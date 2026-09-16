@@ -7,7 +7,7 @@ console.log('login.js loaded');
 const rolePages = {
   resident:     'residents.html',
   clinic_staff: 'staff.html',
-  admin:        'admin.html'
+  admin:        '/admin'
 };
 
 const loginRoles = {

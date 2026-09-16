@@ -1,6 +1,5 @@
-// Central Firebase initialization (ES modules)
-// Replace the firebaseConfig values with your project's credentials.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js';
+import { firebaseConfig } from './firebase-config.js';
 import { getAuth, onAuthStateChanged, signOut as fbSignOut, setPersistence, browserSessionPersistence } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
 import { getStorage } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js';
 import {
@@ -13,16 +12,6 @@ import {
   orderBy,
   getDocs
 } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
-
-const firebaseConfig = {
-  apiKey: 'AIzaSyDK8f4qVtcMus8CVVexYZHdk_BBftnpq_k',
-  authDomain: 'anti-rabies-locator.firebaseapp.com',
-  projectId: 'anti-rabies-locator',
-  storageBucket: 'anti-rabies-locator.firebasestorage.app',
-  messagingSenderId: '503650196823',
-  appId: '1:503650196823:web:70b9dc0f0bfd847c9a3212',
-  measurementId: 'G-7Q2C9XMW87'
-};
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);

@@ -27,7 +27,7 @@ function canonicalVaccineBrand(value) {
 
 document.getElementById('adminSignOutBtn')?.addEventListener('click', async () => {
   await signOut(auth);
-  window.location.replace('login.html');
+  window.location.replace('/admin/login');
 });
 
 document.getElementById('clearReportDates')?.addEventListener('click', () => {

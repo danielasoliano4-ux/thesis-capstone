@@ -1,0 +1,88 @@
+/* Shared responsive safeguards for every application view. */
+:root { --page-gutter: clamp(12px, 3vw, 32px); }
+html { overflow-x: hidden; }
+body { min-width: 0; overflow-x: clip; }
+img, svg, canvas, video, iframe { max-width: 100%; }
+input, select, textarea, button { max-width: 100%; font: inherit; }
+
+.main-container, .tab-panel, .page-wrapper, .content-box, .chart-card,
+.map-card, .section-card, .guide-container, .booking-records-container,
+.notif-container, .public-hub { min-width: 0; }
+.top-grid > *, .bottom-grid > *, .two-col > *, .three-col > *,
+.stats-grid > *, .charts-grid > *, .users-grid > *, .reports-grid > *,
+.profile-row > *, .services-grid > *, .info-grid > *, .guide-info-grid > *,
+.viz-grid > *, .viz-bottom-row > *, .steps-flow > * { min-width: 0; }
+
+/* Keep wide data inside its card rather than scrolling the page. */
+.table-container, .records-table-wrap, .guide-table-wrap, .table-wrap,
+.symptoms-table-wrap, .responsive-table { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table-container > table, .records-table, .guide-table, .symptoms-table,
+.heatmap-table { min-width: 620px; }
+
+.top-header { padding-inline: var(--page-gutter); gap: 12px; }
+.header-right, .logo-section, .content-box-header, .chart-card-header,
+.inventory-top, .map-top, .records-hero, .notif-header-row { min-width: 0; }
+.nav-tabs-bar, .admin-tabs-bar { padding-inline: var(--page-gutter); }
+.tab-panel { padding: clamp(16px, 3vw, 30px); }
+.main-container { padding-inline: var(--page-gutter); }
+.first-aid-card, .map-card { max-width: none; margin-left: 0; }
+.public-hub { width: auto; max-width: 1450px; margin-inline: auto; padding-inline: var(--page-gutter); }
+
+@media (max-width: 1100px) {
+  .top-grid, .bottom-grid, .charts-grid, .viz-grid { grid-template-columns: 1fr; }
+  .stats-grid, .records-summary-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .users-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .animal-exposure-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .top-grid { gap: 20px; }
+}
+
+@media (max-width: 768px) {
+  .top-header { align-items: center; flex-wrap: wrap; padding-block: 10px; }
+  .logo-section { gap: 8px; }
+  .logo-section p { display: none; }
+  .logo-section h2 { font-size: 15px; }
+  .header-right { gap: 10px; margin-left: auto; }
+  .header-right h3, .header-right .sidebar-link { display: none; }
+  .signout-btn { padding: 8px 10px; font-size: 12px; }
+  .nav-tab, .admin-tab { padding: 12px 14px; font-size: 13px; }
+  .page-title h1 { font-size: clamp(26px, 7vw, 34px); }
+  .stats-grid, .two-col, .three-col, .reports-grid, .services-grid,
+  .profile-row, .guide-info-grid, .info-grid, .viz-bottom-row { grid-template-columns: 1fr; }
+  .users-grid { grid-template-columns: 1fr 1fr; }
+  .map-top, .inventory-top, .content-box-header, .chart-card-header,
+  .records-hero, .onboarding-hero, .guide-hero, .cta-box, .notif-header-row {
+    flex-direction: column; align-items: flex-start; gap: 12px;
+  }
+  .map-card, .inventory-content, .section-card-body { padding: 16px; }
+  .map-box, #googleMapOverview, #googleMapNew { height: 320px !important; }
+  .map-directory-filters, .clinic-directory-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; }
+  .map-search-field, .clinic-search-field { grid-column: 1 / -1; }
+  .map-directory-clear, .clear-clinic-filters { grid-column: 1 / -1; width: 100%; }
+  .steps-flow, .appt-steps { grid-template-columns: 1fr 1fr; }
+  .flow-step::after { display: none; }
+  .records-table-footer, .booking-progress-heading, .report-filters,
+  .inventory-controls, .modal-actions { flex-wrap: wrap; }
+  .resident-appointment-card { align-items: flex-start; flex-wrap: wrap; }
+  .resident-appointment-actions { width: 100%; margin-left: 0; align-items: stretch; }
+  .resident-appointment-actions button { width: 100%; }
+}
+
+@media (max-width: 480px) {
+  .tab-panel, .main-container { padding: 14px 12px; }
+  .header-right .profile-btn { font-size: 21px; }
+  .signout-btn { font-size: 0; padding: 9px 11px; }
+  .signout-btn i { margin: 0; font-size: 14px; }
+  .stats-grid, .records-summary-row, .users-grid, .steps-flow, .appt-steps,
+  .accordion-detail-grid, .animal-exposure-form, .dashboard-analytics-form,
+  .map-directory-filters, .clinic-directory-filters { grid-template-columns: 1fr; }
+  .records-controls > *, .report-filters > *, .inventory-controls > * { flex: 1 1 100%; width: 100%; }
+  .map-card, .content-box-header, .chart-card-header, .inventory-content { padding: 12px; }
+  .map-box, #googleMapOverview, #googleMapNew { height: 260px !important; }
+  .modal, .modal-overlay, .profile-modal { padding: 12px; }
+  .modal-content, .modal-box, .profile-dialog { max-width: 100%; padding: 18px; }
+  .modal-actions { flex-direction: column-reverse; }
+  .modal-actions > * { width: 100%; }
+  .history-list { padding: 16px 12px; }
+  .history-changes strong { min-width: 0; width: 100%; }
+  .role-section, .signin-section { padding: 22px 18px; }
+}

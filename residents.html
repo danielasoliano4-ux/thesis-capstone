@@ -252,8 +252,93 @@
         .public-hub { padding: 0 20px 40px; }
         .accordion-detail-grid { grid-template-columns: 1fr 1fr; }
       }
+
+      /* Final responsive overrides: keep every dashboard module within the viewport. */
+      html { overflow-x: hidden; }
+      body { min-width: 0; overflow-x: clip; }
+      img, svg, canvas, iframe { max-width: 100%; }
+      .top-header { padding: 12px clamp(16px, 4vw, 48px); gap: 12px; }
+      .nav-tabs-bar { padding-inline: clamp(12px, 4vw, 48px); }
+      .tab-panel, .main-container { min-width: 0; }
+      .tab-panel { padding: clamp(16px, 3vw, 32px); }
+      .top-grid { grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: clamp(16px, 2vw, 25px); }
+      .top-grid > *, .two-col > *, .three-col > *, .viz-grid > *, .viz-bottom-row > * { min-width: 0; }
+      .first-aid-card, .map-card { width: 100%; max-width: none; margin-left: 0; }
+      #view-new[hidden] { display: none !important; }
+      .new-resident-layout { display: block; margin-bottom: 24px; }
+      .new-resident-layout .map-card[hidden] { display: none !important; }
+      .public-hub { width: auto; max-width: 1450px; margin: 0 auto; padding: 0 clamp(16px, 3vw, 40px) 50px; }
+      .records-table-wrap, .guide-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .records-table, .guide-table { min-width: 650px; }
+      .records-search { min-width: min(200px, 100%); }
+      .map-directory-filters, .clinic-directory-filters { min-width: 0; }
+      .map-directory-filters > *, .clinic-directory-filters > * { min-width: 0; }
+
+      @media (max-width: 1100px) {
+        .top-grid { grid-template-columns: 1fr; }
+        .stat-row { flex-wrap: wrap; }
+        .stat-box { flex: 1 1 calc(50% - 9px); }
+      }
+
+      @media (max-width: 768px) {
+        body { margin-top: 72px; }
+        .top-header { padding: 10px 16px; }
+        .logo-section { gap: 8px; min-width: 0; }
+        .logo-section h2 { font-size: 15px; }
+        .logo-section p { display: none; }
+        .logo-icon { width: 34px; height: 34px; flex: 0 0 auto; }
+        .header-right { gap: 8px; flex: 0 0 auto; }
+        .signout-btn { padding: 8px 10px; font-size: 12px; }
+        .nav-tab { padding: 12px 14px; font-size: 13px; }
+        .stat-row { flex-direction: column; }
+        .stat-box { width: 100%; min-width: 0; }
+        .two-col, .three-col { grid-template-columns: 1fr; }
+        .map-card { padding: 16px; }
+        .map-top, .records-hero, .onboarding-hero { flex-direction: column; align-items: flex-start; gap: 14px; }
+        .map-top h3 { font-size: 18px; }
+        .map-filter { width: 100%; overflow-x: auto; }
+        .map-filter button { flex: 1 0 auto; padding-inline: 10px; }
+        .map-box, #googleMapOverview, #googleMapNew { height: 320px !important; }
+        .map-directory-filters, .clinic-directory-filters { grid-template-columns: 1fr 1fr; padding: 10px; }
+        .map-search-field, .clinic-search-field { grid-column: 1 / -1; }
+        .map-directory-clear, .clear-clinic-filters { grid-column: 1 / -1; width: 100%; }
+        .steps-flow { grid-template-columns: 1fr 1fr; }
+        .flow-step:nth-child(2) { border-right: none; }
+        .flow-step::after { display: none; }
+        .public-hub { padding-bottom: 36px; }
+        .records-summary-row { grid-template-columns: 1fr 1fr; gap: 12px; }
+        .rec-stat { padding: 16px 10px; }
+        .rec-stat h3 { font-size: 28px; }
+        .records-table-footer, .viz-card-header { flex-wrap: wrap; gap: 8px; }
+        .accordion-detail-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+        .donut-wrap { flex-wrap: wrap; }
+        .profile-modal { padding: 12px; }
+      }
+
+      @media (max-width: 480px) {
+        .header-right .profile-btn { font-size: 21px; }
+        .signout-btn { font-size: 0; padding: 9px 11px; }
+        .signout-btn i { font-size: 14px; margin: 0; }
+        .tab-panel { padding: 14px 12px; }
+        .top-grid { margin-top: 14px !important; }
+        .map-card { padding: 12px; border-radius: 12px; }
+        .map-box, #googleMapOverview, #googleMapNew { height: 260px !important; }
+        .map-directory-filters, .clinic-directory-filters { grid-template-columns: 1fr; }
+        .records-summary-row, .steps-flow, .accordion-detail-grid { grid-template-columns: 1fr; }
+        .records-controls > * { width: 100%; }
+        .records-filter-btn { flex: 1 1 auto; }
+        .onboarding-hero { padding: 22px 20px; }
+        .onboarding-hero i { font-size: 36px; }
+        .flow-step { border-right: 0; border-bottom: 1px solid #f3f4f6; }
+        .flow-step:last-child { border-bottom: 0; }
+        .rec-stat p { font-size: 12px; }
+        .profile-dialog, .modal-box { padding: 18px; }
+        .modal-actions { flex-direction: column-reverse; }
+        .modal-actions > * { width: 100%; }
+      }
     </style>
 
+    <link rel="stylesheet" href="responsive.css">
 </head>
 
 
@@ -411,13 +496,13 @@
 </div>
 
     <!-- ---- STATE A: NEW RESIDENT (no vaccination history) ---- -->
-    <div id="view-new" style="display:none;">
+    <div id="view-new" style="display:none;" hidden>
 
       <!-- MAP + BOOK APPOINTMENT -->
-      <div class="three-col">
+      <div class="three-col new-resident-layout">
 
         <!-- MAP -->
-        <div class="map-card" style="margin-bottom:0;">
+        <div class="map-card" style="margin-bottom:0;" hidden aria-hidden="true">
           <div class="map-top">
             <h3><i class="fa-solid fa-location-dot" style="color:#ef0000;margin-right:6px;"></i> Clinic Locator — Cabuyao</h3>
             <div class="map-filter">
@@ -455,16 +540,6 @@
             </h4>
             <div id="clinicSidebarNew" style="display:flex;flex-direction:column;gap:8px;"></div>
           </div>
-        </div>
-
-        <!-- BOOK APPOINTMENT CTA -->
-        <div class="book-cta-card">
-          <i class="fa-regular fa-calendar-plus"></i>
-          <h3>Book Your First Appointment</h3>
-          <p>Find a clinic with available anti-rabies vaccines and schedule your visit.</p>
-          <button class="book-cta-btn" onclick="showTab('appointments', document.querySelectorAll('.nav-tab')[1])">
-            <i class="fa-solid fa-calendar-check"></i> Book Appointment
-          </button>
         </div>
 
       </div>

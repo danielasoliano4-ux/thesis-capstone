@@ -20,6 +20,7 @@
             display: block;
         }
     </style>
+    <link rel="stylesheet" href="responsive.css">
 </head>
 <body>
     <iframe id="appFrame" title="Anti-Rabies Locator"></iframe>
@@ -30,8 +31,8 @@
         const rolePages = {
             resident: 'residents.html',
             clinic_staff: 'staff.html',
-            admin: 'admin.html',
-            administrator: 'admin.html'
+            admin: '/admin',
+            administrator: '/admin'
         };
         const savedPage = sessionStorage.getItem('appPage');
 

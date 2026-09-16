@@ -3,8 +3,8 @@ import { auth, fetchUserProfile, onAuthStateChanged } from './firebase.js';
 const rolePages = {
   resident: 'residents.html',
   clinic_staff: 'staff.html',
-  admin: 'admin.html',
-  administrator: 'admin.html'
+  admin: '/admin',
+  administrator: '/admin'
 };
 
 export function protectPage(expectedRole, loginPage = 'login.html') {
