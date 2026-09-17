@@ -1,6 +1,8 @@
 import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp, runTransaction, setDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-import { auth, db, fetchUserProfile } from './firebase.js';
-import { signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
+// signOutUser comes from the app's own firebase.js, so sign-out acts on the same
+// auth instance that set the session persistence.
+import { auth, db, fetchUserProfile, signOutUser } from './firebase.js';
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
 import { protectPage } from './role-guard.js';
 
 protectPage('clinic_staff');
@@ -32,10 +34,103 @@ function manilaToday() {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
 
+// An appointment has lapsed only when the clinic confirmed it, the resident did
+// not turn up, and the inclusive reservation window has fully passed. The end
+// date itself is still valid, so the comparison is strictly "less than today".
 function isReservationExpired(appointment) {
-    return appointment.status === 'confirmed'
-        && appointment.reservation_end_date
-        && appointment.reservation_end_date < manilaToday();
+    if (!appointment || appointment.status !== 'confirmed') return false;
+    if (!appointment.reservation_end_date) return false;
+    return appointment.reservation_end_date < manilaToday();
+}
+
+// Default grace period in days, used when a clinic has not configured one.
+// A duration of 1 means the appointment is valid only on its scheduled date.
+const DEFAULT_RESERVATION_DAYS = 1;
+const MAX_RESERVATION_DAYS = 7;
+// Cached from the clinic document so confirmation does not need an extra read
+// on every render. Updated whenever clinic settings load.
+let clinicReservationDays = null;
+
+function normaliseReservationDays(value) {
+    const days = Number(value);
+    if (!Number.isFinite(days) || days < 1) return DEFAULT_RESERVATION_DAYS;
+    return Math.min(MAX_RESERVATION_DAYS, Math.floor(days));
+}
+
+// Prefers the clinic's configured duration, then the value already stored on the
+// appointment, then the system default.
+function getConfiguredReservationDays(appointment) {
+    if (clinicReservationDays) return normaliseReservationDays(clinicReservationDays);
+    if (appointment?.reservation_days) return normaliseReservationDays(appointment.reservation_days);
+    return DEFAULT_RESERVATION_DAYS;
+}
+
+// Inclusive reservation window: a duration of N days keeps the appointment
+// valid through the (N-1)th day after the scheduled date.
+function getReservationEndDateFor(startDate, durationDays) {
+    if (!startDate) return '';
+    const parts = String(startDate).split('-').map(Number);
+    if (parts.length !== 3 || parts.some(value => Number.isNaN(value))) return startDate;
+    const end = new Date(parts[0], parts[1] - 1, parts[2]);
+    end.setDate(end.getDate() + normaliseReservationDays(durationDays) - 1);
+    const year = end.getFullYear();
+    const month = String(end.getMonth() + 1).padStart(2, '0');
+    const day = String(end.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// Guards against the confirmed-then-instantly-expired bug: an appointment is
+// never expired before its own scheduled date has passed.
+function isReservationWindowOpen(appointment) {
+    if (!appointment?.reservation_end_date) return true;
+    return appointment.reservation_end_date >= manilaToday();
+}
+
+// Marks lapsed appointments as expired in Firestore. A resident no-show is the
+// only way an appointment reaches this state: the dose was never completed and
+// the reservation window has passed. Failures are logged rather than surfaced,
+// because the scheduled Cloud Function performs the same transition server-side.
+const expiringAppointmentIds = new Set();
+async function persistExpiredAppointments(appointments) {
+    const due = appointments.filter(appointment =>
+        appointment.status === 'expired' &&
+        !appointment.expired_at &&
+        !expiringAppointmentIds.has(appointment.id)
+    );
+    for (const appointment of due) {
+        expiringAppointmentIds.add(appointment.id);
+        try {
+            await updateDoc(doc(db, 'appointments', appointment.id), {
+                status: 'expired',
+                expired_at: serverTimestamp(),
+                expiration_reason: 'Reservation duration ended - resident did not attend'
+            });
+            await addDoc(collection(db, 'history'), {
+                clinic_id: currentClinicId,
+                type: 'appointment',
+                action: 'expired',
+                appointment_id: appointment.id,
+                resident_name: appointment.resident_name || 'Resident',
+                performed_by: auth.currentUser?.uid || '',
+                created_at: serverTimestamp()
+            });
+            if (appointment.resident_uid) {
+                await addDoc(collection(db, 'notifications'), {
+                    recipient_uid: appointment.resident_uid,
+                    user_id: appointment.resident_uid,
+                    appointment_id: appointment.id,
+                    type: 'appointment',
+                    title: 'Appointment Expired',
+                    message: `Your appointment at ${appointment.clinic_name || 'the clinic'} on ${appointment.preferred_date || ''} ${appointment.preferred_time || ''} has expired because it was not completed within the reservation period. Please book a new appointment.`,
+                    read: false,
+                    created_at: serverTimestamp()
+                });
+            }
+        } catch (error) {
+            console.error('Could not mark appointment expired:', appointment.id, error);
+            expiringAppointmentIds.delete(appointment.id);
+        }
+    }
 }
 
 function applyStaffTab() {
@@ -62,12 +157,34 @@ onAuthStateChanged(auth, async (user) => {
 
     currentClinicId = profile.clinic_id || user.uid;
 
-    await setDoc(doc(db, 'clinics', currentClinicId), { staff_uid: user.uid }, { merge: true });
+    // Linking the staff uid to the clinic is a convenience write, not a
+    // prerequisite for the dashboard. It used to be an unguarded await, so a
+    // rejected or stalled write threw here and every listener below never
+    // started - which is why the inventory and appointments stayed empty.
+    try {
+        await setDoc(doc(db, 'clinics', currentClinicId), { staff_uid: user.uid }, { merge: true });
+    } catch (error) {
+        console.error('Could not link this staff account to the clinic:', error);
+    }
 
-    listenToInventory(currentClinicId);
-    listenToPendingAppointmentBadge(currentClinicId, user.uid);
-    loadStaffAppointments(currentClinicId, user.uid);
+    // Each of these is independent, so one failure cannot suppress the others.
+    const startListener = (label, start) => {
+        try { start(); } catch (error) { console.error(`Could not start ${label}:`, error); }
+    };
+    startListener('reservation settings', () => listenToClinicReservationDays(currentClinicId));
+    startListener('inventory', () => listenToInventory(currentClinicId));
+    startListener('pending badge', () => listenToPendingAppointmentBadge(currentClinicId, user.uid));
+    startListener('appointments', () => loadStaffAppointments(currentClinicId, user.uid));
 });
+
+// The grace period is a clinic setting, so it is read from the clinic document
+// and kept live: changing it affects appointments confirmed from then on.
+function listenToClinicReservationDays(clinicId) {
+    onSnapshot(doc(db, 'clinics', clinicId), snapshot => {
+        const value = snapshot.data()?.reservation_days;
+        clinicReservationDays = value === undefined || value === null ? null : normaliseReservationDays(value);
+    }, error => console.error('Could not read the clinic reservation duration:', error));
+}
 
 function listenToPendingAppointmentBadge(clinicId, staffUid = auth.currentUser?.uid) {
     const badge = document.getElementById('pendingAppointmentBadge');
@@ -107,6 +224,9 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
             .map(appointment => isReservationExpired(appointment) ? { ...appointment, status: 'expired' } : appointment)
             .filter(appointment => ['pending', 'confirmed', 'expired'].includes(appointment.status))
             .sort((first, second) => `${second.preferred_date || ''} ${second.preferred_time || ''}`.localeCompare(`${first.preferred_date || ''} ${first.preferred_time || ''}`));
+        // Persist the no-show transitions so the status survives a reload and is
+        // visible to the resident, not just rendered locally for this session.
+        persistExpiredAppointments(appointments);
         if (!appointments.length) {
             container.innerHTML = '<p class="empty-appointments">No resident appointments for this clinic.</p>';
             return;
@@ -153,10 +273,17 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
 async function acceptStaffAppointment(appointmentId) {
     try {
         const appointment = (await getDoc(doc(db, 'appointments', appointmentId))).data();
+        // Recompute the reservation window at confirmation time from the clinic's
+        // current setting, so an appointment booked before the duration was
+        // configured still gets the correct grace period.
+        const reservationDays = getConfiguredReservationDays(appointment);
+        const reservationEndDate = getReservationEndDateFor(appointment?.preferred_date, reservationDays);
         await updateDoc(doc(db, 'appointments', appointmentId), {
             status: 'confirmed',
             reschedule_requested: false,
-            confirmed_at: serverTimestamp()
+            confirmed_at: serverTimestamp(),
+            reservation_days: reservationDays,
+            reservation_end_date: reservationEndDate
         });
         await addDoc(collection(db, 'history'), { clinic_id: currentClinicId, type: 'appointment', action: 'confirmed', appointment_id: appointmentId, resident_name: appointment?.resident_name || 'Resident', performed_by: auth.currentUser.uid, created_at: serverTimestamp() });
         if (appointment?.resident_uid) {
@@ -179,16 +306,124 @@ async function acceptStaffAppointment(appointmentId) {
     }
 }
 
+// Holds the appointment being declined so the live preview can quote it.
+let apparentDeclineAppointment = {};
+
+// Opening the decline dialog replaces the old one-click decline, so staff can
+// point a turned-away resident at a facility that can actually treat them.
 async function declineStaffAppointment(appointmentId) {
+    const modal = document.getElementById('declineReferralModal');
+    if (!modal) return;
+    document.getElementById('declineAppointmentId').value = appointmentId;
+    document.getElementById('declineReferralFacility').value = '';
+    document.getElementById('declineReferralContact').value = '';
+    document.getElementById('declineReferralReason').value = '';
+    document.getElementById('declineReferralNote').value = '';
+    const summary = document.getElementById('declineReferralSummary');
+    if (summary) summary.textContent = 'Loading appointment details...';
+    closeDeclineReferral();
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+    document.getElementById('declineReferralFacility')?.focus();
+
+    let appointment = null;
+    try {
+        const snap = await getDoc(doc(db, 'appointments', appointmentId));
+        appointment = snap.exists() ? snap.data() : null;
+    } catch (error) {
+        console.error('Could not load appointment for decline:', error);
+    }
+    apparentDeclineAppointment = appointment || {};
+    if (summary) {
+        summary.innerHTML = appointment
+            ? `<strong>${escapeHtml(appointment.resident_name || 'Resident')}</strong> · ${escapeHtml(appointment.dose_label || 'Dose 1')} · ${escapeHtml(appointment.preferred_date || '')} ${escapeHtml(appointment.preferred_time || '')}`
+            : 'Appointment details unavailable. You can still decline and add a referral.';
+    }
+    updateDeclineReferralPreview();
+}
+
+function closeDeclineReferral() {
+    const modal = document.getElementById('declineReferralModal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+}
+
+// Mirrors the wording the resident will actually receive, so staff can see the
+// recommendation before committing to it.
+function buildDeclineReferralFields() {
+    const facility = document.getElementById('declineReferralFacility')?.value.trim() || '';
+    return {
+        facility,
+        contact: document.getElementById('declineReferralContact')?.value.trim() || '',
+        reason: document.getElementById('declineReferralReason')?.value.trim() || '',
+        note: document.getElementById('declineReferralNote')?.value.trim() || ''
+    };
+}
+
+function buildDeclineMessage(appointment, referral) {
+    const clinicName = appointment?.clinic_name || 'the clinic';
+    let message = `Your appointment request at ${clinicName} was declined.`;
+    if (referral.facility) {
+        message += ` We recommend you proceed to ${referral.facility} for your animal bite treatment.`;
+        if (referral.contact) message += ` (${referral.contact})`;
+    }
+    if (referral.reason) message += ` Reason: ${referral.reason}.`;
+    if (referral.note) message += ` ${referral.note}`;
+    return message;
+}
+
+function updateDeclineReferralPreview() {
+    const preview = document.getElementById('declineReferralPreview');
+    if (!preview) return;
+    preview.textContent = buildDeclineMessage(apparentDeclineAppointment, buildDeclineReferralFields());
+}
+
+async function submitDeclineReferral(event) {
+    event.preventDefault();
+    const appointmentId = document.getElementById('declineAppointmentId').value;
+    const button = document.getElementById('confirmDeclineReferralBtn');
+    if (!appointmentId || button?.disabled) return;
+    const referral = buildDeclineReferralFields();
+    if (button) { button.disabled = true; button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Declining...'; }
     try {
         const appointmentSnap = await getDoc(doc(db, 'appointments', appointmentId));
-        const appointment = appointmentSnap.exists() ? appointmentSnap.data() : null;
-        await updateDoc(doc(db, 'appointments', appointmentId), { status: 'declined', declined_at: serverTimestamp() });
+        const appointment = appointmentSnap.exists() ? appointmentSnap.data() : apparentDeclineAppointment;
+        // The referral is stored on the appointment so clinics and admins can
+        // audit where a resident was sent, not just on the notification.
+        await updateDoc(doc(db, 'appointments', appointmentId), {
+            status: 'declined',
+            declined_at: serverTimestamp(),
+            referral_facility: referral.facility,
+            referral_contact: referral.contact,
+            referral_reason: referral.reason,
+            referral_note: referral.note,
+            referral_created_at: serverTimestamp()
+        });
         await addDoc(collection(db, 'history'), { clinic_id: currentClinicId, type: 'appointment', action: 'declined', appointment_id: appointmentId, resident_name: appointment?.resident_name || 'Resident', performed_by: auth.currentUser.uid, created_at: serverTimestamp() });
-        if (appointment?.resident_uid) await addDoc(collection(db, 'notifications'), { recipient_uid: appointment.resident_uid, user_id: appointment.resident_uid, appointment_id: appointmentId, type: 'appointment', title: 'Appointment Declined', message: `Your appointment request at ${appointment.clinic_name || 'the clinic'} was declined.`, read: false, created_at: serverTimestamp() });
+        if (appointment?.resident_uid) {
+            await addDoc(collection(db, 'notifications'), {
+                recipient_uid: appointment.resident_uid,
+                user_id: appointment.resident_uid,
+                appointment_id: appointmentId,
+                type: 'appointment',
+                title: 'Appointment Declined',
+                message: buildDeclineMessage(appointment, referral),
+                // Rendered as a highlighted callout by the resident's card.
+                referral_facility: referral.facility,
+                referral_contact: referral.contact,
+                referral_reason: referral.reason,
+                referral_note: referral.note,
+                read: false,
+                created_at: serverTimestamp()
+            });
+        }
+        closeDeclineReferral();
         await loadStaffAppointments(currentClinicId);
     } catch (error) {
         alert('Could not decline appointment: ' + error.message);
+    } finally {
+        if (button) { button.disabled = false; button.innerHTML = '<i class="fa-solid fa-xmark"></i> Decline Appointment'; }
     }
 }
 
@@ -344,7 +579,8 @@ function renderInventory() {
     const items = inventoryItems.filter(item => {
         const category = inventoryCategory(item);
         if (filter === 'all') return true;
-        if (filter === 'active') return category.adequate;
+        // "Active Stock" means every usable batch, including low-stock ones.
+        if (filter === 'active') return category.usable;
         if (filter === 'low') return category.low;
         if (filter === 'expired') return category.expired;
         if (filter === 'archived') return category.archived;
@@ -436,9 +672,17 @@ vaccineForm.addEventListener('submit', async (event) => {
     }
 });
 
-document.querySelector('.signout-btn').addEventListener('click', async () => {
-    await signOut(auth);
-    window.location.href = 'login.html';
+// The optional chaining matters: a missing element previously threw a
+// TypeError here, which aborted the rest of the module.
+document.querySelector('.signout-btn')?.addEventListener('click', async () => {
+    try {
+        await signOutUser();
+    } catch (error) {
+        console.error('Sign out failed:', error);
+        alert('Could not sign out: ' + (error.message || 'Unknown error.'));
+        return;
+    }
+    window.location.replace('login.html');
 });
 
 async function openAppointmentDetails(appointmentId) {
@@ -463,6 +707,14 @@ async function openAppointmentDetails(appointmentId) {
                 ? `<a href="${escapeHtml(appointment.valid_id_url)}" target="_blank" rel="noopener"><img class="appointment-id-preview" src="${escapeHtml(appointment.valid_id_url)}" alt="Uploaded valid ID"></a>`
                 : `<a class="appointment-file-link" href="${escapeHtml(appointment.valid_id_url)}" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> View uploaded ID${appointment.valid_id_name ? ` (${escapeHtml(appointment.valid_id_name)})` : ''}</a>`)
             : '<span>Not provided</span>';
+        // The resident may skip the wound photo, so "not provided" is a normal
+        // outcome rather than an error to chase.
+        const woundPhotoMarkup = appointment.wound_photo_url
+            ? `<a href="${escapeHtml(appointment.wound_photo_url)}" target="_blank" rel="noopener"><img class="appointment-id-preview" src="${escapeHtml(appointment.wound_photo_url)}" alt="Resident wound photo"></a>`
+            : '<span>Not provided (optional)</span>';
+        const priorVaccinationDocumentMarkup = appointment.prior_vaccination_document_url
+            ? `<a class="appointment-file-link" href="${escapeHtml(appointment.prior_vaccination_document_url)}" target="_blank" rel="noopener"><i class="fa-solid fa-file-medical"></i> View ${escapeHtml(appointment.prior_vaccination_document_name || 'previous vaccination record')}</a>`
+            : '<span>Not provided (optional)</span>';
         body.innerHTML = `<div class="appointment-detail-grid">
             <div><strong>Resident</strong><span>${displayStaffValue(appointment.resident_name)}</span></div>
             <div><strong>Status</strong><span>${displayStaffValue(appointment.status)}</span></div>
@@ -474,13 +726,16 @@ async function openAppointmentDetails(appointmentId) {
             <div><strong>Date of Bite (locked intake)</strong><span>${displayStaffValue(intake.bite_date)}</span></div>
             <div><strong>Animal (locked intake)</strong><span>${displayStaffValue(intake.animal_type)}</span></div>
             <div><strong>Bite Body Part (locked intake)</strong><span>${displayStaffValue(intake.bite_body_part)}</span></div>
-            <div><strong>Exposure Category</strong><span>${displayStaffValue(intake.patient_category)}</span></div>
             <div><strong>Wound Washed</strong><span>${displayStaffValue(intake.wound_washed)}</span></div>
             <div><strong>Exposure Type</strong><span>${displayStaffValue(intake.bite_type)}</span></div>
             <div><strong>Dose</strong><span>${displayStaffValue(appointment.dose_label)}</span></div>
             <div><strong>Preferred Date</strong><span>${displayStaffValue(appointment.preferred_date)}</span></div>
             <div><strong>Preferred Time</strong><span>${displayStaffValue(appointment.preferred_time)}</span></div>
             <div><strong>Uploaded ID / Photo</strong><span>${idMarkup}</span></div>
+            <div><strong>Wound Photo (for exposure assessment)</strong><span>${woundPhotoMarkup}</span></div>
+            <div><strong>Previous Vaccination Declared</strong><span>${appointment.prior_vaccination_history_declared ? 'Yes' : 'No / not declared'}</span></div>
+            <div><strong>Previous Vaccination Record</strong><span>${priorVaccinationDocumentMarkup}</span></div>
+            ${appointment.prior_vaccination_history_notes ? `<div class="full-field"><strong>Previous Vaccination Notes</strong><span>${displayStaffValue(appointment.prior_vaccination_history_notes)}</span></div>` : ''}
             <div class="full-field"><strong>Previous Vaccination History</strong><span>${historyMarkup}</span></div>
         </div>`;
     } catch (error) {
@@ -510,3 +765,18 @@ document.getElementById('closeDoseCompletionBtn')?.addEventListener('click', () 
     modal.setAttribute('aria-hidden', 'true');
 });
 document.getElementById('doseCompletionForm')?.addEventListener('submit', completeStaffDose);
+
+// --- Decline with referral --------------------------------------------------
+document.getElementById('closeDeclineReferralBtn')?.addEventListener('click', closeDeclineReferral);
+document.getElementById('cancelDeclineReferralBtn')?.addEventListener('click', closeDeclineReferral);
+document.getElementById('declineReferralForm')?.addEventListener('submit', submitDeclineReferral);
+document.getElementById('declineReferralModal')?.addEventListener('click', event => {
+    if (event.target.id === 'declineReferralModal') closeDeclineReferral();
+});
+document.addEventListener('keydown', event => {
+    const modal = document.getElementById('declineReferralModal');
+    if (event.key === 'Escape' && modal?.style.display === 'flex') closeDeclineReferral();
+});
+// Keep the preview in step with what is being typed.
+['declineReferralFacility', 'declineReferralContact', 'declineReferralReason', 'declineReferralNote']
+    .forEach(id => document.getElementById(id)?.addEventListener('input', updateDeclineReferralPreview));

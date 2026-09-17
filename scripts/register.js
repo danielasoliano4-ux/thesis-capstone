@@ -3,6 +3,51 @@ import { createUserWithEmailAndPassword, deleteUser } from "https://www.gstatic.
 import { doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
 
+const ICONS = {
+  success: 'fa-solid fa-circle-check',
+  error: 'fa-solid fa-circle-exclamation',
+  warning: 'fa-solid fa-triangle-exclamation',
+  info: 'fa-solid fa-circle-info'
+};
+
+function showToast(message, type = 'info') {
+  let container = document.getElementById('toastContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toastContainer';
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  toast.innerHTML = `
+    <i class="toast-icon ${ICONS[type] || ICONS.info}"></i>
+    <div class="toast-body">
+      <p class="toast-title">${type === 'success' ? 'Success' : type === 'error' ? 'Registration failed' : type === 'warning' ? 'Check your details' : 'Notice'}</p>
+      <p class="toast-message"></p>
+    </div>
+    <button type="button" class="toast-close" aria-label="Dismiss">&times;</button>
+    <span class="toast-progress"></span>
+  `;
+  toast.querySelector('.toast-message').textContent = message;
+
+  let timer = null;
+  const remove = () => {
+    clearTimeout(timer);
+    toast.classList.remove('show');
+    toast.classList.add('hide');
+    toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+  };
+
+  toast.querySelector('.toast-close').addEventListener('click', remove);
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('show'));
+
+  timer = setTimeout(remove, 5000);
+}
+
 const policyModal = document.getElementById('policyModal');
 const policyTitle = document.getElementById('policyTitle');
 const policyContent = document.getElementById('policyContent');
@@ -74,23 +119,27 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
   const certificate = certificateInput.files[0];
 
   if (!barangay) {
-    alert('Please select your barangay.');
+    showToast('Please select your barangay.', 'warning');
     return;
   }
   if (password !== password2) {
-    alert('Passwords do not match.');
+    showToast('Passwords do not match.', 'warning');
     return;
   }
   if (password.length < 8) {
-    alert('Password must be at least 8 characters.');
+    showToast('Password must be at least 8 characters.', 'warning');
+    return;
+  }
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password)) {
+    showToast('Password must include at least one special character (e.g. ! @ # $ % ^ & *).', 'warning');
     return;
   }
   if (role === 'clinic_staff' && (!clinicName || !clinicAddress || !certificate)) {
-    alert('Clinic staff registration requires the clinic name, address, and BPLO certificate photo.');
+    showToast('Clinic staff registration requires the clinic name, address, and BPLO certificate photo.', 'warning');
     return;
   }
   if (certificate && (certificate.size > 5 * 1024 * 1024 || !['image/jpeg', 'image/png'].includes(certificate.type))) {
-    alert('Upload a JPG or PNG BPLO certificate image no larger than 5 MB.');
+    showToast('Upload a JPG or PNG BPLO certificate image no larger than 5 MB.', 'warning');
     return;
   }
 
@@ -135,10 +184,10 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
       created_at: serverTimestamp()
     });
 
-    alert(role === 'clinic_staff'
+    showToast(role === 'clinic_staff'
       ? 'Registration submitted. An administrator must approve your clinic staff account before you can sign in.'
-      : 'Account created successfully! You can now sign in.');
-    window.location.href = 'login.html';
+      : 'Account created successfully! You can now sign in.', 'success');
+    setTimeout(() => { window.location.href = 'login.html'; }, 1800);
 
   } catch (err) {
     if (createdUser) {
@@ -148,13 +197,13 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
     btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create Account';
 
     if (err.code === 'auth/email-already-in-use') {
-      alert('That email is already registered. Please sign in instead.');
+      showToast('That email is already registered. Please sign in instead.', 'error');
     } else if (err.code === 'auth/invalid-email') {
-      alert('Please enter a valid email address.');
+      showToast('Please enter a valid email address.', 'error');
     } else if (err.code === 'auth/weak-password') {
-      alert('Password is too weak. Use at least 8 characters.');
+      showToast('Password is too weak. Use at least 8 characters including a special character.', 'error');
     } else {
-      alert('Registration failed: ' + err.message);
+      showToast('Registration failed: ' + err.message, 'error');
     }
   }
 });

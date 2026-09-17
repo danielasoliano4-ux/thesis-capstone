@@ -174,7 +174,7 @@ function createMarkerForMap(map, clinic, mapId) {
     const routeButton = event.popup.getElement()?.querySelector('.map-directions-button');
     if (routeButton) routeButton.addEventListener('click', () => {
       selectedDestination = clinic;
-      locateUser();
+      locateUser(false);
       if (userLocation) updateRoutes();
     });
   });
@@ -314,7 +314,7 @@ function addLocationControl(entry) {
     button.title = 'Use my current location';
     button.setAttribute('aria-label', 'Use my current location');
     button.innerHTML = '<i class="fa-solid fa-location-crosshairs"></i>';
-    L.DomEvent.on(button, 'click', locateUser);
+    L.DomEvent.on(button, 'click', () => locateUser(true));
     return button;
   };
   control.addTo(entry.map);
@@ -322,15 +322,24 @@ function addLocationControl(entry) {
 
 let userLocation = null;
 let locationWatchId = null;
-function locateUser() {
+// Location updates keep the blue marker accurate, but should never take over
+// the viewport unless the resident explicitly pressed the location control.
+let centerOnNextLocationUpdate = false;
+function locateUser(centerMap = true) {
   if (!navigator.geolocation) return alert('Location is not supported by this browser.');
+  centerOnNextLocationUpdate = centerMap;
+  if (centerMap && userLocation) {
+    mapsData.forEach(entry => entry.map.setView(userLocation, 17));
+    centerOnNextLocationUpdate = false;
+  }
   const updateLocation = position => {
     userLocation = [position.coords.latitude, position.coords.longitude];
     mapsData.forEach(entry => {
       if (!entry.userMarker) entry.userMarker = L.circleMarker(userLocation, { radius: 8, color: '#fff', weight: 3, fillColor: '#2878e8', fillOpacity: 1 }).addTo(entry.map);
       else entry.userMarker.setLatLng(userLocation);
-      if (!selectedDestination) entry.map.setView(userLocation, 16);
+      if (centerOnNextLocationUpdate) entry.map.setView(userLocation, 17);
     });
+    centerOnNextLocationUpdate = false;
     if (selectedDestination) updateRoutes();
   };
   if (locationWatchId !== null) return;

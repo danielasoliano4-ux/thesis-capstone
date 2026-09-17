@@ -37,6 +37,14 @@ body {
     align-items: center;
 }
 
+/* Uses the replaceable assets/system-logo.png file instead of a map-pin icon. */
+.system-logo {
+    width: 46px;
+    height: 46px;
+    object-fit: contain;
+    flex: 0 0 auto;
+}
+
 .logo-section h2 {
     font-size: 18px;
 }
@@ -502,5 +510,35 @@ tbody td {
 .appointment-course-history li { line-height: 1.45; }
 .appointment-file-link { color: #2563eb; font-weight: 700; text-decoration: none; }
 .appointment-details-error { color: #b91c1c; }
+
+/* --- Decline with referral ------------------------------------------------- */
+.decline-referral-modal-content { max-width: 620px; max-height: calc(100vh - 40px); overflow-y: auto; padding: 28px 30px; }
+.decline-referral-modal-content .modal-header { margin-bottom: 8px; }
+.decline-referral-modal-content .modal-header h2 { color: #111827; font-size: 22px; }
+.decline-referral-intro { color: #6b7280; font-size: 13.5px; line-height: 1.55; margin: 0 0 20px; }
+#declineReferralForm { display: grid; gap: 16px; }
+.decline-referral-summary { padding: 12px 14px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 13px; color: #374151; }
+.decline-referral-summary strong { color: #111827; }
+.decline-referral-field { display: block; font-size: 13px; font-weight: 600; color: #374151; }
+.decline-referral-field input,
+.decline-referral-field textarea { width: 100%; margin-top: 6px; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; font-weight: 400; color: #111827; font-family: inherit; }
+.decline-referral-field input:focus,
+.decline-referral-field textarea:focus { outline: none; border-color: #ef0000; }
+.decline-referral-field textarea { resize: vertical; }
+.optional-note { font-weight: 400; color: #9ca3af; font-size: 12px; }
+.decline-referral-preview { padding: 14px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; }
+.decline-referral-preview .preview-label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #c2410c; margin-bottom: 6px; }
+.decline-referral-preview p { margin: 0; font-size: 13px; line-height: 1.55; color: #7c2d12; }
+.decline-referral-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.modal-secondary-btn { padding: 11px 18px; background: #f3f4f6; color: #374151; border: 0; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.modal-secondary-btn:hover { background: #e5e7eb; }
+.modal-danger-btn { flex: 1; max-width: 260px; padding: 11px 18px; background: #ef0000; color: #fff; border: 0; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.modal-danger-btn:hover { background: #cc0000; }
+.modal-danger-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+@media (max-width: 600px) {
+    .decline-referral-modal-content { padding: 20px 18px; }
+    .decline-referral-actions { flex-direction: column-reverse; }
+    .decline-referral-actions > * { width: 100%; max-width: none; }
+}
 @media (max-width: 700px) { .appointment-details-modal-content { max-height: calc(100vh - 24px); padding: 22px 18px; } .appointment-details-body { max-height: calc(100vh - 135px); } .appointment-detail-grid { grid-template-columns: 1fr; } .appointment-detail-grid > .full-field { grid-column: auto; } }
 @media (max-width: 700px) { .resident-appointment-card { align-items: flex-start; flex-wrap: wrap; } .resident-appointment-actions { align-items: stretch; margin-left: 64px; width: calc(100% - 64px); } .resident-appointment-actions button { width: 100%; } }

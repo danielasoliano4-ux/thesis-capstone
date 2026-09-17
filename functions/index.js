@@ -81,6 +81,32 @@ exports.sendAppointmentConfirmation = onDocumentUpdated(
 	}
 );
 
+// Inclusive reservation window: a duration of N days keeps an appointment valid
+// through the (N-1)th day after its scheduled date.
+const DEFAULT_RESERVATION_DAYS = 1;
+const MAX_RESERVATION_DAYS = 7;
+
+function addDaysToDateString(dateString, daysToAdd) {
+	const parts = String(dateString || '').split('-').map(Number);
+	if (parts.length !== 3 || parts.some(value => Number.isNaN(value))) return '';
+	const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+	date.setUTCDate(date.getUTCDate() + Number(daysToAdd || 0));
+	return date.toISOString().split('T')[0];
+}
+
+async function getReservationDaysFor(clinicId) {
+	if (!clinicId) return DEFAULT_RESERVATION_DAYS;
+	try {
+	const clinic = await db.collection('clinics').doc(clinicId).get();
+	const days = Number(clinic.data()?.reservation_days);
+	if (!Number.isFinite(days) || days < 1) return DEFAULT_RESERVATION_DAYS;
+	return Math.min(MAX_RESERVATION_DAYS, Math.floor(days));
+	} catch (error) {
+	console.error('Could not read reservation duration for clinic', clinicId, error);
+	return DEFAULT_RESERVATION_DAYS;
+	}
+}
+
 function getManilaDate(daysFromNow = 0) {
 	const date = new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000);
 	return new Intl.DateTimeFormat('en-CA', {
@@ -130,23 +156,36 @@ exports.expireAppointments = onSchedule(
 			timeZone: 'Asia/Manila'
 		},
 		async () => {
-			const today = getManilaDate();
+				const today = getManilaDate();
 			const snapshot = await db.collection('appointments')
-				.where('status', '==', 'confirmed')
-				.get();
+			.where('status', '==', 'confirmed')
+			.get();
 
-			const batch = db.batch();
 			let expiredCount = 0;
 			for (const appointmentDoc of snapshot.docs) {
-				if (!appointmentDoc.data().reservation_end_date || appointmentDoc.data().reservation_end_date >= today) continue;
-				batch.update(appointmentDoc.ref, {
-					status: 'expired',
-					expired_at: admin.firestore.FieldValue.serverTimestamp(),
-					expiration_reason: 'Reservation duration ended'
-				});
+			const appointment = appointmentDoc.data();
+			const endDate = appointment.reservation_end_date;
+			// Prefer the stored window. When an older appointment never had one
+			// written, derive it from the clinic setting (or the system default)
+			// so unfulfilled schedules cannot stay active forever.
+			let effectiveEnd = endDate;
+			if (!effectiveEnd) {
+			const days = await getReservationDaysFor(appointment.clinic_id);
+				effectiveEnd = addDaysToDateString(appointment.preferred_date, days - 1);
+			if (!effectiveEnd) continue;
+			}
+			// The end date is inclusive, so the appointment is only lapsed once
+			// today is strictly past it.
+			if (effectiveEnd >= today) continue;
+			appointmentDoc.ref.update({
+			status: 'expired',
+				expired_at: admin.firestore.FieldValue.serverTimestamp(),
+				expiration_reason: 'Reservation duration ended - resident did not attend',
+			reservation_end_date: effectiveEnd
+			});
 				expiredCount++;
 			}
-			if (expiredCount) await batch.commit();
+			if (expiredCount) console.log(`Expired ${expiredCount} unfulfilled appointment(s).`);
 		}
 	);
 

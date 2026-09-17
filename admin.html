@@ -16,9 +16,8 @@
     <!-- HEADER -->
     <header class="top-header">
         <div class="logo-section">
-            <div class="logo-icon">
-                <i class="fa-solid fa-location-dot"></i>
-            </div>
+            <!-- Replace assets/system-logo.png with your own logo image anytime. -->
+            <img class="system-logo" src="/assets/system-logo.png" alt="System logo">
             <div>
                 <h2>Anti-Rabies Locator</h2>
                 <p>Cabuyao, Laguna</p>
@@ -239,7 +238,7 @@
                 <div>
                     <h4>Monthly Rabies Cases Report</h4>
                     <p>Comprehensive breakdown of rabies cases by barangay for the current month.</p>
-                    <button class="dl-btn" data-report="cases"><i class="fa-solid fa-download"></i> Download PDF</button>
+                    <button class="dl-btn" data-report="cases"><i class="fa-solid fa-eye"></i> Preview Report</button>
                 </div>
             </div>
             <div class="report-card">
@@ -247,7 +246,7 @@
                 <div>
                     <h4>Vaccination Status Report</h4>
                     <p>List of all active patients, their dose completion status and next appointment dates.</p>
-                    <button class="dl-btn" data-report="vaccinations"><i class="fa-solid fa-download"></i> Download PDF</button>
+                    <button class="dl-btn" data-report="vaccinations"><i class="fa-solid fa-eye"></i> Preview Report</button>
                 </div>
             </div>
             <div class="report-card">
@@ -255,7 +254,7 @@
                 <div>
                     <h4>Vaccine Inventory Report</h4>
                     <p>City-wide vaccine stock levels across all clinics, including expiry dates and batch numbers.</p>
-                    <button class="dl-btn" data-report="inventory"><i class="fa-solid fa-download"></i> Download PDF</button>
+                    <button class="dl-btn" data-report="inventory"><i class="fa-solid fa-eye"></i> Preview Report</button>
                 </div>
             </div>
             <div class="report-card">
@@ -263,10 +262,23 @@
                 <div>
                     <h4>Barangay Risk Assessment</h4>
                     <p>Heat map and risk classification of all barangays based on case rates and vaccination coverage.</p>
-                    <button class="dl-btn" data-report="risk"><i class="fa-solid fa-download"></i> Download PDF</button>
+                    <button class="dl-btn" data-report="risk"><i class="fa-solid fa-eye"></i> Preview Report</button>
                 </div>
             </div>
         </div>
+    </div>
+</div>
+<!-- Report content is rendered here before the admin chooses to print or save it as PDF. -->
+<div id="reportPreviewModal" class="report-preview-modal" role="dialog" aria-modal="true" aria-labelledby="reportPreviewTitle" aria-hidden="true" hidden>
+    <div class="report-preview-shell">
+        <div class="report-preview-toolbar">
+            <div><strong id="reportPreviewTitle">Report Preview</strong><span>Review before printing or saving as PDF</span></div>
+            <div class="report-preview-actions">
+                <button type="button" id="closeReportPreviewBtn" class="btn-outline">Close</button>
+                <button type="button" id="printReportPreviewBtn" class="btn-primary"><i class="fa-solid fa-print"></i> Proceed to Print / Save PDF</button>
+            </div>
+        </div>
+        <div class="report-preview-stage"><article id="reportPreviewDocument" class="report-preview-document"></article></div>
     </div>
 </div>
 <script type="module">

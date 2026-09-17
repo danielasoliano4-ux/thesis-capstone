@@ -20,9 +20,7 @@
 
         <div class="logo-section">
 
-            <div class="logo-icon">
-                <i class="fa-solid fa-location-dot"></i>
-            </div>
+            <img class="system-logo" src="assets/system-logo.png" alt="System logo">
 
             <div>
                 <h2>Anti-Rabies Locator</h2>
@@ -288,6 +286,57 @@
                 <button type="button" id="closeAppointmentDetailsBtn" class="modal-close" aria-label="Close">&times;</button>
             </div>
             <div id="appointmentDetailsBody" class="appointment-details-body">Loading appointment details...</div>
+        </div>
+    </div>
+
+    <!-- Decline uses an optional referral so the resident is told where to go next. -->
+    <div id="declineReferralModal" class="modal" aria-hidden="true">
+        <div class="modal-content decline-referral-modal-content" role="dialog" aria-modal="true" aria-labelledby="declineReferralTitle">
+            <div class="modal-header">
+                <h2 id="declineReferralTitle">Decline Appointment</h2>
+                <button type="button" id="closeDeclineReferralBtn" class="modal-close" aria-label="Close">&times;</button>
+            </div>
+            <p class="decline-referral-intro">
+                Tell the resident why this clinic cannot accommodate the case. If you know of a facility that can, add a referral — it is shown to the resident in their notification.
+            </p>
+            <form id="declineReferralForm">
+                <input type="hidden" id="declineAppointmentId">
+                <div id="declineReferralSummary" class="decline-referral-summary"></div>
+                <label class="decline-referral-field">
+                    Recommended facility <span class="optional-note">(optional)</span>
+                    <input id="declineReferralFacility" list="referralFacilityOptions" placeholder="e.g., Sta. Cruz Hospital" maxlength="120">
+                </label>
+                <datalist id="referralFacilityOptions">
+                    <option value="Sta. Cruz Hospital"></option>
+                    <option value="Cabuyao City Health Center"></option>
+                    <option value="Laguna Medical Center"></option>
+                    <option value="Philippine General Hospital"></option>
+                    <option value="San Lazaro Hospital (Animal Bite Treatment Center)"></option>
+                    <option value="Research Institute for Tropical Medicine"></option>
+                </datalist>
+                <label class="decline-referral-field">
+                    Referral address or contact <span class="optional-note">(optional)</span>
+                    <input id="declineReferralContact" placeholder="e.g., 123 Rizal St, Sta. Cruz, Laguna / (049) 123-4567" maxlength="160">
+                </label>
+                <label class="decline-referral-field">
+                    Reason for referral <span class="optional-note">(optional)</span>
+                    <input id="declineReferralReason" placeholder="e.g., No available anti-rabies vaccine stock" maxlength="160">
+                </label>
+                <label class="decline-referral-field">
+                    Note to the resident <span class="optional-note">(optional)</span>
+                    <textarea id="declineReferralNote" rows="3" placeholder="e.g., Please bring your bite record and a valid ID." maxlength="400"></textarea>
+                </label>
+                <div class="decline-referral-preview">
+                    <span class="preview-label">What the resident will see</span>
+                    <p id="declineReferralPreview"></p>
+                </div>
+                <div class="decline-referral-actions">
+                    <button type="button" class="modal-secondary-btn" id="cancelDeclineReferralBtn">Cancel</button>
+                    <button type="submit" class="modal-danger-btn" id="confirmDeclineReferralBtn">
+                        <i class="fa-solid fa-xmark"></i> Decline Appointment
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

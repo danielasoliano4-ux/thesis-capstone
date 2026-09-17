@@ -157,6 +157,115 @@
         #registerForm .register-btn {
             margin-top: 2px;
         }
+        .pw-hint {
+            display: block;
+            margin-top: 6px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 3000;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: min(360px, calc(100vw - 32px));
+            pointer-events: none;
+        }
+        .toast {
+            position: relative;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            overflow: hidden;
+            padding: 14px 40px 14px 16px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-left: 4px solid #6b7280;
+            border-radius: 10px;
+            box-shadow: 0 12px 30px rgba(17, 24, 39, 0.16);
+            pointer-events: auto;
+            opacity: 0;
+            transform: translateX(120%);
+            transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.35s ease;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .toast.hide {
+            opacity: 0;
+            transform: translateX(120%);
+        }
+        .toast-icon {
+            font-size: 18px;
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+        .toast-body { flex: 1; min-width: 0; }
+        .toast-title {
+            margin: 0 0 2px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #111827;
+        }
+        .toast-message {
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #4b5563;
+            overflow-wrap: anywhere;
+        }
+        .toast-close {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            border: 0;
+            background: transparent;
+            color: #9ca3af;
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .toast-close:hover { color: #4b5563; }
+        .toast-progress {
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            height: 3px;
+            width: 100%;
+            background: currentColor;
+            opacity: 0.25;
+            transform-origin: left;
+            animation: toast-countdown 5s linear forwards;
+        }
+        .toast.hide .toast-progress { animation-play-state: paused; }
+        @keyframes toast-countdown {
+            from { transform: scaleX(1); }
+            to { transform: scaleX(0); }
+        }
+        .toast-success { border-left-color: #16a34a; color: #16a34a; }
+        .toast-success .toast-icon,
+        .toast-success .toast-title { color: #15803d; }
+        .toast-error { border-left-color: #ef0000; color: #ef0000; }
+        .toast-error .toast-icon,
+        .toast-error .toast-title { color: #b91c1c; }
+        .toast-warning { border-left-color: #f59e0b; color: #f59e0b; }
+        .toast-warning .toast-icon,
+        .toast-warning .toast-title { color: #b45309; }
+        .toast-info { border-left-color: #2563eb; color: #2563eb; }
+        .toast-info .toast-icon,
+        .toast-info .toast-title { color: #1d4ed8; }
+        @media (max-width: 600px) {
+            .toast-container { top: 12px; right: 12px; left: 12px; width: auto; }
+            .toast { transform: translateY(-140%); }
+            .toast.show { transform: translateY(0); }
+            .toast.hide { transform: translateY(-140%); }
+        }
         .register-card .terms-text {
             margin: 14px 0 0;
             line-height: 1.5;
@@ -174,9 +283,7 @@
 <body>
     <header class="top-header"
         <div class="logo-section">
-            <div class="logo-icon">
-                <i class="fa-solid fa-location-dot"></i>
-            </div>
+            <img class="system-logo" src="assets/system-logo.png" alt="System logo">
             <div>
                 <h2>Anti-Rabies Locator</h2>
                 <p>Cabuyao, Laguna</p>
@@ -188,9 +295,7 @@
     <main class="main-container" style="padding: 40px 20px;">
 
         <div class="main-logo" style="margin-bottom: 24px;">
-            <div class="big-logo">
-                <i class="fa-solid fa-location-dot"></i>
-            </div>
+            <img class="system-logo system-logo-hero" src="assets/system-logo.png" alt="System logo">
             <h1>Create Your Account</h1>
             <p>Join the Anti-Rabies Locator System for Cabuyao</p>
         </div>
@@ -273,9 +378,10 @@
                     <div class="form-group">
                         <label>Password</label>
                         <div class="password-wrapper">
-                            <input type="password" id="pw" placeholder="Min. 8 characters" required />
+                            <input type="password" id="pw" placeholder="password" required />
                             <button type="button" class="toggle-pw" onclick="togglePw('pw')" aria-label="Show or hide password"><i class="fa-regular fa-eye"></i></button>
                         </div>
+                        <small class="pw-hint">Use at least 8 characters with one special character (e.g. ! @ # $ %).</small>
                     </div>
                     <div class="form-group">
                         <label>Confirm Password</label>

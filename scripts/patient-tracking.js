@@ -404,7 +404,6 @@ async function openRecordModal(id) {
         <div><strong>Valid ID</strong><span>${validIdMarkup}</span></div>
         <div><strong>Reservation</strong><span>${displayValue(details.preferred_date)}${details.reservation_end_date && details.reservation_end_date !== details.preferred_date ? ` to ${displayValue(details.reservation_end_date)}` : ''} at ${displayValue(details.preferred_time)}</span></div>
         <div><strong>Dose</strong><span>${displayValue(details.dose_label)}</span></div>
-        <div><strong>Category of Patient</strong><span>${displayValue(details.patient_category)}</span></div>
         <div><strong>Was the Bite Washed?</strong><span>${displayValue(details.wound_washed)}</span></div>
         <div><strong>Type of Bite</strong><span>${displayValue(details.bite_type)}</span></div>
       </div>`;

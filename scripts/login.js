@@ -79,7 +79,11 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
       return;
     }
 
-    if (role === 'clinic_staff' && (profile.is_active === false || profile.approval_status !== 'approved')) {
+    // The approval gate only applies to newly registered clinic staff, whose
+    // profile is written with approval_status 'pending'. Existing clinic staff
+    // accounts may have no approval_status field at all, so only an explicit
+    // 'pending' or 'denied' status should block sign-in.
+    if (role === 'clinic_staff' && (profile.approval_status === 'pending' || profile.approval_status === 'denied')) {
       showLoginMessage(profile.approval_status === 'denied'
         ? 'Your clinic staff registration was not approved. Please contact an administrator.'
         : 'Your clinic staff account is pending administrator approval.');
@@ -104,14 +108,24 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     btn.textContent = originalText;
     btn.disabled = false;
 
+    // Surface the real failure in the console — otherwise every unrecognised
+    // error collapses into the same generic "check your connection" message.
+    console.error('Login failed:', err.code || err.name, err.message, err);
+
     if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-email') {
       showLoginMessage('The email or password is incorrect. Check your details or register for an account.');
     } else if (err.code === 'auth/wrong-password') {
       showLoginMessage('The password is incorrect. Please try again.');
     } else if (err.code === 'auth/too-many-requests') {
       showLoginMessage('Too many failed attempts. Please wait a moment before trying again.');
+    } else if (err.code === 'auth/network-request-failed') {
+      showLoginMessage('Network error. Check your internet connection and try again.');
+    } else if (err.code === 'auth/invalid-api-key' || err.code === 'auth/configuration-not-found') {
+      showLoginMessage('Login is not configured correctly. Please contact your administrator.');
+    } else if (err.code === 'permission-denied' || err.code === 'unavailable') {
+      showLoginMessage('Could not read your account profile. Please contact your administrator.');
     } else {
-      showLoginMessage('Login failed. Please check your connection and try again.');
+      showLoginMessage(`Login failed (${err.code || 'unknown error'}). Please try again.`);
     }
   }
 });

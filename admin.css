@@ -566,6 +566,35 @@ tbody tr:last-child td {
 .report-filters label { display:grid; gap:4px; color:#4b5563; font-size:12px; font-weight:600; }
 .report-filters input { min-height:36px; padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; font:inherit; }
 
+/* Print preview: the sheet is sized for A4 and doubles as the print document. */
+.report-preview-modal { position: fixed; inset: 0; z-index: 1000; background: rgba(17, 24, 39, .65); padding: 24px; overflow: auto; }
+.report-preview-shell { width: min(100%, 1050px); margin: 0 auto; }
+.report-preview-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 18px; background: #fff; border-radius: 10px 10px 0 0; }
+.report-preview-toolbar strong, .report-preview-toolbar span { display: block; }
+.report-preview-toolbar span { margin-top: 2px; color: #6b7280; font-size: 12px; }
+.report-preview-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.report-preview-stage { padding: 28px; background: #d1d5db; }
+.report-preview-document { box-sizing: border-box; width: 210mm; min-height: 297mm; max-width: 100%; margin: 0 auto; padding: 17mm; background: #fff; color: #111827; font-family: Arial, sans-serif; font-size: 10pt; box-shadow: 0 2px 12px rgba(0,0,0,.18); }
+.report-document-header { display: flex; justify-content: space-between; gap: 18px; padding-bottom: 14px; border-bottom: 3px solid #ef0000; }
+.report-brand { display: flex; gap: 10px; align-items: center; color: #b91c1c; font-weight: 700; }
+.report-brand i { font-size: 20px; }
+.report-document-header h1 { margin: 6px 0 4px; color: #111827; font-size: 20pt; }
+.report-document-header p, .report-generated { margin: 0; color: #4b5563; font-size: 9pt; line-height: 1.45; }
+.report-generated { text-align: right; }
+.report-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0; }
+.report-summary-card { padding: 11px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f9fafb; }
+.report-summary-card span { display: block; color: #6b7280; font-size: 8.5pt; }
+.report-summary-card strong { display: block; margin-top: 4px; color: #111827; font-size: 15pt; }
+.report-preview-document h2 { margin: 18px 0 8px; font-size: 12pt; }
+.report-preview-document table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.report-preview-document th { padding: 8px 6px; background: #fee2e2; color: #991b1b; font-size: 8pt; text-align: left; text-transform: uppercase; }
+.report-preview-document td { padding: 7px 6px; border-bottom: 1px solid #e5e7eb; overflow-wrap: anywhere; vertical-align: top; }
+.report-preview-document tr { break-inside: avoid; }
+.report-empty { padding: 16px; background: #f9fafb; color: #6b7280; text-align: center; }
+.report-footer { margin-top: 20px; padding-top: 8px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 8pt; display: flex; justify-content: space-between; }
+@media (max-width: 700px) { .report-preview-modal { padding: 0; } .report-preview-toolbar { border-radius: 0; align-items: flex-start; flex-direction: column; } .report-preview-stage { padding: 10px; } .report-preview-document { padding: 10mm; font-size: 8pt; } .report-summary { grid-template-columns: 1fr; } }
+@media print { body > * { display: none !important; } body > #reportPreviewModal { display: block !important; position: static; overflow: visible; padding: 0; background: #fff; } #reportPreviewModal[hidden] { display: block !important; } .report-preview-shell { width: auto; margin: 0; } .report-preview-toolbar { display: none !important; } .report-preview-stage { padding: 0; background: #fff; } .report-preview-document { width: 210mm; min-height: 0; max-width: none; margin: 0; padding: 12mm; box-shadow: none; } @page { size: A4; margin: 0; } }
+
 /* Consistent actions for Clinic and User Management tables. */
 .table-action-group { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .table-action {
@@ -583,6 +612,13 @@ tbody tr:last-child td {
     min-height: 32px;
     padding: 7px 10px;
     transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease;
+}
+
+.system-logo {
+    width: 58px;
+    height: 58px;
+    object-fit: contain;
+    flex: 0 0 auto;
 }
 .table-action:hover { transform: translateY(-1px); }
 .table-action:focus-visible { outline: 3px solid rgba(239, 0, 0, .22); outline-offset: 2px; }

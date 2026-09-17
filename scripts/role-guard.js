@@ -19,7 +19,11 @@ export function protectPage(expectedRole, loginPage = 'login.html') {
     const profile = await fetchUserProfile(user.uid);
     const hasExpectedRole = profile && (profile.role === expectedRole
       || (expectedRole === 'admin' && profile.role === 'administrator'));
-    if (expectedRole === 'clinic_staff' && profile && (profile.is_active === false || profile.approval_status !== 'approved')) {
+    // Only newly registered clinic staff carry a 'pending' approval_status.
+    // Existing staff accounts may have no approval_status field, so they must
+    // not be signed out and bounced back to the login page.
+    if (expectedRole === 'clinic_staff' && profile
+      && (profile.approval_status === 'pending' || profile.approval_status === 'denied')) {
       await signOut(auth);
       alert(profile.approval_status === 'denied'
         ? 'Your clinic staff registration was not approved.'

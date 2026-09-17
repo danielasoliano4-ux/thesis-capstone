@@ -144,7 +144,9 @@ service cloud.firestore {
     }
 
     match /vaccination_documents/{documentId} {
-      allow read: if isResident() && resource.data.resident_uid == request.auth.uid;
+      // Supporting vaccination-history records can be reviewed by administrators;
+      // clinic staff receive only the document reference attached to their clinic's appointment.
+      allow read: if isAdmin() || (isResident() && resource.data.resident_uid == request.auth.uid);
       allow create: if isResident() && request.resource.data.resident_uid == request.auth.uid;
       allow update, delete: if isResident() && resource.data.resident_uid == request.auth.uid;
     }

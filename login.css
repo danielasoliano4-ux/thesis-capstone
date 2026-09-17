@@ -466,3 +466,17 @@ hr {
     from { opacity: 0; transform: translateY(-4px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* Uses the replaceable assets/system-logo.png file on login and registration. */
+.system-logo {
+    width: 46px;
+    height: 46px;
+    object-fit: contain;
+    flex: 0 0 auto;
+}
+.system-logo-hero {
+    display: block;
+    width: 104px;
+    height: 104px;
+    margin: 0 auto;
+}

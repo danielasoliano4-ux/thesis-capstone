@@ -35,7 +35,12 @@ document.getElementById('clearReportDates')?.addEventListener('click', () => {
   document.getElementById('reportStartDate').value = '';
   document.getElementById('reportEndDate').value = '';
 });
-document.querySelectorAll('[data-report]').forEach(button => button.addEventListener('click', () => downloadReport(button.dataset.report)));
+document.querySelectorAll('[data-report]').forEach(button => button.addEventListener('click', () => openReportPreview(button.dataset.report)));
+document.getElementById('closeReportPreviewBtn')?.addEventListener('click', closeReportPreview);
+document.getElementById('printReportPreviewBtn')?.addEventListener('click', () => window.print());
+document.getElementById('reportPreviewModal')?.addEventListener('click', event => {
+  if (event.target.id === 'reportPreviewModal') closeReportPreview();
+});
 document.getElementById('addClinicBtn')?.addEventListener('click', () => editClinic());
 document.getElementById('addUserBtn')?.addEventListener('click', () => createUserAccount());
 document.getElementById('analyticsYear')?.addEventListener('change', event => {
@@ -232,7 +237,7 @@ function renderAnalytics() {
     ongoing,
     deaths,
     highRiskBarangays: barangays.filter(item => item.cases / maxCases >= 0.66).length,
-    pendingStaff: users.filter(user => user.role === 'clinic_staff' && (user.is_active === false || user.approval_status === 'pending' || user.status === 'pending')).length,
+    pendingStaff: users.filter(user => user.role === 'clinic_staff' && (user.approval_status === 'pending' || user.status === 'pending')).length,
     clinicsOutOfStock: clinics.filter(clinic => usableClinicStock(clinic.id) === 0).length,
     expiringBatches: inventory.filter(item => !item.archived && isExpiringOrExpired(item.expiry)).length,
     publicRecords: buildPublicCaseRecords()
@@ -288,7 +293,7 @@ function escapeHtml(value) {
 
 function renderManagement() {
   const staff = users.filter(user => user.role === 'clinic_staff');
-  const pending = staff.filter(user => user.is_active === false || user.approval_status === 'pending' || user.status === 'pending');
+  const pending = staff.filter(user => user.approval_status === 'pending' || user.status === 'pending');
   setText('userTotalResidents', users.filter(user => user.role === 'resident').length || residents.size);
   setText('userClinicStaff', staff.length);
   setText('userPendingApproval', pending.length);
@@ -311,8 +316,12 @@ function renderManagement() {
   if (userBody) {
     userBody.innerHTML = users.length ? users.map(user => {
       const active = user.is_active !== false && user.status !== 'disabled';
-      const location = user.role === 'resident' ? residents.get(user.id)?.barangay || '-' : user.clinic_name || user.clinic_id || '-';
-      return `<tr><td><strong>${escapeHtml(user.full_name || user.email || 'User')}</strong></td><td>${escapeHtml(user.role || '-')}</td><td>${escapeHtml(location)}</td><td><span class="status ${active ? 'adequate' : 'critical'}">${active ? 'Active' : 'Inactive'}</span></td><td>${formatDate(user.last_active_at || user.updated_at || user.created_at)}</td><td><div class="table-action-group"><button type="button" class="table-action table-action-edit" data-edit-user="${user.id}" aria-label="Edit ${escapeHtml(user.full_name || user.email || 'user')}"><i class="fa-regular fa-pen-to-square"></i><span>Edit</span></button><button type="button" class="table-action table-action-delete" data-delete-user="${user.id}" aria-label="Delete ${escapeHtml(user.full_name || user.email || 'user')}"><i class="fa-regular fa-trash-can"></i><span>Delete</span></button></div></td></tr>`;
+      const residentProfile = residents.get(user.id);
+      const location = user.role === 'resident' ? residentProfile?.barangay || '-' : user.clinic_name || user.clinic_id || '-';
+      const priorHistory = user.role === 'resident' && residentProfile?.prior_vaccination_history_declared
+        ? `<br><small style="color:#1d4ed8;font-weight:700;">Prior vaccination declared</small>${residentProfile.prior_vaccination_document_url ? `<br><a href="${escapeHtml(residentProfile.prior_vaccination_document_url)}" target="_blank" rel="noopener">Review supporting record</a>` : ''}`
+        : '';
+      return `<tr><td><strong>${escapeHtml(user.full_name || user.email || 'User')}</strong>${priorHistory}</td><td>${escapeHtml(user.role || '-')}</td><td>${escapeHtml(location)}</td><td><span class="status ${active ? 'adequate' : 'critical'}">${active ? 'Active' : 'Inactive'}</span></td><td>${formatDate(user.last_active_at || user.updated_at || user.created_at)}</td><td><div class="table-action-group"><button type="button" class="table-action table-action-edit" data-edit-user="${user.id}" aria-label="Edit ${escapeHtml(user.full_name || user.email || 'user')}"><i class="fa-regular fa-pen-to-square"></i><span>Edit</span></button><button type="button" class="table-action table-action-delete" data-delete-user="${user.id}" aria-label="Delete ${escapeHtml(user.full_name || user.email || 'user')}"><i class="fa-regular fa-trash-can"></i><span>Delete</span></button></div></td></tr>`;
     }).join('') : '<tr><td colspan="6">No users found.</td></tr>';
     userBody.querySelectorAll('[data-edit-user]').forEach(button => button.addEventListener('click', () => editUser(users.find(item => item.id === button.dataset.editUser))));
     userBody.querySelectorAll('[data-delete-user]').forEach(button => button.addEventListener('click', () => deleteUserAccount(button.dataset.deleteUser)));
@@ -447,7 +456,7 @@ function inReportRange(record, range) {
   return (!range.start || value >= range.start) && (!range.end || value <= range.end);
 }
 
-function downloadReport(kind) {
+function legacyDownloadReport(kind) {
   try {
     const range = reportRange();
     if (!window.jspdf?.jsPDF) throw new Error('The PDF library has not loaded. Check your internet connection and try again.');
@@ -475,4 +484,67 @@ function downloadReport(kind) {
   } catch (error) {
     alert(`Could not generate report: ${error.message}`);
   }
+}
+
+function reportDefinition(kind, range) {
+  const caseRows = appointments.filter(item => item.status !== 'declined' && inReportRange(item, range));
+  const vaccinationRows = vaccinations.filter(item => inReportRange(item, range));
+  const activeInventory = inventory.filter(item => !item.archived);
+  if (kind === 'cases') return {
+    title: 'Rabies Cases Report', subtitle: 'Reported animal-bite cases by clinic and barangay',
+    headers: ['Date', 'Resident', 'Barangay', 'Clinic', 'Status'],
+    rows: caseRows.map(item => [item.preferred_date || 'No date', item.resident_name || 'Resident', item.barangay || barangayFor(item), item.clinic_name || '-', item.status || 'pending']),
+    totals: [['Reported cases', caseRows.length], ['Confirmed', caseRows.filter(item => item.status === 'confirmed').length], ['Completed', caseRows.filter(item => item.status === 'completed').length]]
+  };
+  if (kind === 'vaccinations') return {
+    title: 'Vaccination Status Report', subtitle: 'Completed anti-rabies vaccine doses by resident and clinic',
+    headers: ['Date given', 'Resident', 'Dose', 'Vaccine', 'Clinic'],
+    rows: vaccinationRows.map(item => [item.date_given || 'No date', item.resident_name || item.resident_uid || 'Resident', `Dose ${item.dose_number || '-'}`, item.vaccine_name || '-', item.clinic_name || '-']),
+    totals: [['Doses recorded', vaccinationRows.length], ['Residents served', new Set(vaccinationRows.map(item => item.resident_uid).filter(Boolean)).size], ['Clinics reporting', new Set(vaccinationRows.map(item => item.clinic_id).filter(Boolean)).size]]
+  };
+  if (kind === 'inventory') return {
+    title: 'Vaccine Inventory Report', subtitle: 'Current non-archived vaccine batches across all clinics',
+    headers: ['Clinic', 'Vaccine', 'Batch', 'Quantity', 'Expiry date'],
+    rows: activeInventory.map(item => [item.clinic_name || clinics.find(clinic => clinic.id === item.clinic_id)?.name || item.clinic_id || '-', item.type || '-', item.batch || '-', `${Number(item.quantity || 0)} doses`, item.expiry || '-']),
+    totals: [['Active batches', activeInventory.length], ['Total doses', activeInventory.reduce((sum, item) => sum + Number(item.quantity || 0), 0)], ['Low / expired', activeInventory.filter(item => Number(item.quantity || 0) <= 15 || isExpired(item.expiry)).length]]
+  };
+  if (kind === 'risk') {
+    const counts = new Map();
+    caseRows.forEach(item => { const name = barangayFor(item); counts.set(name, (counts.get(name) || 0) + 1); });
+    const rows = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    const highest = Math.max(1, ...rows.map(([, count]) => count));
+    return {
+      title: 'Barangay Risk Assessment', subtitle: 'Case-volume risk classification by barangay',
+      headers: ['Barangay', 'Reported cases', 'Risk classification'],
+      rows: rows.map(([name, count]) => [name, count, count / highest >= .66 ? 'High' : count / highest >= .33 ? 'Medium' : 'Low']),
+      totals: [['Barangays assessed', rows.length], ['High-risk barangays', rows.filter(([, count]) => count / highest >= .66).length], ['Reported cases', rows.reduce((sum, [, count]) => sum + count, 0)]]
+    };
+  }
+  return null;
+}
+
+function openReportPreview(kind) {
+  try {
+    const range = reportRange();
+    const report = reportDefinition(kind, range);
+    const documentEl = document.getElementById('reportPreviewDocument');
+    const modal = document.getElementById('reportPreviewModal');
+    if (!report || !documentEl || !modal) throw new Error('The report preview is unavailable. Please refresh and try again.');
+    const table = report.rows.length
+      ? `<table><thead><tr>${report.headers.map(header => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead><tbody>${report.rows.map(row => `<tr>${row.map(value => `<td>${escapeHtml(value)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+      : '<p class="report-empty">No records match this report and date range.</p>';
+    documentEl.innerHTML = `<header class="report-document-header"><div><div class="report-brand"><i class="fa-solid fa-shield-virus"></i> Anti-Rabies Locator</div><h1>${escapeHtml(report.title)}</h1><p>${escapeHtml(report.subtitle)}</p></div><div class="report-generated">Cabuyao, Laguna<br>Coverage: ${escapeHtml(range.label)}<br>Generated: ${escapeHtml(new Date().toLocaleString())}</div></header><section class="report-summary">${report.totals.map(([label, value]) => `<div class="report-summary-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}</section><h2>Report details</h2>${table}<footer class="report-footer"><span>Anti-Rabies Locator System</span><span>Administrator report</span></footer>`;
+    document.getElementById('reportPreviewTitle').textContent = report.title;
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+  } catch (error) {
+    alert(`Could not prepare report preview: ${error.message}`);
+  }
+}
+
+function closeReportPreview() {
+  const modal = document.getElementById('reportPreviewModal');
+  if (!modal) return;
+  modal.hidden = true;
+  modal.setAttribute('aria-hidden', 'true');
 }
