@@ -66,7 +66,7 @@ function lifecycleHandler({ db, HttpsError, timestamp, now = () => new Date() })
       const end = start + WINDOW_MS;
       if (action === 'confirm') {
         if (item.status !== 'pending') throw new HttpsError('failed-precondition', 'Only pending appointments can be confirmed.');
-        if (!Number.isFinite(end) || +current >= end) throw new HttpsError('failed-precondition', 'The arrival window has ended. Ask the resident to book again.');
+        if (!Number.isFinite(start) || +current >= start) throw new HttpsError('failed-precondition', 'This pending appointment has expired. Ask the resident to book again.');
         tx.update(ref, { status: 'confirmed', confirmed_at: timestamp(), reschedule_requested: false,
           scheduled_at_ms: start, arrival_deadline_ms: end });
         const notification = db.collection('notifications').doc();
@@ -105,12 +105,29 @@ function lifecycleHandler({ db, HttpsError, timestamp, now = () => new Date() })
     });
   };
 }
+function archiveExpiredAppointment(db, tx, ref, item, current, reason) {
+  const id = ref.id || ref.path.split('/').pop();
+  tx.update(ref, { status: 'expired', archived: true, archived_at: current, expired_at: current, expiration_reason: reason });
+  tx.set(db.collection('history').doc('appointment-expired-' + id), {
+    type: 'appointment', action: 'expired', appointment_id: id, clinic_id: item.clinic_id,
+    resident_uid: item.resident_uid || '', resident_name: item.resident_name || 'Resident',
+    preferred_date: item.preferred_date || '', preferred_time: item.preferred_time || '',
+    expiration_reason: reason, performed_by: 'system', created_at: current
+  });
+  if (typeof item.resident_uid === 'string' && item.resident_uid.trim()) tx.set(db.collection('notifications').doc('appointment-expired-' + id), {
+    recipient_uid: item.resident_uid, user_id: item.resident_uid, appointment_id: id,
+    clinic_id: item.clinic_id, clinic_name: item.clinic_name || '', type: 'appointment',
+    title: 'Appointment expired', action: 'rebook',
+    message: 'Your appointment at ' + (item.clinic_name || 'the clinic') + ' on ' + item.preferred_date + ' at ' + item.preferred_time + ' has expired. Choose a new slot to reschedule your visit.',
+    read: false, created_at: current
+  });
+}
 async function deleteNoShow(db, ref, now = () => new Date()) {
   return db.runTransaction(async tx => {
     const item = (await tx.get(ref)).data();
-    // Re-read inside the transaction so cleanup can never delete a recorded arrival.
-    if (!isNoShow(item, now())) return false;
-    tx.delete(ref);
+    // Re-read inside the transaction so expiry cannot archive a recorded arrival.
+    if (!isNoShow(item, now()) || typeof item.clinic_id !== 'string' || !item.clinic_id.trim()) return false;
+    archiveExpiredAppointment(db, tx, ref, item, now(), 'arrival_window_elapsed');
     return true;
   });
 }
@@ -143,3 +160,32 @@ function animalExposureSummary(records) {
   }).filter(animal => animal.count > 0).sort((a, b) => b.count - a.count);
 }
 module.exports = { animalExposureSummary, scheduledTime, deadline, isNoShow, validateIntake, lifecycleHandler, deleteNoShow, cleanupAppointments };
+
+function isPendingExpired(item, now) {
+  return item?.status === 'pending' && scheduledTime(item.preferred_date, item.preferred_time) <= +now;
+}
+async function expirePendingAppointment(db, ref, now = () => new Date()) {
+  return db.runTransaction(async tx => {
+    const item = (await tx.get(ref)).data();
+    if (!isPendingExpired(item, now()) && !(item?.status === 'expired' && !item.archived)) return false;
+    if (typeof item.clinic_id !== 'string' || !item.clinic_id.trim()) return false;
+    archiveExpiredAppointment(db, tx, ref, item, now(), item.expiration_reason || 'not_confirmed_before_scheduled_time');
+    return true;
+  });
+}
+async function expirePendingAppointments(db, now = () => new Date()) {
+  let cursor, expired = 0;
+  do {
+    let query = db.collection('appointments').where('status', 'in', ['pending', 'expired']).orderBy('__name__').limit(200);
+    if (cursor) query = query.startAfter(cursor);
+    const page = await query.get();
+    for (const doc of page.docs) {
+      if ((isPendingExpired(doc.data(), now()) || (doc.data().status === 'expired' && !doc.data().archived)) && await expirePendingAppointment(db, doc.ref, now)) expired++;
+    }
+    cursor = page.size === 200 ? page.docs[page.docs.length - 1] : null;
+  } while (cursor);
+  return expired;
+}
+module.exports.isPendingExpired = isPendingExpired;
+module.exports.expirePendingAppointment = expirePendingAppointment;
+module.exports.expirePendingAppointments = expirePendingAppointments;

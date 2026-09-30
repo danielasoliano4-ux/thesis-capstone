@@ -7,6 +7,28 @@ import { protectPage } from './role-guard.js';
 protectPage('clinic_staff');
 initializeHoursPickers();
 
+let selectedLocation = null;
+let locationMap, locationMarker;
+const locationStatus = document.getElementById('clinicLocationStatus');
+function setClinicLocation(lat, lng) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < 14.10 || lat > 14.35 || lng < 121.00 || lng > 121.25) {
+        locationStatus.textContent = 'Choose a location within the Cabuyao area.';
+        if (locationMarker && selectedLocation) locationMarker.setLatLng(selectedLocation);
+        return;
+    }
+    selectedLocation = { lat, lng };
+    if (!locationMap) return;
+    if (!locationMarker) {
+        locationMarker = L.marker(selectedLocation, { draggable: true }).addTo(locationMap);
+        locationMarker.on('dragend', () => { const point = locationMarker.getLatLng(); setClinicLocation(point.lat, point.lng); });
+    } else locationMarker.setLatLng(selectedLocation);
+    locationStatus.textContent = 'Clinic pin: ' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '. Save Changes to publish.';
+}
+if (window.L) {
+    locationMap = L.map('clinicLocationMap').setView([14.272, 121.126], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(locationMap);
+    locationMap.on('click', event => setClinicLocation(event.latlng.lat, event.latlng.lng));
+} else locationStatus.textContent = 'The map could not load. Check your connection and reload to pin your clinic.';
 let currentClinicId = null;
 let currentClinicProfile = null;
 const form = document.getElementById('clinicProfileForm');
@@ -38,6 +60,13 @@ async function loadProfile(clinicId) {
         const savedProfile = profileSnapshot.data();
         const profile = { ...defaultProfile, ...savedProfile };
         currentClinicProfile = profile;
+        selectedLocation = null;
+        if (locationMarker) { locationMarker.remove(); locationMarker = null; }
+        locationStatus.textContent = 'No location pinned yet.';
+        if (Number.isFinite(profile.lat) && Number.isFinite(profile.lng)) {
+            setClinicLocation(profile.lat, profile.lng);
+            if (locationMap) locationMap.setView([profile.lat, profile.lng], 17);
+        }
         document.getElementById('profileName').value = profile.name || '';
         const clinicType = document.getElementById('profileType');
         clinicType.value = ['Animal Bite Center', 'Animal Bite Treatment Center'].includes(profile.type)
@@ -64,7 +93,10 @@ async function loadProfile(clinicId) {
 form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!currentClinicId) return;
+    if (!selectedLocation) { alert('Please pin your clinic location before saving.'); return; }
     const profile = {
+        ...selectedLocation,
+        location: { latitude: selectedLocation.lat, longitude: selectedLocation.lng },
         name: document.getElementById('profileName').value.trim(),
         type: document.getElementById('profileType').value.trim(),
         address: document.getElementById('profileAddress').value.trim(),
@@ -96,7 +128,7 @@ form.addEventListener('submit', async (event) => {
 
 function getProfileChanges(before, after) {
     const labels = {
-        name: 'Clinic name', type: 'Clinic type', address: 'Address', contact: 'Contact', email: 'Email', priceRange: 'Vaccination price range',
+        lat: 'Clinic latitude', lng: 'Clinic longitude', name: 'Clinic name', type: 'Clinic type', address: 'Address', contact: 'Contact', email: 'Email', priceRange: 'Vaccination price range',
         weekdayHours: 'Weekday operating hours', weekendHours: 'Weekend operating hours', reservationDays: 'Reservation days', services: 'Services offered'
     };
     return Object.keys(labels).reduce((changes, field) => {

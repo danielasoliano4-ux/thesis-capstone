@@ -405,6 +405,7 @@
     </style>
 
     <link rel="stylesheet" href="responsive.css">
+    <link rel="stylesheet" href="clinic-map.css">
 </head>
 
 
@@ -478,6 +479,7 @@
   <div class="tab-panel active" id="panel-overview">
  <div class="top-grid" style="margin-top: 25px;">
   <!-- Left Side: First Aid Card (Width fixed at 400px by grid) -->
+  <div class="overview-left-panel">
   <div class="first-aid-card">
     <div class="card-header">
       Emergency First Aid for Animal Bites
@@ -519,6 +521,12 @@
       <strong style="color: #b91c1c;">CRITICAL WARNING</strong>
       <p style="font-size: 13px; color: #6b7280; margin-top: 6px;">Rabies is 100% fatal once symptoms appear. Early treatment is essential for survival.</p>
     </div>
+  </div>
+
+    <aside class="provincial-vaccine-advisory" aria-labelledby="provincialVaccineAdvisoryTitle">
+      <h3 id="provincialVaccineAdvisoryTitle"><i class="fa-solid fa-house-medical" aria-hidden="true"></i> Provincial Vaccine Supply Advisory</h3>
+      <p>For guaranteed anti-rabies vaccine availability regardless of current local stock levels across clinics, provincial health facilities in Santa Cruz, Laguna, serve as a reliable, centralized backup hub.</p>
+    </aside>
   </div>
 
   <!-- Right Side: Map Card (Fills remaining space) -->
@@ -615,15 +623,6 @@
 
     <!-- ---- STATE B: ACTIVE PATIENT (has vaccination record) ---- -->
     <div id="view-active" style="display:none;">
-
-      <!-- UNLOCKED NOTIFICATION -->
-      <div class="unlocked-banner">
-        <i class="fa-solid fa-circle-check"></i>
-        <div>
-          <h4>Vaccination Record Unlocked</h4>
-          <p>Your clinic staff has recorded your first dose. Your vaccination progress tracker is now active. Complete all scheduled doses to finish treatment.</p>
-        </div>
-      </div>
 
       <!-- STAT ROW -->
       <div class="stat-row">
@@ -1000,7 +999,7 @@
         <p style="font-size:13px;color:#6b7280;padding:10px 0;">Loading appointments...</p>
       </div>
 
-      <p class="section-label" style="margin-top:24px;">Completed</p>
+      <p class="section-label" style="margin-top:24px;">Appointment History</p>
       <div id="liveCompletedAppointments">
         <p style="font-size:13px;color:#6b7280;padding:10px 0;">Loading completed appointments...</p>
       </div>

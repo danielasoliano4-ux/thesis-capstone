@@ -114,7 +114,7 @@ body {
 
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 20px;
     margin-bottom: 30px;
 }
@@ -542,3 +542,20 @@ tbody td {
 }
 @media (max-width: 700px) { .appointment-details-modal-content { max-height: calc(100vh - 24px); padding: 22px 18px; } .appointment-details-body { max-height: calc(100vh - 135px); } .appointment-detail-grid { grid-template-columns: 1fr; } .appointment-detail-grid > .full-field { grid-column: auto; } }
 @media (max-width: 700px) { .resident-appointment-card { align-items: flex-start; flex-wrap: wrap; } .resident-appointment-actions { align-items: stretch; margin-left: 64px; width: calc(100% - 64px); } .resident-appointment-actions button { width: 100%; } }
+
+.expired-appointment { background: #f8fafc; border-color: #d1d5db; cursor: default; box-shadow: none; }
+.status-expired, .appointment-expired { display: inline-block; background: #e5e7eb !important; color: #4b5563 !important; border: 1px solid #d1d5db; border-radius: 20px; padding: 4px 10px; font-size: 12px; font-weight: 700; }
+.expired-appointment button:disabled { background: #e5e7eb; color: #6b7280; border: 1px solid #d1d5db; cursor: not-allowed; opacity: 1; }
+.expired-appointment .book-again-button { background: #fff; color: #b91c1c; border: 1px solid #fecaca; cursor: pointer; }
+
+/* Keep batch selection and dose forms accessible within short viewports. */
+#doseCompletionForm label:has(#completionVaccine) { grid-column: 1 / -1; min-width: 0; }
+#doseCompletionForm #completionVaccine { height: 156px; min-height: 156px; max-width: 100%; padding: 6px; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; background: #fff; font-size: 14px; font-weight: 400; }
+#completionVaccine option { padding: 10px 12px; min-height: 34px; border-radius: 5px; }
+#completionVaccineHint { font-size: 12px; font-weight: 400; line-height: 1.5; color: #64748b; }
+.record-modal-content, .dose-completion-modal-content { box-sizing: border-box; max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; -webkit-overflow-scrolling: touch; }
+@media (max-width: 560px) { #doseCompletionForm .record-edit-grid { grid-template-columns: 1fr; } .record-modal-content, .dose-completion-modal-content { padding: 20px 16px; } }
+
+.vaccine-identity-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.vaccine-identity-grid select { width: 100%; min-width: 0; }
+@media (max-width: 540px) { .vaccine-identity-grid { grid-template-columns: 1fr; } }

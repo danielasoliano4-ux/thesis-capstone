@@ -41,13 +41,16 @@ test('deadline selection permits rebooking a lapsed no-show, but never an arrive
 });
 
 test('time dropdown rebuilds when clinic/date/time changes and preserves valid selections', () => {
- const {availableSlots}=require('./clinic-hours');
+ const {availableSlots,clockMinutes,dateStart}=require('./clinic-hours');
+ let counts = {};
  const source=fs.readFileSync(path.join(__dirname,'../scripts/residents.js'),'utf8');
  let clock=Date.parse('2026-09-24T00:00:00Z');
  let rebuilds=0;
  const select={value:'',dataset:{},options:[],replaceChildren(){this.options=[];this.value='';rebuilds++},appendChild(option){this.options.push(option);if(this.options.length===1)this.value=option.value}};
+ Object.defineProperty(select,'selectedOptions',{get:()=>select.options.filter(option=>option.value===select.value)});
  const elements={time:select,date:{value:'2026-09-24'},hint:{}};
  const context={
+  requestSlotCapacity:()=>({data:{counts}}), clockMinutes, dateStart,
   availableSlots:(clinic,date)=>availableSlots(clinic,date,clock),
   document:{getElementById:id=>elements[id],createElement:()=>({})}
  };
@@ -67,4 +70,8 @@ test('time dropdown rebuilds when clinic/date/time changes and preserves valid s
  context.updateTimeSelect('time','date',{hours:'5 AM - 5 PM'},'hint');
  assert.equal(select.disabled,false);assert.equal(select.options.length,24);
  assert.equal(select.value,'5:00 AM');
+ counts = {[dateStart('2026-09-25')+clockMinutes('5:00 AM')*60000]:5};
+ context.updateTimeSelect('time','date',{hours:'5 AM - 5 PM'},'hint');
+ assert.equal(select.options[0].disabled,true);
+ assert.equal(select.value,'5:30 AM');
 });

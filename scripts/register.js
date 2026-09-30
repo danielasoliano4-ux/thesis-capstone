@@ -90,9 +90,77 @@ const clinicNameInput = document.getElementById('clinicName');
 const clinicAddressInput = document.getElementById('clinicAddress');
 const certificateInput = document.getElementById('bploCertificate');
 
+let registrationPin = null;
+let registrationMap, registrationMarker, selectRegistrationLocation;
+let locationRequest = 0;
+function showRegistrationMap() {
+  const status = document.getElementById('registrationPinStatus');
+  if (!window.L) { status.textContent = 'Map unavailable. Check your connection and reload before registering your clinic.'; return; }
+  if (!registrationMap) {
+    registrationMap = L.map('registrationClinicMap').setView([14.272, 121.126], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(registrationMap);
+    const select = point => {
+      locationRequest++;
+      document.getElementById('locateRegistrationClinic').disabled = false;
+      if (point.lat < 14.10 || point.lat > 14.35 || point.lng < 121.00 || point.lng > 121.25) {
+        status.textContent = 'Choose a location within the Cabuyao area.';
+        if (registrationMarker && registrationPin) registrationMarker.setLatLng(registrationPin);
+        return;
+      }
+      registrationPin = { lat: point.lat, lng: point.lng };
+      if (!registrationMarker) {
+        registrationMarker = L.marker(point, { draggable: true }).addTo(registrationMap);
+        registrationMarker.on('dragend', () => select(registrationMarker.getLatLng()));
+      } else registrationMarker.setLatLng(point);
+      status.textContent = 'Selected clinic location: ' + point.lat.toFixed(6) + ', ' + point.lng.toFixed(6);
+    };
+    selectRegistrationLocation = select;
+    registrationMap.on('click', event => select(event.latlng));
+  }
+  requestAnimationFrame(() => registrationMap.invalidateSize());
+}
+document.getElementById('locateRegistrationClinic').addEventListener('click', () => {
+  const button = document.getElementById('locateRegistrationClinic');
+  const status = document.getElementById('registrationPinStatus');
+  if (!window.isSecureContext || !navigator.geolocation) {
+    status.textContent = 'Current location needs HTTPS (or localhost) and a browser that supports location. You can still click the map to place your pin.';
+    return;
+  }
+  showRegistrationMap();
+  if (!registrationMap || !selectRegistrationLocation) return;
+  const requestId = ++locationRequest;
+  button.disabled = true;
+  status.textContent = 'Finding your current location. Allow location access when your browser asks.';
+  navigator.geolocation.getCurrentPosition(position => {
+    if (requestId !== locationRequest) return;
+    button.disabled = false;
+    const { latitude: lat, longitude: lng, accuracy } = position.coords;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < 14.10 || lat > 14.35 || lng < 121.00 || lng > 121.25) {
+      status.textContent = 'Your detected location is outside the Cabuyao area. Click the map to select your clinic location instead.';
+      return;
+    }
+    selectRegistrationLocation({ lat, lng });
+    registrationMap.setView([lat, lng], 17);
+    status.textContent = 'Detected location: ' + lat.toFixed(6) + ', ' + lng.toFixed(6)
+      + (Number.isFinite(accuracy) ? ' (estimated accuracy: ' + Math.round(accuracy) + ' meters).' : '.')
+      + ' Check that the pin is on your clinic; drag it to adjust before submitting.';
+  }, error => {
+    if (requestId !== locationRequest) return;
+    button.disabled = false;
+    const messages = {
+      1: 'Location permission was denied. Allow location in your browser settings and try again, or place the pin manually.',
+      2: 'Your device could not determine your location. Try again or place the pin manually.',
+      3: 'Finding your location timed out. Try again or place the pin manually.'
+    };
+    status.textContent = messages[error.code] || 'Could not detect your location. Place the pin manually.';
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+});
 function updateRegistrationFields() {
   const isStaff = accountRole.value === 'clinic_staff';
   staffRegistrationFields.hidden = !isStaff;
+  if (!isStaff) { locationRequest++; document.getElementById('locateRegistrationClinic').disabled = false; }
+  if (isStaff) showRegistrationMap();
+  document.querySelector('#barangayGroup label').textContent = isStaff ? 'Clinic Barangay' : 'Barangay';
   clinicNameInput.required = isStaff;
   clinicAddressInput.required = isStaff;
   certificateInput.required = isStaff;
@@ -118,6 +186,12 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
   const clinicName = clinicNameInput.value.trim();
   const clinicAddress = clinicAddressInput.value.trim();
   const certificate = certificateInput.files[0];
+  const clinicPin = registrationPin ? { ...registrationPin } : null;
+  if (role === 'clinic_staff' && !clinicPin) {
+    showToast('Please select your clinic location on the map before registering.', 'warning');
+    document.getElementById('registrationClinicMap').scrollIntoView({ block: 'center' });
+    return;
+  }
 
   if (!barangay) {
     showToast('Please select your barangay.', 'warning');
@@ -169,6 +243,8 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
       phone,
       clinic_name: role === 'clinic_staff' ? clinicName : '',
       clinic_address: role === 'clinic_staff' ? clinicAddress : '',
+      clinic_barangay: role === 'clinic_staff' ? barangay : '',
+      ...(role === 'clinic_staff' ? { clinic_lat: clinicPin.lat, clinic_lng: clinicPin.lng } : {}),
       bplo_certificate_url: certificateUrl,
       is_active: role !== 'clinic_staff',
       approval_status: role === 'clinic_staff' ? 'pending' : 'approved',

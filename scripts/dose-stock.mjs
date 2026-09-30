@@ -1,6 +1,6 @@
 export function usableStock(item, clinicId, today) {
   return item?.clinic_id === clinicId && !item.archived && typeof item.type === 'string' && item.type.trim()
-    && /^\d{4}-\d{2}-\d{2}$/.test(item.expiry || '') && item.expiry >= today
+    && /^\d{4}-\d{2}-\d{2}$/.test(item.expiry || '') && item.expiry > today
     && Number.isInteger(Number(item.quantity)) && Number(item.quantity) > 0;
 }
 export function availableStock(items, clinicId, today) {
@@ -24,7 +24,8 @@ export async function commitDose(tx, refs, values) {
   tx.set(refs.record, {
     resident_uid: appointment.resident_uid, resident_name: appointment.resident_name || '', appointment_id: refs.appointment.id,
     vaccination_session_id: appointment.vaccination_session_id || 'legacy', dose_number: values.doseNumber,
-    vaccine_name: stock.type, vaccine_type: stock.type, inventory_id: refs.stock.id, vaccine_batch: stock.batch || '',
+    vaccine_name: stock.brand_name || stock.type, vaccine_type: stock.generic_name || stock.type,
+    brand_name: stock.brand_name || '', generic_name: stock.generic_name || '', inventory_id: refs.stock.id, vaccine_batch: stock.batch || '',
     clinic_id: values.clinicId, clinic_name: appointment.clinic_name || '', clinic_location: values.location.trim(),
     date_given: values.date, administered_by: values.uid, recorded_at: values.timestamp
   });

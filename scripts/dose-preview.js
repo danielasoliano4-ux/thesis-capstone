@@ -2,8 +2,9 @@ export function doseSummaryFields(record, residentName, dateLabel) {
   const value = input => String(input ?? '').trim() || 'Not recorded';
   return [
     ['Resident', value(residentName)],
-    ['Vaccine name', value(record.vaccine_name)],
-    ['Vaccine type', value(record.vaccine_type)],
+    ['Brand name', value(record.brand_name || record.vaccine_brand || record.vaccine_name)],
+    ['Generic name', value(record.generic_name || record.vaccine_generic_name || (record.vaccine_type !== record.vaccine_name ? record.vaccine_type : ''))],
+    ['Vaccine batch', value(record.vaccine_batch || record.batch_number || record.batch)],
     ['Dose number', value(record.dose_number)],
     ['Administration date', value(dateLabel)],
     ['Clinic facility', value(record.clinic_name)],
@@ -117,7 +118,7 @@ export function buildDoseReportHtml(records, residentName, formatDate) {
   const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const rows = records.map(record => {
     const fields = new Map(doseSummaryFields(record, residentName, formatDate(record.date_given)));
-    return `<tr>${['Dose number', 'Vaccine name', 'Vaccine type', 'Administration date', 'Clinic facility', 'Dose status'].map(label => `<td>${escape(fields.get(label))}</td>`).join('')}</tr>`;
+    return `<tr>${['Dose number', 'Brand name', 'Generic name', 'Vaccine batch', 'Administration date', 'Clinic facility', 'Dose status'].map(label => `<td>${escape(fields.get(label))}</td>`).join('')}</tr>`;
   }).join('');
   const logo = new URL('../assets/system-logo.png', import.meta.url).href;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Selected vaccination doses</title><style>
@@ -130,7 +131,7 @@ export function buildDoseReportHtml(records, residentName, formatDate) {
     th, td { padding: 10px 6px; border: 1px solid #cbd5e1; text-align: left; vertical-align: top; overflow-wrap: anywhere; } th { background: #eff6ff; } th:first-child { width: 9%; }
     thead { display: table-header-group; } tr { break-inside: avoid; } footer { margin-top: 24px; border-top: 1px solid #cbd5e1; padding-top: 14px; line-height: 1.7; } .note { color: #64748b; font-size: 11px; }
     @media print { body { padding: 0; background: white; } article { padding: 0; max-width: none; min-height: 0; } }
-    </style></head><body><article><header><img src="${escape(logo)}" alt="Vaxx Bite Cabuyao"><div><p>VACCINATION RECORD</p><h1>Selected dose summary</h1></div></header><div class="meta"><strong>Resident:</strong> ${escape(residentName || 'Not recorded')}<br><strong>Report date:</strong> ${escape(new Date().toLocaleDateString())}</div><table><thead><tr><th scope="col">Dose</th><th scope="col">Vaccine name</th><th scope="col">Vaccine type</th><th scope="col">Administered</th><th scope="col">Clinic facility</th><th scope="col">Dose status</th></tr></thead><tbody>${rows}</tbody></table><footer><strong>Total selected dose records: ${records.length}</strong><p class="note">Only selected dose records are included. Missing information is shown as “Not recorded”.</p></footer></article></body></html>`;
+    </style></head><body><article><header><img src="${escape(logo)}" alt="Vaxx Bite Cabuyao"><div><p>VACCINATION RECORD</p><h1>Selected dose summary</h1></div></header><div class="meta"><strong>Resident:</strong> ${escape(residentName || 'Not recorded')}<br><strong>Report date:</strong> ${escape(new Date().toLocaleDateString())}</div><table><thead><tr><th scope="col">Dose</th><th scope="col">Brand name</th><th scope="col">Generic name</th><th scope="col">Vaccine batch</th><th scope="col">Administered</th><th scope="col">Clinic facility</th><th scope="col">Dose status</th></tr></thead><tbody>${rows}</tbody></table><footer><strong>Total selected dose records: ${records.length}</strong><p class="note">Only selected dose records are included. Missing information is shown as “Not recorded”.</p></footer></article></body></html>`;
 }
 
 export function openDoseReportPreview(records, residentName, formatDate) {

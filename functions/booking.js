@@ -1,9 +1,10 @@
+const {checkSlotCapacity}=require('./booking-capacity');
 'use strict';
 const { bookingTimeError } = require('./clinic-hours');
-const { scheduledTime, deadline } = require('./appointment-lifecycle');
+const { scheduledTime, deadline, isPendingExpired } = require('./appointment-lifecycle');
 const { createHash } = require('node:crypto');
 function activeBooking(item, today, current = new Date()) {
-  return item.status === 'pending' || item.status === 'in_progress' ||
+  return (item.status === 'pending' && !isPendingExpired(item, current)) || item.status === 'in_progress' ||
     (['confirmed', 'accepted', 'approved'].includes(item.status) &&
       (Number.isFinite(deadline(item)) ? deadline(item) > +current : (!item.reservation_end_date || item.reservation_end_date >= today)));
 }
@@ -41,10 +42,12 @@ function createBookingHandler({ db, HttpsError, timestamp, now = () => new Date(
         .where('resident_uid', '==', uid).where('clinic_id', '==', data.clinic_id));
       const duplicate = existing.docs.find(item => activeBooking(item.data(), today, now()));
       if (duplicate) throw new HttpsError('already-exists', 'You already have a pending or accepted appointment at this clinic.', { appointmentId: duplicate.id, status: duplicate.data().status });
+      const slotLock = await checkSlotCapacity(tx, db, data.clinic_id, data.preferred_date, data.preferred_time, null, HttpsError);
       // Residents supply only scheduling and existing course context. Intake is staff-only.
       const fields = ['vaccination_session_id', 'primary_clinic_id', 'primary_clinic_name', 'clinic_changed_for_dose', 'dose_label', 'vaccine_name', 'preferred_date', 'preferred_time'];
       const payload = Object.fromEntries(fields.filter(key => data[key] !== undefined).map(key => [key, data[key]]));
       tx.set(appointment, { ...payload, scheduled_at_ms: scheduled, resident_uid: uid, resident_name: profile.full_name || '', resident_email: claims.email || profile.email || '', clinic_id: data.clinic_id, clinic_name: clinic.name || '', clinic_address: clinic.address || '', clinic_staff_uid: clinic.staff_uid || '', status: 'pending', created_at: timestamp() });
+      tx.set(slotLock, { updated_at: timestamp() });
       tx.set(lock, { appointment_id: appointment.id, updated_at: timestamp() });
       return { id: appointment.id };
     });
@@ -74,6 +77,8 @@ function rescheduleBookingHandler({ db, HttpsError, timestamp, now = () => new D
       const nextDate = new Date(Date.parse(item.preferred_date + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10);
       if (data.preferred_date < item.preferred_date || data.preferred_date > nextDate)
         throw new HttpsError('invalid-argument', 'Choose the original appointment date or the following day.');
+      const slotLock = await checkSlotCapacity(tx, db, item.clinic_id, data.preferred_date, data.preferred_time, ref.id, HttpsError);
+      tx.set(slotLock, { updated_at: timestamp() });
       tx.update(ref, { preferred_date: data.preferred_date, preferred_time: data.preferred_time,
         scheduled_at_ms: scheduledTime(data.preferred_date, data.preferred_time),
         arrival_deadline_ms: null, confirmed_at: null, status: 'pending',

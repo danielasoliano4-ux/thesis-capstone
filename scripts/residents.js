@@ -1,4 +1,4 @@
-import { availableSlots, bookingTimeError } from './clinic-hours.js';
+import { availableSlots, bookingTimeError, clockMinutes, dateStart } from './clinic-hours.js';
 import { listenPatientRecords } from './appointment-intake.js';
 import { openDosePreview, openDoseReportPreview } from './dose-preview.js';
 import { app, auth, db, storage, fetchUserProfile, onAuthStateChanged, signOutUser } from './firebase.js';
@@ -6,7 +6,7 @@ import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, a
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
 
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-functions.js';
-import { clinicBooking, appointmentDeadline } from './booking-status.js';
+import { clinicBooking, appointmentDeadline, pendingAppointmentExpired } from './booking-status.js';
 const createBooking = httpsCallable(getFunctions(app), 'createBooking');
 const rescheduleBooking = httpsCallable(getFunctions(app), 'rescheduleBooking');
 
@@ -36,7 +36,7 @@ function manilaToday() {
 }
 
 function isReservationExpired(appointment) {
-  return appointment.status === 'confirmed'
+  return pendingAppointmentExpired(appointment) || appointment.status === 'confirmed'
     && Number.isFinite(appointmentDeadline(appointment))
     && Date.now() >= appointmentDeadline(appointment);
 }
@@ -134,9 +134,13 @@ function loadResidentNotifications(uid) {
       const iconColor = declined ? '#b91c1c' : '#2563eb';
       return `<div class="notif-item${notification.read ? '' : ' unread'}" data-id="${escapeHtml(notification.id)}" data-type="${escapeHtml(type)}" style="background:white;border:1px solid ${declined ? '#fecaca' : '#e5e7eb'};border-radius:10px;padding:16px 20px;margin-bottom:10px;display:flex;gap:14px;align-items:flex-start;position:relative;">
         <div class="notif-icon icon-blue" style="width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:${iconBg};color:${iconColor};"><i class="fa-solid ${icon}"></i></div>
-        <div class="notif-body" style="flex:1;min-width:0;"><h4 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 4px;">${escapeHtml(notification.title || 'Notification')}</h4><p style="margin:0;font-size:13px;color:#4b5563;line-height:1.5;">${escapeHtml(notification.message || notification.body || '')}</p>${buildReferralCallout(notification)}<div class="notif-meta" style="display:flex;align-items:center;gap:12px;margin-top:8px;flex-wrap:wrap;"><span class="notif-time" style="font-size:12px;color:#9ca3af;"><i class="fa-regular fa-clock"></i> ${escapeHtml(createdAt)}</span><span class="notif-tag tag-${escapeHtml(type)}">${escapeHtml(type)}</span></div></div>
+        <div class="notif-body" style="flex:1;min-width:0;"><h4 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 4px;">${escapeHtml(notification.title || 'Notification')}</h4><p style="margin:0;font-size:13px;color:#4b5563;line-height:1.5;">${escapeHtml(notification.message || notification.body || '')}</p>${buildReferralCallout(notification)}${notification.action === 'rebook' ? `<button type="button" class="action-btn notification-rebook" data-notification-id="${escapeHtml(notification.id)}">Reschedule visit</button>` : ''}<div class="notif-meta" style="display:flex;align-items:center;gap:12px;margin-top:8px;flex-wrap:wrap;"><span class="notif-time" style="font-size:12px;color:#9ca3af;"><i class="fa-regular fa-clock"></i> ${escapeHtml(createdAt)}</span><span class="notif-tag tag-${escapeHtml(type)}">${escapeHtml(type)}</span></div></div>
         ${notification.read ? '' : '<div class="unread-dot" style="position:absolute;top:20px;right:16px;width:8px;height:8px;background:#ef0000;border-radius:50%;"></div>'}</div>`;
     }).join('');
+    list.querySelectorAll('.notification-rebook').forEach(button => button.addEventListener('click', () => {
+      const notification = notifications.find(item => item.id === button.dataset.notificationId);
+      if (notification) openBookingModal(notification.clinic_name, notification.clinic_id);
+    }));
     const unreadCount = notifications.filter(notification => !notification.read).length;
     const unread = document.getElementById('unreadCount');
     const badge = document.getElementById('notifBadge');
@@ -407,7 +411,7 @@ async function loadResidentBookings(uid) {
         return `
         <div class="booking-progress-card"><div class="booking-progress-heading"><div><strong>${escapeHtml(booking.clinic_name || 'Clinic')}</strong><div>${escapeHtml(booking.preferred_date || '')} at ${escapeHtml(booking.preferred_time || '')} - ${escapeHtml(booking.dose_label || 'Dose 1')}</div></div><span class="booking-status status-${escapeHtml(status || 'pending')}">${status === 'in_progress' ? 'Arrived' : status === 'confirmed' ? 'Confirmed' : status === 'completed' ? 'Completed' : status === 'declined' ? 'Declined' : status === 'expired' ? 'Expired' : 'Pending clinic review'}</span></div>
         <button type="button" class="view-record-button" data-record-id="${escapeHtml(booking.id)}">View Full Record</button><div class="full-record-details" id="full-record-${escapeHtml(booking.id)}" hidden><strong>Vaccination progress</strong><p>${completedDoseCount} of 5 doses completed.</p><p>${completedDoseCount < 5 ? `Next: Dose ${nextDose} (Day ${doseDayOffsets[nextDose - 1]})${nextDoseDate ? ` on ${formatScheduleDate(firstDoseDate, doseDayOffsets[nextDose - 1])}` : ''}.` : 'Vaccination schedule complete.'}</p>${completedDoseCount < 5 && latestCompletedAppointment?.id === booking.id ? `<button type="button" class="next-dose-button" data-clinic-id="${escapeHtml(latestRecord?.clinic_id || booking.clinic_id || '')}">Book Dose ${nextDose}${nextDoseDate ? ` for ${formatScheduleDate(firstDoseDate, doseDayOffsets[nextDose - 1])}` : ''}</button>` : ''}</div>
-        ${status === 'declined' ? '<p class="booking-status-message">This appointment was declined by the clinic. Please choose another clinic or date.</p>' : status === 'expired' ? '<p class="booking-status-message">The 90-minute arrival window ended. Please book a new appointment.</p>' : `<div class="booking-steps"><div class="booking-step done"><span><i class="fa-solid fa-check"></i></span><small>Booked</small></div><div class="booking-step ${status === 'pending' ? 'current' : 'done'}"><span>${status === 'pending' ? '<i class="fa-solid fa-clock"></i>' : '<i class="fa-solid fa-check"></i>'}</span><small>${status === 'pending' ? 'Under review' : 'Confirmed'}</small></div><div class="booking-step ${status === 'completed' ? 'done' : ''}"><span>${status === 'completed' ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-calendar-day"></i>'}</span><small>${status === 'completed' ? 'Dose recorded' : 'Appointment'}</small></div></div>`}</div>`; }).join('')}</div>`;
+        ${status === 'declined' ? '<p class="booking-status-message">This appointment was declined by the clinic. Please choose another clinic or date.</p>' : status === 'expired' ? '<p class="booking-status-message">This appointment has expired. Please book a new appointment.</p>' : `<div class="booking-steps"><div class="booking-step done"><span><i class="fa-solid fa-check"></i></span><small>Booked</small></div><div class="booking-step ${status === 'pending' ? 'current' : 'done'}"><span>${status === 'pending' ? '<i class="fa-solid fa-clock"></i>' : '<i class="fa-solid fa-check"></i>'}</span><small>${status === 'pending' ? 'Under review' : 'Confirmed'}</small></div><div class="booking-step ${status === 'completed' ? 'done' : ''}"><span>${status === 'completed' ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-calendar-day"></i>'}</span><small>${status === 'completed' ? 'Dose recorded' : 'Appointment'}</small></div></div>`}</div>`; }).join('')}</div>`;
       container.innerHTML = bookingMarkup;
       container.querySelectorAll('.view-record-button').forEach(button => button.addEventListener('click', () => { const details = document.getElementById(`full-record-${button.dataset.recordId}`); if (details) details.hidden = !details.hidden; }));
       container.querySelectorAll('.next-dose-button').forEach(button => button.addEventListener('click', () => { const clinic = window.clinicDirectory?.find(item => item.id === button.dataset.clinicId); openBookingModal(clinic?.name || '', clinic?.id || ''); }));
@@ -755,7 +759,7 @@ function renderLiveAppointments(bookings) {
   if (!upcomingContainer && !completedContainer) return;
   const sorted = [...bookings].sort((first, second) => `${second.preferred_date || ''} ${second.preferred_time || ''}`.localeCompare(`${first.preferred_date || ''} ${first.preferred_time || ''}`));
   const upcoming = sorted.filter(booking => ['pending', 'confirmed', 'in_progress'].includes(appointmentStatus(booking)) && (!booking.preferred_date || booking.preferred_date >= manilaToday()));
-  const completed = sorted.filter(booking => booking.status === 'completed');
+  const completed = sorted.filter(booking => booking.status === 'completed' || appointmentStatus(booking) === 'expired');
   updateNextAppointmentSummary(upcoming);
   const renderCard = (booking, isCompleted) => {
     const appointmentDate = isCompleted ? (booking.completed_at || booking.preferred_date) : booking.preferred_date;
@@ -766,11 +770,15 @@ function renderLiveAppointments(bookings) {
     const vaccine = booking.vaccine_name || 'Vaccination';
     const detail = isCompleted ? `Administered on ${formatRecordDate(appointmentDate)}` : `${booking.preferred_time || 'Time not specified'} | ${booking.clinic_address || 'Clinic location not specified'}`;
     const status = appointmentStatus(booking);
-    return `<div class="appt-card ${isCompleted ? 'completed' : 'upcoming'}"><div class="appt-card-date"><div class="big-day">${escapeHtml(String(day))}</div><div class="month-yr">${escapeHtml(monthYear)}</div></div><div class="appt-card-body"><div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><h3>Dose ${escapeHtml(dose)} ${escapeHtml(vaccine)} Vaccination</h3><span class="appt-status ${isCompleted ? 'status-done' : status === 'expired' ? 'status-expired' : 'status-upcoming'}">${isCompleted ? 'Completed' : status === 'expired' ? 'Expired' : status === 'in_progress' ? 'Arrived' : status === 'confirmed' ? 'Confirmed' : 'Pending'}</span></div><p><i class="fa-solid fa-hospital" style="color:#6b7280;"></i> ${escapeHtml(booking.clinic_name || 'Clinic not specified')}</p><p><i class="fa-regular fa-clock" style="color:#6b7280;"></i> ${escapeHtml(detail)}</p>${['pending', 'confirmed'].includes(status) ? `<div class="appt-card-actions"><button class="action-btn reschedule-button" data-appointment-id="${escapeHtml(booking.id)}"><i class="fa-solid fa-arrows-rotate"></i> Reschedule</button><button class="action-btn danger cancel-appointment-button" data-appointment-id="${escapeHtml(booking.id)}"><i class="fa-solid fa-xmark"></i> Cancel</button></div>` : ''}</div></div>`;
+    return `<div class="appt-card ${status === 'expired' ? 'expired-appointment' : isCompleted ? 'completed' : 'upcoming'}"><div class="appt-card-date"><div class="big-day">${escapeHtml(String(day))}</div><div class="month-yr">${escapeHtml(monthYear)}</div></div><div class="appt-card-body"><div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><h3>Dose ${escapeHtml(dose)} ${escapeHtml(vaccine)} Vaccination</h3><span class="appt-status ${isCompleted ? 'status-done' : status === 'expired' ? 'status-expired' : 'status-upcoming'}">${isCompleted ? 'Completed' : status === 'expired' ? 'Expired' : status === 'in_progress' ? 'Arrived' : status === 'confirmed' ? 'Confirmed' : 'Pending'}</span></div><p><i class="fa-solid fa-hospital" style="color:#6b7280;"></i> ${escapeHtml(booking.clinic_name || 'Clinic not specified')}</p><p><i class="fa-regular fa-clock" style="color:#6b7280;"></i> ${escapeHtml(detail)}</p>${status === 'expired' ? `<div class="appt-card-actions"><button type="button" class="action-btn book-again-button" data-appointment-id="${escapeHtml(booking.id)}">Book Again</button></div>` : ''}${['pending', 'confirmed'].includes(status) ? `<div class="appt-card-actions"><button class="action-btn reschedule-button" data-appointment-id="${escapeHtml(booking.id)}"><i class="fa-solid fa-arrows-rotate"></i> Reschedule</button><button class="action-btn danger cancel-appointment-button" data-appointment-id="${escapeHtml(booking.id)}"><i class="fa-solid fa-xmark"></i> Cancel</button></div>` : ''}</div></div>`;
   };
   if (upcomingContainer) upcomingContainer.innerHTML = upcoming.length ? upcoming.map(booking => renderCard(booking, false)).join('') : '<p style="font-size:13px;color:#6b7280;padding:10px 0;">No upcoming appointments.</p>';
-  if (completedContainer) completedContainer.innerHTML = completed.length ? completed.map(booking => renderCard(booking, true)).join('') : '<p style="font-size:13px;color:#6b7280;padding:10px 0;">No completed appointments yet.</p>';
+  if (completedContainer) completedContainer.innerHTML = completed.length ? completed.map(booking => renderCard(booking, booking.status === 'completed')).join('') : '<p style="font-size:13px;color:#6b7280;padding:10px 0;">No past appointments yet.</p>';
   document.querySelectorAll('.reschedule-button').forEach(button => button.addEventListener('click', () => openRescheduleModal(bookings.find(booking => booking.id === button.dataset.appointmentId))));
+  document.querySelectorAll('.book-again-button').forEach(button => button.addEventListener('click', () => {
+    const booking = bookings.find(item => item.id === button.dataset.appointmentId);
+    if (booking && appointmentStatus(booking) === 'expired') openBookingModal(booking.clinic_name, booking.clinic_id);
+  }));
   document.querySelectorAll('.cancel-appointment-button').forEach(button => button.addEventListener('click', () => openCancelModal(bookings.find(booking => booking.id === button.dataset.appointmentId))));
 }
 
@@ -786,15 +794,8 @@ function updateNextAppointmentSummary(bookings) {
 
 function updateNearestClinicSummary(clinics = []) {
   const element = document.getElementById('nearestClinicDistance');
-  if (!element || !clinics.length) return;
-  const fallback = { lat: 14.2718, lng: 121.1246 };
-  const update = position => {
-    const origin = position ? { lat: position.coords.latitude, lng: position.coords.longitude } : fallback;
-    const nearest = clinics.filter(clinic => Number.isFinite(clinic.lat) && Number.isFinite(clinic.lng)).sort((first, second) => distanceInKm(origin, first) - distanceInKm(origin, second))[0];
-    element.textContent = nearest ? `${distanceInKm(origin, nearest).toFixed(1)} km` : 'No clinic location';
-  };
-  if (navigator.geolocation) navigator.geolocation.getCurrentPosition(update, () => update(), { maximumAge: 300000, timeout: 5000 });
-  else update();
+  if (!element) return;
+  element.textContent = clinics.some(clinic => Number.isFinite(clinic.lat) && Number.isFinite(clinic.lng)) ? 'Tap to find nearest' : 'No clinic location';
 }
 
 function distanceInKm(origin, clinic) {
@@ -1116,20 +1117,38 @@ function earliestBookingDate(doseLevel) {
 }
 
 // --- Appointment time slots -------------------------------------------------
+const slotCapacityCache = new Map();
+const getSlotAvailability = httpsCallable(getFunctions(app), 'getSlotAvailability');
+function requestSlotCapacity(clinicId, date) {
+  if (!clinicId || !date) return null;
+  const key = clinicId + ':' + date;
+  let entry = slotCapacityCache.get(key);
+  if (!entry || (!entry.loading && Date.now() - entry.updated > 15000)) {
+    entry = { ...entry, loading: true, updated: Date.now() }; slotCapacityCache.set(key, entry);
+    getSlotAvailability({ clinic_id: clinicId, date }).then(({data}) => {
+      slotCapacityCache.set(key, { data, updated: Date.now(), loading: false });
+      refreshTimeSlots(); refreshRescheduleSlots();
+    }).catch(() => { slotCapacityCache.set(key, { error: true, updated: Date.now(), loading: false }); refreshTimeSlots(); refreshRescheduleSlots(); });
+  }
+  return entry;
+}
 function updateTimeSelect(selectId, dateId, clinic, hintId) {
   const select = document.getElementById(selectId);
   const date = document.getElementById(dateId)?.value;
   if (!select) return;
   const previous = select.value;
   const result = availableSlots(clinic, date);
-  const signature = [date, result.known, result.hours, ...result.slots].join('|');
+  const capacity = requestSlotCapacity(clinic?.id, date);
+  const signature = [clinic?.id, date, result.known, result.hours, JSON.stringify(capacity?.data), capacity?.error, ...result.slots].join('|');
   if (select.dataset.scheduleSignature === signature) return;
   select.dataset.scheduleSignature = signature;
   select.replaceChildren();
   for (const time of result.slots) {
     const option = document.createElement('option');
     option.value = time;
-    option.textContent = time;
+    const count = capacity?.data?.counts[dateStart(date) + clockMinutes(time) * 60000] || 0;
+    option.disabled = !capacity?.data || count >= 5;
+    option.textContent = time + (capacity?.data ? count >= 5 ? ' - Full' : ' - ' + (5-count) + ' slots left' : ' - Checking availability');
     select.appendChild(option);
   }
   if (!result.slots.length) {
@@ -1138,11 +1157,15 @@ function updateTimeSelect(selectId, dateId, clinic, hintId) {
     option.textContent = !result.known ? 'Operating hours unavailable' : !result.minutes.length ? 'Clinic closed' : 'No future slots available';
     select.appendChild(option);
   } else if (result.slots.includes(previous)) select.value = previous;
-  select.disabled = !result.slots.length;
+  if (select.selectedOptions[0]?.disabled) select.value = [...select.options].find(option => !option.disabled)?.value || '';
+  select.disabled = !result.slots.length || !capacity?.data || ![...select.options].some(option => !option.disabled);
   const hint = document.getElementById(hintId);
   if (hint) hint.textContent = !result.known ? 'Contact the clinic to confirm its operating hours.'
     : !result.slots.length ? 'No available times for this date. Please choose another date.'
-    : 'Hours: ' + result.hours + '. Slots are every 30 minutes (Philippine time).';
+    : capacity?.error ? 'Could not check slot availability. Please try again shortly.'
+    : !capacity?.data ? 'Checking available booking slots...'
+    : select.disabled ? 'All slots are full. Please choose another date.'
+    : 'Maximum 5 bookings per 30-minute slot (Philippine time).';
 }
 function refreshTimeSlots() {
   const current = window.clinicDirectory?.find(item => item.id === selectedClinic?.id);
@@ -1441,6 +1464,9 @@ document.addEventListener('DOMContentLoaded', function() {
   nextAppointmentCard?.addEventListener('click', () => showTab('appointments', document.querySelectorAll('.nav-tab')[1]));
   nextAppointmentCard?.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') nextAppointmentCard.click(); });
   nearestClinicCard?.addEventListener('click', () => { showTab('overview', document.querySelectorAll('.nav-tab')[0]); window.focusNearestClinic?.(); });
+  nearestClinicCard?.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); nearestClinicCard.click(); }
+  });
   notificationsCard?.addEventListener('click', () => showTab('notifications', document.getElementById('nav-notif')));
 
   onAuthStateChanged(auth, (user) => {
@@ -1465,3 +1491,14 @@ document.addEventListener('DOMContentLoaded', function() {
   renderCasesChart();
   setTimeout(renderResVizChart, 300);
 });
+
+let appointmentDisplayKey = '';
+setInterval(() => {
+  const bookings = window.residentAppointments || [];
+  const key = bookings.map(item => item.id + ':' + appointmentStatus(item)).join('|');
+  if (key !== appointmentDisplayKey) {
+    appointmentDisplayKey = key;
+    renderLiveAppointments(bookings);
+    renderUpcomingAppointments(bookings);
+  }
+}, 1000);

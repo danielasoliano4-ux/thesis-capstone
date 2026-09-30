@@ -58,12 +58,12 @@ test('early arrival on the Manila appointment date, scheduled arrival and arriva
   await f.call('arrive'); // idempotent retry after the window
  }
 });
-test('cleanup deletes only confirmed no-shows; preserves pending/arrived/completed',async()=>{
+test('cleanup archives only confirmed no-shows; preserves pending/arrived/completed',async()=>{
  for(const status of ['pending','in_progress','completed','cancelled','declined']){
   const f=fixture({...base,status});f.at('2026-09-25T00:00:00Z');assert.equal(await f.clean(),false);assert.ok(f.rows.has('appointments/a'));
  }
  const f=fixture({...base,status:'confirmed'});f.at('2026-09-24T02:30:00Z');
- assert.equal(await f.clean(),true);assert.equal(f.rows.has('appointments/a'),false);assert.equal(await f.clean(),false);
+ assert.equal(await f.clean(),true);assert.equal(f.rows.get('appointments/a').status,'expired');assert.equal(f.rows.get('appointments/a').archived,true);assert.equal(await f.clean(),false);
 });
 test('arrival and cleanup serialize so recorded arrivals cannot be removed',async()=>{
  const f=fixture({...base,status:'confirmed'});f.at('2026-09-24T02:29:59Z');
@@ -71,7 +71,7 @@ test('arrival and cleanup serialize so recorded arrivals cannot be removed',asyn
  f.at('2026-09-24T02:31:00Z');await f.clean();assert.ok(f.rows.get('appointments/a').arrived_at);
  const late=fixture({...base,status:'confirmed'});late.at('2026-09-24T02:30:00Z');
  const results=await Promise.allSettled([late.clean(),late.call('arrive')]);
- assert.equal(results[1].status,'rejected');assert.equal(late.rows.has('appointments/a'),false);
+ assert.equal(results[1].status,'rejected');assert.equal(late.rows.get('appointments/a').status,'expired');
 });
 test('intake requires arrival and creates a permanent record atomically; retries do not overwrite',async()=>{
  const f=fixture();await assert.rejects(f.call('intake',{intake}),{code:'failed-precondition'});
@@ -104,11 +104,11 @@ test('late confirmation is rejected and malformed schedules are not deleted',asy
  const bad=fixture({...base,status:'confirmed',preferred_time:'unknown'});bad.at('2026-09-25T00:00:00Z');assert.equal(await bad.clean(),false);
 });
 test('cleanup scans beyond its first page',async()=>{
- const rows=Array.from({length:205},(_,i)=>({id:String(i).padStart(3,'0'),ref:{id:i},data:()=>({...base,status:'confirmed'})}));
+ const rows=Array.from({length:205},(_,i)=>({id:String(i).padStart(3,'0'),ref:{id:String(i)},data:()=>({...base,status:'confirmed'})}));
  let calls=0, removed=0;
- const db={collection:()=>({where:()=>({orderBy:()=>({limit:()=>({
+ const db={collection:()=>({doc:id=>({id}),where:()=>({orderBy:()=>({limit:()=>({
    startAfter(cursor){this.cursor=cursor;return this}, async get(){calls++;const start=this.cursor?Number(this.cursor.id)+1:0;const docs=rows.slice(start,start+200);return{docs,size:docs.length}}
- })})})}),runTransaction:async fn=>fn({get:async()=>({data:()=>({...base,status:'confirmed'})}),delete:()=>removed++})};
+ })})})}),runTransaction:async fn=>fn({get:async()=>({data:()=>({...base,status:'confirmed'})}),update:()=>removed++,set:()=>{}})};
  assert.equal(await cleanupAppointments(db,()=>new Date('2026-09-24T02:30:00Z')),205);
  assert.equal(removed,205);assert.equal(calls,2);
 });
@@ -136,4 +136,73 @@ test('intake rejects unsupported dropdown values',async()=>{
   await assert.rejects(f.call('intake',{intake:{...intake,...changes}}),{code:'invalid-argument'});
   assert.equal(f.rows.has('patient_records/a'),false);
  }
+});
+
+test('pending requests expire exactly at scheduled time and retain their record', async () => {
+ const { expirePendingAppointment } = require('./appointment-lifecycle');
+ const f = fixture();
+ const expire = () => expirePendingAppointment(f.db, {path:'appointments/a'}, f.now);
+ f.at('2026-09-24T00:59:59.999Z'); assert.equal(await expire(),false);
+ f.at('2026-09-24T01:00:00Z'); assert.equal(await expire(),true);
+ const record=f.rows.get('appointments/a');
+ assert.equal(record.status,'expired'); assert.equal(record.resident_uid,'resident');
+ assert.equal(record.expiration_reason,'not_confirmed_before_scheduled_time');
+ assert.equal(await expire(),false);
+ await assert.rejects(f.call('confirm'), {code:'failed-precondition'});
+});
+test('confirmation at scheduled time is rejected even before the expiry sweep',async()=>{
+ const f=fixture();f.at('2026-09-24T01:00:00Z');
+ await assert.rejects(f.call('confirm'),{code:'failed-precondition'});
+});
+test('expiry cannot change confirmed, arrived, completed or malformed requests', async()=>{
+ const { expirePendingAppointment } = require('./appointment-lifecycle');
+ for(const changes of [{status:'confirmed'}, {status:'in_progress',arrived_at:'saved'}, {status:'completed'}, {preferred_time:'unknown'}]) {
+  const f=fixture({...base,...changes}); f.at('2026-09-25T00:00:00Z');
+  assert.equal(await expirePendingAppointment(f.db,{path:'appointments/a'},f.now),false);
+  assert.deepEqual(f.rows.get('appointments/a'),{...base,...changes});
+ }
+});
+test('concurrent expiry and acceptance at cutoff leave a retained expired record',async()=>{
+ const { expirePendingAppointment } = require('./appointment-lifecycle');
+ const f=fixture();f.at('2026-09-24T01:00:00Z');
+ const result=await Promise.allSettled([f.call('confirm'),expirePendingAppointment(f.db,{path:'appointments/a'},f.now)]);
+ assert.equal(result[0].status,'rejected');assert.equal(f.rows.get('appointments/a').status,'expired');
+});
+test('past pending requests stop blocking new bookings in server and browser',()=>{
+ const {activeBooking}=require('./booking');
+ const fs=require('node:fs'),vm=require('node:vm');
+ const source=fs.readFileSync(require('node:path').join(__dirname,'../scripts/booking-status.js'),'utf8').replaceAll('export function','function');
+ const context={};vm.createContext(context);vm.runInContext(source,context);
+ const time=Date.parse('2026-09-24T01:00:00Z');
+ assert.equal(activeBooking(base,'2026-09-24',new Date(time)),false);
+ assert.equal(context.clinicBooking([base],'clinic','2026-09-24',time),null);
+ assert.equal(activeBooking(base,'2026-09-24',new Date(time-1)),true);
+ assert.ok(context.clinicBooking([base],'clinic','2026-09-24',time-1));
+});
+
+test('expiry writes audit history and resident rebooking notification once',async()=>{
+ const {expirePendingAppointment}=require('./appointment-lifecycle');
+ for(const status of ['pending','confirmed']) {
+  const f=fixture({...base,status});f.at('2026-09-24T03:00:00Z');
+  const expire=()=>status==='pending'?expirePendingAppointment(f.db,{path:'appointments/a'},f.now):f.clean();
+  await expire();const size=f.rows.size;await expire();assert.equal(f.rows.size,size);
+  assert.equal(f.rows.get('history/appointment-expired-a').action,'expired');
+  assert.equal(f.rows.get('notifications/appointment-expired-a').action,'rebook');
+  assert.equal(f.rows.get('appointments/a').resident_uid,'resident');
+ }
+});
+
+test('legacy appointments missing clinic assignment do not abort expiry',async()=>{
+ const {expirePendingAppointment}=require('./appointment-lifecycle');
+ for(const status of ['pending','confirmed','expired']) {
+  const item={...base,status};delete item.clinic_id;const f=fixture(item);f.at('2026-09-25T00:00:00Z');
+  assert.equal(await (status==='confirmed'?f.clean():expirePendingAppointment(f.db,{path:'appointments/a'},f.now)),false);
+  assert.deepEqual(f.rows.get('appointments/a'),item);
+ }
+});
+test('legacy expired records can be archived without an undefined resident or schedule',async()=>{
+ const {expirePendingAppointment}=require('./appointment-lifecycle');
+ const f=fixture({clinic_id:'clinic',status:'expired'});await expirePendingAppointment(f.db,{path:'appointments/a'},f.now);
+ const history=f.rows.get('history/appointment-expired-a');assert.ok(history);assert.ok(Object.values(history).every(value=>value!==undefined));
+ assert.equal(f.rows.has('notifications/appointment-expired-a'),false);
 });

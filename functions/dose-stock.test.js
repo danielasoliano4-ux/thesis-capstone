@@ -18,7 +18,7 @@ function fixture(overrides={}) {
 }
 test('stock choices exclude other clinics, expired, empty, archived and malformed quantities; earliest expiry first',async()=>{
  const {availableStock}=await core;
- const early={...stock,batch:'early',expiry:'2026-09-26'};
+ const early={...stock,batch:'early',expiry:'2026-09-27'};
  const rows=[stock,early,...[{clinic_id:'other'},{expiry:'2026-09-25'},{expiry:''},{quantity:0},{quantity:-1},{quantity:'invalid'},{quantity:0.5},{archived:true}].map(change=>({...stock,...change}))];
  assert.deepEqual(availableStock(rows,'clinic',values.today).map(item=>item.batch),['early','B1']);
 });
@@ -58,3 +58,14 @@ test('failed transaction commits no stock or patient changes and can be retried'
  assert.equal(f.rows.get('stock').quantity,2);assert.equal(f.rows.has('record'),false);
  await f.run();assert.equal(f.rows.get('stock').quantity,1);
 });
+
+test('a batch expiring today cannot be selected or used to complete a dose',async()=>{
+ const {availableStock}=await core;
+ assert.deepEqual(availableStock([{...stock,expiry:values.today}],'clinic',values.today),[]);
+ const f=fixture({stock:{...stock,expiry:values.today}});
+ await assert.rejects(f.run());
+ assert.equal(f.rows.get('stock').quantity,2);
+ assert.equal(f.rows.has('record'),false);
+});
+
+test('completion preserves separate inventory brand and generic name in the dose report record',async()=>{const f=fixture({stock:{...stock,brand_name:'Verorab',generic_name:'PVRV'}});await f.run();const record=f.rows.get('record');assert.equal(record.brand_name,'Verorab');assert.equal(record.generic_name,'PVRV');assert.equal(record.vaccine_type,'PVRV');assert.equal(record.vaccine_batch,'B1');});

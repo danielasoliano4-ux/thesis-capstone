@@ -9,31 +9,17 @@
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
     <link rel="stylesheet" href="clinic-profile.css"/>
     <link rel="stylesheet" href="responsive.css">
+<link rel="stylesheet" href="clinic-layout.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
-<body>
+<body class="clinic-dashboard">
 
     <!-- HEADER -->
-    <header class="top-header">
-        <div class="logo-section">
-            <div class="logo-icon">
-                <i class="fa-solid fa-location-dot"></i>
-            </div>
-            <div>
-                <h2>Anti-Rabies Locator</h2>
-                <p>Cabuyao, Laguna</p>
-            </div>
-        </div>
-        <div class="header-right">
-            <a href="staff.html" class="sidebar-link">
-                <i class="fa-regular fa-hospital"></i>
-                Clinic Dashboard
-            </a>
-            <button type="button" class="signout-btn">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i>
-                Sign Out
-            </button>
-        </div>
-    </header>
+    <header class="top-header clinic-header">
+  <div class="logo-section"><img class="system-logo" src="assets/system-logo.png" alt="Anti-Rabies Locator logo"><div><h2>Anti-Rabies Locator</h2><p>Cabuyao, Laguna</p></div></div>
+  <div class="header-right"><a href="staff.html" class="sidebar-link">Clinic Dashboard</a><button type="button" class="signout-btn" id="signOutBtn" data-clinic-signout>Sign Out</button></div>
+</header>
 
     <!-- MAIN -->
     <main class="main-container">
@@ -55,7 +41,8 @@
                 <a href="staff.html#resident-appointments" class="tab-link">
                     <button>Resident Appointment</button>
                 </a>
-                <a href="patient-tracking.html" class="tab-link">
+                <a href="confirmed-appointments.html" class="tab-link"><button>Confirmed Appointments</button></a>
+<a href="patient-tracking.html" class="tab-link">
                     <button>Patient Tracking</button>
                 </a>
                 <a href="clinic-profile.html" class="tab-link">
@@ -64,6 +51,7 @@
                 <a href="history.html" class="tab-link">
                     <button>History</button>
                 </a>
+<a href="clinic-notifications.html" class="tab-link"><button>Notifications<span data-expiry-count></span></button></a>
             </div>
 
             <!-- CLINIC PROFILE CONTENT -->
@@ -92,7 +80,8 @@
                     <input id="profileAddress" type="text" value="Brgy. Poblacion Uno, Cabuyao City, Laguna" required/>
                 </div>
 
-                <!-- CONTACT AND EMAIL -->
+                <div class="profile-field full-width"><label>Clinic map location</label><p>Click the map or drag the pin to your clinic in Cabuyao. Save Changes to share your location with residents and administrators.</p><div id="clinicLocationMap" style="height:320px;width:100%;position:relative;z-index:0" aria-label="Pin your clinic location"></div><p id="clinicLocationStatus" role="status">No location pinned yet.</p></div>
+<!-- CONTACT AND EMAIL -->
                 <div class="profile-row">
                     <div class="profile-field">
                         <label>Contact Number</label>
@@ -238,5 +227,7 @@
 
     </main>
     <script type="module" src="scripts/clinic-profile.js"></script>
+<script type="module" src="scripts/clinic-notifications.js"></script>
+<script type="module" src="scripts/clinic-layout.js"></script>
 </body>
 </html>

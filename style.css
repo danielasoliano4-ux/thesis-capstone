@@ -639,3 +639,28 @@ body{
     height: 104px;
     margin: 0 auto;
 }
+
+/* Overview first aid and provincial supply information */
+.overview-left-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+.provincial-vaccine-advisory {
+    padding: 20px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 18px;
+    color: #1e3a8a;
+}
+.provincial-vaccine-advisory h3 {
+    margin: 0 0 10px;
+    font-size: 16px;
+    line-height: 1.5;
+}
+.provincial-vaccine-advisory p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.7;
+}

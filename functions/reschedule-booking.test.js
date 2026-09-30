@@ -5,8 +5,9 @@ class HttpsError extends Error {constructor(code,message){super(message);this.co
 function fixture() {
  let item={resident_uid:'resident',clinic_id:'clinic',status:'confirmed',preferred_date:'2026-09-24',preferred_time:'9:00 AM'};
  let clinic={hours:'5 AM - 5 PM'}, clock=new Date('2026-09-24T00:00:00Z');
- const db={collection:name=>({doc:id=>({name,id})}),runTransaction:async fn=>fn({
-  get:async ref=>({data:()=>ref.name==='users'?{role:'resident',is_active:true}:ref.name==='clinics'?clinic:item}),
+ const db={collection:name=>({doc:id=>({name,id}),where:()=>({query:true})}),runTransaction:async fn=>fn({
+  get:async ref=>ref.query?{docs:[{id:'a',data:()=>item}]}:({data:()=>ref.name==='users'?{role:'resident',is_active:true}:ref.name==='clinics'?clinic:item}),
+  set:()=>{},
   update:(_ref,data)=>{item={...item,...data}}
  })};
  const handler=rescheduleBookingHandler({db,HttpsError,timestamp:()=> 'server',now:()=>clock});

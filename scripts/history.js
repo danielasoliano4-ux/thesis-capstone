@@ -21,7 +21,7 @@ onAuthStateChanged(auth, async (user) => {
       list.innerHTML = entries.map(entry => {
         const isProfile = entry.type === 'clinic_profile';
         const title = isProfile ? 'Clinic profile updated' : `Appointment ${entry.action}`;
-        const detail = isProfile ? 'Business profile settings were saved.' : `${entry.resident_name || 'Resident'} appointment was ${entry.action}.`;
+        const detail = entry.action === 'expired' ? `${entry.resident_name || 'Resident'} ? ${entry.preferred_date || ''} at ${entry.preferred_time || ''}. ${entry.expiration_reason === 'arrival_window_elapsed' ? 'Arrival window elapsed.' : 'Not confirmed before the scheduled time.'} Archived automatically; appointment record retained.` : isProfile ? 'Business profile settings were saved.' : `${entry.resident_name || 'Resident'} appointment was ${entry.action}.`;
         const profileChanges = isProfile ? normalizeChanges(entry.changes) : [];
         const changeMarkup = isProfile
           ? (profileChanges.length

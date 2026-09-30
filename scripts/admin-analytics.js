@@ -1,3 +1,4 @@
+import { viewClinicPin } from './clinic-approval-pin.js';
 import { auth, db, fetchUserProfile } from './firebase.js';
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
 import { routes } from './routes.js';
@@ -42,43 +43,63 @@ document.getElementById('reportPreviewModal')?.addEventListener('click', event =
   if (event.target.id === 'reportPreviewModal') closeReportPreview();
 });
 document.getElementById('addClinicBtn')?.addEventListener('click', () => editClinic());
-document.getElementById('addUserBtn')?.addEventListener('click', () => createUserAccount());
+
 document.getElementById('analyticsYear')?.addEventListener('change', event => {
   selectedAnalyticsYear = Number(event.target.value) || new Date().getFullYear();
   renderAnalytics();
 });
 
+const analyticsStatIds = ["statTotalCases","statTotalVaccinations","statActivePatients","statHighRiskBarangays","statOngoingCases","statCompletedCases","statDeaths"];
+let analyticsUnsubscribes = [];
+let analyticsGeneration = 0;
+const analyticsSources = new Map();
+function analyticsReady() {
+  return analyticsSources.size === 6 && [...analyticsSources.values()].every(state => state === 'ready');
+}
+function updateAnalyticsConnection() {
+  const states = [...analyticsSources.values()];
+  const failed = states.includes('error');
+  const ready = analyticsReady();
+  setText('analyticsLiveStatus', failed ? 'Live data is unavailable. Check your connection and reload to retry.'
+    : ready ? 'Live updates connected - totals follow the selected year.'
+    : states.includes('cached') ? 'Connecting to live data. Waiting for the latest records...'
+    : 'Loading live dashboard...');
+  if (!ready) analyticsStatIds.forEach(id => setText(id, failed ? 'Unavailable' : 'Loading...'));
+}
 onAuthStateChanged(auth, async user => {
+  const generation = ++analyticsGeneration;
+  analyticsUnsubscribes.forEach(unsubscribe => unsubscribe());
+  analyticsUnsubscribes = [];
+  analyticsSources.clear();
+  appointments = []; vaccinations = []; residents = new Map(); users = []; clinics = []; inventory = [];
+  updateAnalyticsConnection();
   if (!user) return;
   const profile = await fetchUserProfile(user.uid);
-  if (profile?.role !== 'admin' && profile?.role !== 'administrator') return;
-  onSnapshot(collection(db, 'appointments'), snapshot => {
-    appointments = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
-    renderAnalytics();
-  }, reportError);
-  onSnapshot(collection(db, 'vaccination_records'), snapshot => {
-    vaccinations = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
-    renderAnalytics();
-  }, reportError);
-  onSnapshot(collection(db, 'residents'), snapshot => {
-    residents = new Map(snapshot.docs.map(item => [item.id, item.data()]));
-    renderAnalytics();
-  }, reportError);
-  onSnapshot(collection(db, 'users'), snapshot => {
-    users = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
-    renderManagement();
-    renderAnalytics();
-  }, reportError);
-  onSnapshot(collection(db, 'clinics'), snapshot => {
-    clinics = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
-    renderManagement();
-    renderAnalytics();
-  }, reportError);
-  onSnapshot(collection(db, 'inventory'), snapshot => {
-    inventory = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
-    renderManagement();
-    renderAnalytics();
-  }, reportError);
+  if (generation !== analyticsGeneration || (profile?.role !== 'admin' && profile?.role !== 'administrator')) return;
+  const sources = {
+    appointments: rows => { appointments = rows; },
+    vaccination_records: rows => { vaccinations = rows; },
+    residents: rows => { residents = new Map(rows.map(item => [item.id, item])); },
+    users: rows => { users = rows; },
+    clinics: rows => { clinics = rows; },
+    inventory: rows => { inventory = rows; }
+  };
+  Object.keys(sources).forEach(name => analyticsSources.set(name, 'loading'));
+  for (const [name, assign] of Object.entries(sources)) {
+    analyticsUnsubscribes.push(onSnapshot(collection(db, name), { includeMetadataChanges: true }, snapshot => {
+      if (generation !== analyticsGeneration) return;
+      assign(snapshot.docs.map(item => ({ id: item.id, ...item.data() })));
+      analyticsSources.set(name, snapshot.metadata.fromCache ? 'cached' : 'ready');
+      updateAnalyticsConnection();
+      if (name === 'users') renderManagement();
+      if (analyticsReady()) { renderManagement(); renderAnalytics(); }
+    }, error => {
+      if (generation !== analyticsGeneration) return;
+      analyticsSources.set(name, 'error');
+      updateAnalyticsConnection();
+      reportError(error);
+    }));
+  }
 });
 
 function reportError(error) {
@@ -181,6 +202,7 @@ function buildPublicCaseRecords() {
 }
 
 function renderAnalytics() {
+  if (!analyticsReady()) return;
   refreshYearSelector();
   const cases = buildCaseSessions().filter(item => item.date?.getFullYear() === selectedAnalyticsYear);
   const yearVaccinations = vaccinations.filter(inSelectedAnalyticsYear);
@@ -297,6 +319,10 @@ function renderManagement() {
   setText('userTotalResidents', users.filter(user => user.role === 'resident').length || residents.size);
   setText('userClinicStaff', staff.length);
   setText('userPendingApproval', pending.length);
+  setText('pendingApprovalsBadge', pending.length);
+  const approvalBadge = document.getElementById('pendingApprovalsBadge');
+  if (approvalBadge) approvalBadge.hidden = pending.length === 0;
+  setText('pendingApprovalSummary', pending.length + ' pending registration' + (pending.length === 1 ? '' : 's'));
   setText('userTotalClinics', clinics.length);
 
   const pendingGrid = document.getElementById('pendingStaffGrid');
@@ -304,10 +330,16 @@ function renderManagement() {
     pendingGrid.innerHTML = pending.length ? pending.map(user => `<div class="user-card">
       <div class="user-avatar" style="background:#dbeafe;color:#2563eb;"><i class="fa-solid fa-user-nurse"></i></div>
       <h4>${escapeHtml(user.full_name || user.email || 'Clinic Staff')}</h4>
-      <p>${escapeHtml(user.clinic_name || user.clinic_id || 'Clinic not assigned')}<br>Created ${formatDate(user.created_at)}${user.bplo_certificate_url ? `<br><a href="${escapeHtml(user.bplo_certificate_url)}" target="_blank" rel="noopener">View BPLO certificate</a>` : ''}</p>
+      <p>${escapeHtml(user.clinic_name || user.clinic_id || 'Clinic not assigned')}<br>${escapeHtml(user.clinic_address || 'Address not provided')}<br>Barangay: ${escapeHtml(user.clinic_barangay || 'Not provided')}<br>Created ${formatDate(user.created_at)}${user.bplo_certificate_url ? `<br><button type="button" class="bplo-view-button" data-bplo-user="${escapeHtml(user.id)}"><i class="fa-regular fa-file-image" aria-hidden="true"></i> View BPLO Certificate</button>` : ''}</p>
+      <button type="button" class="bplo-view-button" data-registration-pin="${escapeHtml(user.id)}">View Clinic Location</button>
       <button class="approve-btn" type="button" data-approve-user="${user.id}">Approve</button>
       <button class="deny-btn" type="button" data-deny-user="${user.id}">Deny</button>
     </div>`).join('') : '<p>No pending clinic staff approvals.</p>';
+    pendingGrid.querySelectorAll('[data-registration-pin]').forEach(button => button.addEventListener('click', () => {
+      const user = users.find(item => item.id === button.dataset.registrationPin);
+      if (user) viewClinicPin({ name: user.clinic_name, address: user.clinic_address, lat: user.clinic_lat, lng: user.clinic_lng });
+    }));
+    pendingGrid.querySelectorAll('[data-bplo-user]').forEach(button => button.addEventListener('click', () => openBploPreview(users.find(user => user.id === button.dataset.bploUser))));
     pendingGrid.querySelectorAll('[data-approve-user]').forEach(button => button.addEventListener('click', () => changeStaffStatus(button.dataset.approveUser, true)));
     pendingGrid.querySelectorAll('[data-deny-user]').forEach(button => button.addEventListener('click', () => changeStaffStatus(button.dataset.denyUser, false)));
   }
@@ -334,8 +366,9 @@ function renderManagement() {
       const totalStock = stock.reduce((total, item) => total + Number(item.quantity || 0), 0);
       const status = totalStock === 0 ? ['critical', 'Out of Stock'] : totalStock <= 15 ? ['low', 'Low Stock'] : ['adequate', 'Available'];
       const updated = [...stock, clinic].map(item => item.updated_at || item.created_at).sort((first, second) => timestampValue(second) - timestampValue(first))[0];
-      return `<tr><td><strong>${escapeHtml(clinic.name || 'Unnamed Clinic')}</strong></td><td>${escapeHtml(clinic.type || 'ABTC')}</td><td>${escapeHtml(clinic.barangay || clinic.address || '-')}</td><td>${totalStock} doses</td><td><span class="status ${status[0]}">${status[1]}</span></td><td>${formatDate(updated)}</td><td><div class="table-action-group"><button type="button" class="table-action table-action-edit" data-edit-clinic="${clinic.id}" aria-label="Edit ${escapeHtml(clinic.name || 'clinic')}"><i class="fa-regular fa-pen-to-square"></i><span>Edit</span></button><button type="button" class="table-action table-action-delete" data-delete-clinic="${clinic.id}" aria-label="Delete ${escapeHtml(clinic.name || 'clinic')}"><i class="fa-regular fa-trash-can"></i><span>Delete</span></button></div></td></tr>`;
+      return `<tr><td><strong>${escapeHtml(clinic.name || 'Unnamed Clinic')}</strong></td><td>${escapeHtml(clinic.type || 'ABTC')}</td><td>${escapeHtml(clinic.barangay || clinic.address || '-')}</td><td>${totalStock} doses</td><td><span class="status ${status[0]}">${status[1]}</span></td><td>${formatDate(updated)}</td><td><div class="table-action-group"><button type="button" class="table-action" data-view-clinic="${clinic.id}">View Location</button><button type="button" class="table-action table-action-edit" data-edit-clinic="${clinic.id}" aria-label="Edit ${escapeHtml(clinic.name || 'clinic')}"><i class="fa-regular fa-pen-to-square"></i><span>Edit</span></button><button type="button" class="table-action table-action-delete" data-delete-clinic="${clinic.id}" aria-label="Delete ${escapeHtml(clinic.name || 'clinic')}"><i class="fa-regular fa-trash-can"></i><span>Delete</span></button></div></td></tr>`;
     }).join('') : '<tr><td colspan="7">No clinics found.</td></tr>';
+    clinicBody.querySelectorAll('[data-view-clinic]').forEach(button => button.addEventListener('click', () => viewClinicPin(clinics.find(item => item.id === button.dataset.viewClinic))));
     clinicBody.querySelectorAll('[data-edit-clinic]').forEach(button => button.addEventListener('click', () => editClinic(clinics.find(item => item.id === button.dataset.editClinic))));
     clinicBody.querySelectorAll('[data-delete-clinic]').forEach(button => button.addEventListener('click', () => deleteClinic(button.dataset.deleteClinic)));
   }
@@ -343,7 +376,7 @@ function renderManagement() {
 
 async function changeStaffStatus(userId, approved) {
   try {
-    await updateDoc(doc(db, 'users', userId), { is_active: approved, approval_status: approved ? 'approved' : 'denied', updated_at: serverTimestamp() });
+    await httpsCallable(getFunctions(), 'reviewClinicRegistration')({ uid: userId, approved });
   } catch (error) {
     console.error('Could not update staff approval:', error);
     alert(`Could not update staff approval: ${error.message}`);
@@ -533,7 +566,7 @@ function openReportPreview(kind) {
     const table = report.rows.length
       ? `<table><thead><tr>${report.headers.map(header => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead><tbody>${report.rows.map(row => `<tr>${row.map(value => `<td>${escapeHtml(value)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
       : '<p class="report-empty">No records match this report and date range.</p>';
-    documentEl.innerHTML = `<header class="report-document-header"><div><div class="report-brand"><i class="fa-solid fa-shield-virus"></i> Anti-Rabies Locator</div><h1>${escapeHtml(report.title)}</h1><p>${escapeHtml(report.subtitle)}</p></div><div class="report-generated">Cabuyao, Laguna<br>Coverage: ${escapeHtml(range.label)}<br>Generated: ${escapeHtml(new Date().toLocaleString())}</div></header><section class="report-summary">${report.totals.map(([label, value]) => `<div class="report-summary-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}</section><h2>Report details</h2>${table}<footer class="report-footer"><span>Anti-Rabies Locator System</span><span>Administrator report</span></footer>`;
+    documentEl.innerHTML = `<header class="report-document-header"><div><div class="report-brand"><img class="report-system-logo" src="/assets/system-logo.png" alt="System logo" width="40" height="40"> <span>Anti-Rabies Locator</span></div><h1>${escapeHtml(report.title)}</h1><p>${escapeHtml(report.subtitle)}</p></div><div class="report-generated">Cabuyao, Laguna<br>Coverage: ${escapeHtml(range.label)}<br>Generated: ${escapeHtml(new Date().toLocaleString())}</div></header><section class="report-summary">${report.totals.map(([label, value]) => `<div class="report-summary-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}</section><h2>Report details</h2>${table}<footer class="report-footer"><span>Anti-Rabies Locator System</span><span>Administrator report</span></footer>`;
     document.getElementById('reportPreviewTitle').textContent = report.title;
     modal.hidden = false;
     modal.setAttribute('aria-hidden', 'false');
@@ -548,3 +581,30 @@ function closeReportPreview() {
   modal.hidden = true;
   modal.setAttribute('aria-hidden', 'true');
 }
+
+let bploZoom = 100;
+function setBploZoom(value) {
+  bploZoom = Math.min(250, Math.max(50, value));
+  document.getElementById('bploPreviewImage').style.width = bploZoom + '%';
+  setText('bploZoomLevel', bploZoom + '%');
+}
+function openBploPreview(user) {
+  if (!user?.bplo_certificate_url) return;
+  let url;
+  try { url = new URL(user.bplo_certificate_url); if (url.protocol !== 'https:') throw new Error(); }
+  catch { alert('The certificate link is invalid.'); return; }
+  const dialog = document.getElementById('bploPreview');
+  const image = document.getElementById('bploPreviewImage');
+  setText('bploPreviewOwner', (user.full_name || 'Clinic staff') + ' - ' + (user.clinic_name || 'Clinic'));
+  setText('bploImageStatus', 'Loading certificate...');
+  image.hidden = true;
+  image.onload = () => { image.hidden = false; setText('bploImageStatus', ''); };
+  image.onerror = () => { setText('bploImageStatus', 'Could not load this certificate. Try Open full size or ask the applicant to submit a valid image.'); };
+  image.src = url.href;
+  document.getElementById('bploOriginal').href = url.href;
+  setBploZoom(100);
+  dialog.showModal();
+}
+document.getElementById('closeBploPreview')?.addEventListener('click', () => document.getElementById('bploPreview').close());
+document.getElementById('bploZoomIn')?.addEventListener('click', () => setBploZoom(bploZoom + 25));
+document.getElementById('bploZoomOut')?.addEventListener('click', () => setBploZoom(bploZoom - 25));

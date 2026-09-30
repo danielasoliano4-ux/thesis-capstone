@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Clinic Notifications | Anti-Rabies Locator</title><link rel="stylesheet" href="staff.css"><link rel="stylesheet" href="responsive.css"><link rel="stylesheet" href="clinic-notifications.css"><link rel="stylesheet" href="clinic-layout.css">
+</head>
+<body class="clinic-dashboard"><header class="top-header clinic-header">
+  <div class="logo-section"><img class="system-logo" src="assets/system-logo.png" alt="Anti-Rabies Locator logo"><div><h2>Anti-Rabies Locator</h2><p>Cabuyao, Laguna</p></div></div>
+  <div class="header-right"><a href="staff.html" class="sidebar-link">Clinic Dashboard</a><button type="button" class="signout-btn" id="signOutBtn" data-clinic-signout>Sign Out</button></div>
+</header>
+<main class="main-container"><div class="page-title"><h1>Notifications</h1><p>Vaccine expiry reminders for your clinic</p></div>
+<section class="content-box clinic-module"><nav class="clinic-notification-nav" aria-label="Clinic navigation"><a href="staff.html">Vaccine Inventory</a><a href="staff.html#resident-appointments">Resident Appointments</a><a href="confirmed-appointments.html">Confirmed Appointments</a><a href="patient-tracking.html">Patient Tracking</a><a href="clinic-profile.html">Clinic Profile</a><a href="history.html">History</a><a href="clinic-notifications.html" aria-current="page">Notifications</a></nav>
+<section class="expiry-panel"><h2>Vaccine expiry reminders</h2><p class="expiry-help">Reminders appear 30 days before expiration. Dates use Philippine time. Batches are expired starting on their expiration date.</p><div class="expiry-filters" role="group" aria-label="Filter reminders"><button type="button" data-expiry-filter="all" aria-pressed="true">All</button><button type="button" data-expiry-filter="soon" aria-pressed="false">Expiring soon</button><button type="button" data-expiry-filter="expired" aria-pressed="false">Expired</button></div><p id="expiryStatus" role="status">Loading reminders...</p><div id="expiryReminders"></div></section></section></main><script type="module" src="scripts/clinic-notifications.js"></script><script type="module" src="scripts/clinic-layout.js"></script>
+</body></html>

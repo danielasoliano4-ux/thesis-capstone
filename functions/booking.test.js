@@ -12,7 +12,7 @@ function fixture(initial = [], clinic = { name: 'Clinic', hours: '24 hours' }) {
    where: (key, op, value) => { const q = { filters: [[key,value]], where: (k,o,v) => { q.filters.push([k,v]); return q; } }; return q; }
   }),
   runTransaction: fn => { const p = queue.then(() => fn({
-   get: async ref => ref.filters ? { docs: appointments.filter(d => ref.filters.every(([k,v]) => d.data()[k] === v)) } : { data: () => ref.name === 'users' ? profiles[ref.id] : ref.name === 'clinics' ? clinic : undefined },
+   get: async ref => ref.filters ? { docs: appointments.filter(d => ref.filters.every(([k,v]) => d.data()[k] === v)) } : { data: () => ref.name === 'users' ? (profiles[ref.id] || profiles.resident) : ref.name === 'clinics' ? clinic : undefined },
    set: (ref, data) => { if (ref.name === 'appointments') appointments.push({ id: ref.id, data: () => data }); }
   })); queue = p.catch(() => {}); return p; }
  };
@@ -107,4 +107,20 @@ test('server rejects out-of-hours and non-slot bookings using saved clinic hours
  }
  await fixture([], {name:'Clinic', hours:'5 AM - 5 PM'}).book({preferred_time:'5:00 AM'});
  await assert.rejects(fixture([], {name:'Clinic', hours:'Closed'}).book(), {code:'invalid-argument'});
+});
+
+test('five residents can book a slot concurrently; sixth must select another time',async()=>{
+ const f=fixture();
+ const identity=uid=>({uid,token:{secure_login:true,email_verified:true,firebase:{sign_in_provider:'custom'}}});
+ const results=await Promise.allSettled(Array.from({length:6},(_,i)=>f.book({},identity('resident-'+i))));
+ assert.equal(results.filter(item=>item.status==='fulfilled').length,5);
+ assert.equal(results.find(item=>item.status==='rejected').reason.code,'resource-exhausted');
+ await f.book({preferred_time:'09:30'},identity('resident-6'));
+ assert.equal(f.appointments.length,6);
+});
+test('equivalent time labels share capacity; cancelled requests release slots',async()=>{
+ const rows=Array.from({length:5},(_,i)=>({resident_uid:'other-'+i,clinic_id:'clinic-a',preferred_date:'2026-09-22',preferred_time:'9:00 AM',status:'confirmed'}));
+ await assert.rejects(fixture(rows).book(),{code:'resource-exhausted'});
+ rows[0].status='cancelled';await fixture(rows).book();
+ await fixture(rows).book({clinic_id:'clinic-b'});
 });

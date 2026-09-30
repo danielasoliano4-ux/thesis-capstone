@@ -279,6 +279,8 @@
         }
     </style>
     <link rel="stylesheet" href="responsive.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
     <header class="top-header"
@@ -359,6 +361,13 @@
                 </div>
 
                 <div id="staffRegistrationFields" hidden>
+<div class="form-group" style="grid-column:1/-1;min-width:0">
+<label>Clinic location (required)</label><p>Click your clinic location on the map, then drag the pin to adjust it. Your administrator will review this location.</p>
+<button type="button" id="locateRegistrationClinic" style="margin:10px 0;padding:10px 14px;cursor:pointer">Use my current location</button>
+<p>Use this while at your clinic. Device location is approximate; check and adjust the pin before submitting.</p>
+<div id="registrationClinicMap" style="height:300px;width:100%;position:relative;z-index:0" aria-label="Select clinic location"></div>
+<p id="registrationPinStatus" role="status">Select your clinic location in Cabuyao.</p>
+</div>
                     <div class="form-group">
                         <label for="clinicName">Clinic Name</label>
                         <input type="text" id="clinicName" placeholder="Name of clinic or facility" />

@@ -1,0 +1,23 @@
+.nearest-clinic-status { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 12px 16px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; color: #1e40af; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.nearest-clinic-status::before { content: ''; flex: 0 0 9px; width: 9px; height: 9px; border-radius: 50%; background: #2563eb; }
+.map-box > .leaflet-container { flex: 1 1 100%; min-width: 0; width: 100%; }
+.clinic-popup .leaflet-popup-content-wrapper { border-radius: 16px; padding: 1px; box-shadow: 0 6px 24px rgba(15,23,42,.2); }
+.clinic-popup .leaflet-popup-content { margin: 18px; max-width: calc(100vw - 90px); font-family: Arial, sans-serif; line-height: 1.45; }
+.clinic-popup .leaflet-popup-close-button { top: 7px; right: 7px; border-radius: 50%; }
+.clinic-popup-card header { padding: 0 14px 12px 0; border-bottom: 1px solid #e5e7eb; }
+.clinic-popup-type { color: #64748b; font-size: 11px; font-weight: 600; }
+.clinic-popup-card h3 { font-size: 17px; line-height: 1.3; margin: 4px 0 8px; color: #111827; overflow-wrap: anywhere; }
+.clinic-popup-status { display: inline-block; padding: 3px 9px; border-radius: 6px; background: #f3f4f6; font-size: 11px; font-weight: 700; }
+.clinic-popup-card dl { margin: 12px 0; }
+.clinic-popup-card dl > div { display: grid; grid-template-columns: 55px minmax(0,1fr); gap: 8px; margin: 7px 0; font-size: 12px; }
+.clinic-popup-card dt { color: #64748b; font-weight: 400; }
+.clinic-popup-card dd { margin: 0; color: #334155; overflow-wrap: anywhere; }
+.clinic-popup-actions { display: grid; gap: 8px; }
+.clinic-popup-actions button { box-sizing: border-box; width: 100%; min-height: 40px; margin: 0 !important; padding: 10px 12px; border-radius: 8px; font: 600 12px Arial, sans-serif; cursor: pointer; }
+.clinic-popup-actions .map-book-button { background: #e60000; color: white; border: 1px solid #e60000; }
+.clinic-popup-actions .map-book-button:disabled { border-color: #e5e7eb; }
+.clinic-popup-actions .map-directions-button { border: 1px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; }
+.clinic-popup-actions .map-directions-button:hover { background: #dbeafe; }
+.clinic-popup-actions button:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.clinic-popup-card .route-summary:empty { display: none; }
+.clinic-popup-card .route-summary:not(:empty) { margin-top: 10px; color: #1d4ed8; font-size: 12px; }

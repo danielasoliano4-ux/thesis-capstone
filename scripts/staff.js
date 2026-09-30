@@ -1,5 +1,6 @@
+import { summarizeStock, clinicStockStatus } from './stock-summary.mjs';
 import { watchDoseStock, saveStockDose } from './dose-completion.js';
-import { appointmentDeadline } from './booking-status.js';
+import { appointmentDeadline, pendingAppointmentExpired } from './booking-status.js';
 import { manageAppointment, markArrivalAndOpenIntake, openIntake } from './appointment-intake.js';
 import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 // signOutUser comes from the app's own firebase.js, so sign-out acts on the same
@@ -29,6 +30,28 @@ const VACCINE_NAME_ALIASES = {
     'rabivax': 'Rabivax-S (PVRV)', 'rabivax s': 'Rabivax-S (PVRV)',
     'imovax': 'Imovax (HDCV)', 'rabavert': 'RabAvert (PCECV)', 'rab avert': 'RabAvert (PCECV)'
 };
+const vaccineBrandSelect = document.getElementById('vacType');
+const vaccineGenericSelect = document.getElementById('vacGeneric');
+const vaccineBrands = [...vaccineBrandSelect.options].filter(option => option.value).map(option => ({
+    value: option.value, brand: option.textContent.trim(), generic: option.value.match(/\(([^)]+)\)$/)?.[1] || ''
+}));
+function setVaccineSelection(value = '') {
+    const selected = vaccineBrands.find(item => item.value === value);
+    vaccineBrandSelect.replaceChildren(new Option('Select vaccine brand', ''), ...vaccineBrands.map(item => new Option(item.brand, item.value)));
+    vaccineBrandSelect.options[0].disabled = true;
+    vaccineBrandSelect.value = selected?.value || '';
+    vaccineGenericSelect.value = selected?.generic || '';
+}
+vaccineBrandSelect.addEventListener('change', () => {
+    vaccineGenericSelect.value = vaccineBrands.find(item => item.value === vaccineBrandSelect.value)?.generic || '';
+});
+vaccineGenericSelect.addEventListener('change', () => {
+    const previous = vaccineBrandSelect.value;
+    const matches = vaccineBrands.filter(item => item.generic === vaccineGenericSelect.value);
+    vaccineBrandSelect.replaceChildren(new Option('Select vaccine brand', ''), ...matches.map(item => new Option(item.brand, item.value)));
+    vaccineBrandSelect.options[0].disabled = true;
+    vaccineBrandSelect.value = matches.some(item => item.value === previous) ? previous : matches.length === 1 ? matches[0].value : '';
+});
 const LOW_STOCK_THRESHOLD = 15;
 function canonicalVaccineName(value) {
     const key = String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -90,10 +113,12 @@ function listenToPendingAppointmentBadge(clinicId, staffUid = auth.currentUser?.
     const sources = new Map();
     const renderBadge = () => {
         const appointments = [...new Map([...sources.values()].flat().map(item => [item.id, item])).values()];
-        const count = appointments.filter(item => item.status === 'pending').length;
+        const count = appointments.filter(item => item.status === 'pending' && !pendingAppointmentExpired(item)).length;
         badge.textContent = count;
         badge.hidden = false;
     };
+    const badgeTimer = setInterval(renderBadge, 1000);
+    pendingBadgeSourceUnsubscribes.push(() => clearInterval(badgeTimer));
     const listenToBadgeSource = (sourceKey, appointmentQuery) => {
         const unsubscribe = onSnapshot(appointmentQuery, snapshot => {
             sources.set(sourceKey, snapshot.docs.map(item => ({ id: item.id, ...item.data() })));
@@ -109,24 +134,43 @@ function listenToPendingAppointmentBadge(clinicId, staffUid = auth.currentUser?.
     if (staffUid) listenToBadgeSource('staff', query(collection(db, 'appointments'), where('clinic_staff_uid', '==', staffUid)));
 }
 
+function countActivePatients(appointments, clinicId, now = Date.now()) {
+    return new Set(appointments.filter(item => item.clinic_id === clinicId && item.resident_uid &&
+        (item.status === 'in_progress' || (item.status === 'confirmed' && appointmentDeadline(item) > now)))
+        .map(item => item.resident_uid)).size;
+}
+
 async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid) {
     const container = document.getElementById('staffAppointments');
     if (!container) return;
     appointmentSourceUnsubscribes.forEach(unsubscribe => unsubscribe());
     appointmentSourceUnsubscribes = [];
     const appointmentSources = new Map();
+    const activePatientsElement = document.getElementById('statActivePatients');
+    let clinicSourceState = 'loading';
+    const updateActivePatients = () => {
+        if (!activePatientsElement) return;
+        activePatientsElement.textContent = clinicSourceState === 'ready'
+            ? String(countActivePatients(appointmentSources.get('clinic') || [], clinicId))
+            : clinicSourceState === 'error' ? 'Unavailable' : 'Loading...';
+        activePatientsElement.title = clinicSourceState === 'error' ? 'Could not load active patients. Check your connection or reload.'
+            : 'Unique residents with an active confirmed or in-progress appointment at this clinic.';
+    };
+    updateActivePatients();
     const renderAppointments = () => {
+        updateActivePatients();
         const appointments = [...new Map([...appointmentSources.values()].flat().map(item => [item.id, item])).values()]
-            .filter(appointment => ['pending', 'confirmed', 'in_progress'].includes(appointment.status))
+            .map(appointment => pendingAppointmentExpired(appointment) ? { ...appointment, status: 'expired' } : appointment)
+            .filter(appointment => appointment.status === 'pending' && !appointment.archived)
             .sort((first, second) => `${second.preferred_date || ''} ${second.preferred_time || ''}`.localeCompare(`${first.preferred_date || ''} ${first.preferred_time || ''}`));
-        // The server removes no-shows; recorded arrivals remain available for intake.
+        // Accepted appointments continue in Patient Tracking; this list shows only active pending requests. Expired appointments are kept in History.
 
         if (!appointments.length) {
-            container.innerHTML = '<p class="empty-appointments">No resident appointments for this clinic.</p>';
+            container.innerHTML = '<p class="empty-appointments">No pending appointment requests. Expired appointments are available in History.</p>';
             return;
         }
                 container.innerHTML = `<div class="resident-appointment-cards">${appointments.map(appointment => `
-                        <article class="resident-appointment-card">
+                        <article class="resident-appointment-card ${appointment.status === 'expired' ? 'expired-appointment' : ''}">
                             <div class="appointment-avatar"><i class="fa-solid fa-user"></i></div>
                             <div class="resident-appointment-info">
                                 <h3>${escapeHtml(appointment.resident_name || 'Resident')}</h3>
@@ -134,7 +178,8 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
                                 <div class="appointment-tags"><span>${escapeHtml(appointment.dose_label || 'Dose 1')}</span><span><i class="fa-regular fa-clock"></i> ${escapeHtml(appointment.preferred_time || '')}</span><span>${escapeHtml(appointment.clinic_name || '')}</span></div>
                             </div>
                             <div class="resident-appointment-actions">
-                                <span class="appointment-status appointment-${escapeHtml(appointment.status || 'pending')}">${escapeHtml(appointment.status || 'pending')}</span>
+                                <span class="appointment-status appointment-${escapeHtml(appointment.status || 'pending')}">${appointment.status === 'expired' ? 'Expired' : escapeHtml(appointment.status || 'pending')}</span>
+                                ${appointment.status === 'expired' ? '<button type="button" class="confirm-appointment-btn" disabled>Accept</button><small>Expired before clinic confirmation</small>' : ''}
                                 ${appointment.status === 'pending' ? `<button type="button" class="confirm-appointment-btn" data-confirm-id="${appointment.id}"><i class="fa-solid fa-circle-check"></i> Confirm</button><button type="button" class="decline-appointment-btn" data-decline-id="${appointment.id}"><i class="fa-solid fa-xmark"></i> Decline</button>` : ''}
                                 ${appointment.status === 'confirmed' ? `<button type="button" class="confirm-appointment-btn" data-arrive-id="${appointment.id}">Mark Arrived</button><small>Arrival deadline: ${escapeHtml(new Date(appointmentDeadline(appointment)).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }))}</small>` : ''}
                                 ${appointment.status === 'in_progress' && !appointment.intake_completed_at ? `<button type="button" class="confirm-appointment-btn" data-intake-id="${appointment.id}">Complete Intake</button>` : ''}
@@ -163,12 +208,21 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
         finally { button.disabled = false; }
     }, { signal: staffIntakeController.signal });
 
+    let displayKey = '';
+    const timer = setInterval(() => {
+      updateActivePatients();
+      const key = [...appointmentSources.values()].flat().map(item => item.id + ':' + pendingAppointmentExpired(item)).join('|');
+      if (key !== displayKey) { displayKey = key; renderAppointments(); }
+    }, 1000);
+    appointmentSourceUnsubscribes.push(() => clearInterval(timer));
     const listenToSource = (sourceKey, appointmentQuery) => {
         const unsubscribe = onSnapshot(appointmentQuery, snapshot => {
+            if (sourceKey === 'clinic') clinicSourceState = 'ready';
             appointmentSources.set(sourceKey, snapshot.docs.map(item => ({ id: item.id, ...item.data() })));
             renderAppointments();
         }, error => {
             console.error(`Failed to load appointment source ${sourceKey}:`, error);
+            if (sourceKey === 'clinic') clinicSourceState = 'error';
             appointmentSources.set(sourceKey, []);
             renderAppointments();
             if (!appointmentSourceUnsubscribes.length) container.innerHTML = `<p class="empty-appointments">Could not load appointments: ${escapeHtml(error.message)}</p>`;
@@ -180,7 +234,9 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
 }
 
 async function acceptStaffAppointment(appointmentId) {
-    try { await manageAppointment({ appointment_id: appointmentId, action: 'confirm' }); }
+    try { await manageAppointment({ appointment_id: appointmentId, action: 'confirm' });
+      alert('Appointment confirmed. You can now find it in Confirmed Appointments.');
+    }
     catch (error) { alert('Could not confirm appointment: ' + error.message); }
 }
 
@@ -372,7 +428,7 @@ function listenToInventory(clinicId) {
         document.querySelector('.alert-box p').textContent = `${lowStockCount} stock item${lowStockCount === 1 ? '' : 's'} require immediate attention.`;
         setDoc(doc(db, 'clinics', clinicId), {
             stock_total: totalStock,
-            stock_status: totalStock === 0 ? 'out' : lowStockCount > 0 ? 'low' : 'available',
+            stock_status: clinicStockStatus(totalStock),
             stock_summary: snapshot.docs.map(item => `${item.data().type || 'Vaccine'}: ${Number(item.data().quantity || 0)}`).join(' · ')
         }, { merge: true }).catch(error => console.error('Failed to publish clinic stock summary:', error));
     }, (error) => {
@@ -383,7 +439,7 @@ function listenToInventory(clinicId) {
 
 
 function expiryState(expiry) {
-    if (!expiry || expiry < manilaToday()) return ['expired', 'Expired'];
+    if (!expiry || expiry <= manilaToday()) return ['expired', 'Expired'];
     const days = Math.ceil((new Date(`${expiry}T00:00:00`) - new Date(`${manilaToday()}T00:00:00`)) / 86400000);
     return days <= 30 ? ['expiring', `Expires in ${days} day${days === 1 ? '' : 's'}`] : ['', ''];
 }
@@ -419,7 +475,7 @@ function renderInventory() {
         if (category.low) lowCount++;
         if (category.expired) expiryCount++;
         const statusLabel = category.expired ? 'expired' : category.archived ? (category.quantity <= 0 ? 'zeroed out' : 'archived') : category.low ? 'low' : 'adequate';
-        return `<tr><td><strong>${escapeHtml(item.type)}</strong></td><td>${escapeHtml(item.manufacturer)}</td><td>${escapeHtml(item.batch)}</td><td><strong>${category.quantity} doses</strong></td><td>${escapeHtml(item.expiry)}${expiryLabel ? `<div class="inventory-warning">${escapeHtml(expiryLabel)}</div>` : ''}</td><td><span class="status ${status}">${statusLabel}</span></td><td><div class="inventory-actions"><button type="button" class="update-link" data-edit-id="${item.id}">Update</button><button type="button" class="inventory-action secondary" data-archive-id="${item.id}">${item.archived ? 'Restore' : 'Archive'}</button><button type="button" class="inventory-action" data-delete-id="${item.id}">Delete</button></div></td></tr>`;
+        return `<tr><td><strong>${escapeHtml(item.type)}</strong></td><td>${escapeHtml(item.manufacturer)}</td><td>${escapeHtml(item.batch)}</td><td><strong>${category.quantity} doses</strong></td><td>${escapeHtml(item.expiry)}${expiryLabel ? `<div class="inventory-warning">${escapeHtml(expiryLabel)}</div>` : ''}</td><td><span class="status ${status}">${statusLabel}</span></td><td><div class="inventory-actions">${category.expired ? '' : `<button type="button" class="update-link" data-edit-id="${item.id}">Update</button><button type="button" class="inventory-action secondary" data-archive-id="${item.id}">${item.archived ? 'Restore' : 'Archive'}</button>`}<button type="button" class="inventory-action" data-delete-id="${item.id}">Delete</button></div></td></tr>`;
     }).join('') || '<tr><td colspan="7">No inventory batches match this filter.</td></tr>';
     tbody.querySelectorAll('[data-edit-id]').forEach(button => button.addEventListener('click', () => openModal(button.dataset.editId, inventoryItems.find(item => item.id === button.dataset.editId))));
     tbody.querySelectorAll('[data-archive-id]').forEach(button => button.addEventListener('click', () => updateDoc(doc(db, 'inventory', button.dataset.archiveId), { archived: !inventoryItems.find(item => item.id === button.dataset.archiveId)?.archived, updated_at: serverTimestamp() })));
@@ -428,7 +484,7 @@ function renderInventory() {
     document.getElementById('statTotalStock').textContent = total;
     document.getElementById('statLowStock').textContent = lowCount;
     document.querySelector('.alert-box p').textContent = `${lowCount} usable batch${lowCount === 1 ? ' is' : 'es are'} below ${LOW_STOCK_THRESHOLD} doses.${expiryCount ? ` ${expiryCount} batch${expiryCount === 1 ? ' is' : 'es are'} expired.` : ''}`;
-    setDoc(doc(db, 'clinics', currentClinicId), { stock_total: total, stock_status: total === 0 ? 'out' : lowCount ? 'low' : 'available', stock_summary: active.map(item => `${item.type || 'Vaccine'} (${item.batch || 'No batch'}): ${Number(item.quantity || 0)}`).join(' · '), updated_at: serverTimestamp() }, { merge: true }).catch(console.error);
+    setDoc(doc(db, 'clinics', currentClinicId), { stock_total: total, stock_status: clinicStockStatus(total), stock_summary: summarizeStock(active), updated_at: serverTimestamp() }, { merge: true }).catch(console.error);
 }
 
 function escapeHtml(value = '') {
@@ -438,9 +494,10 @@ function escapeHtml(value = '') {
 }
 
 function openModal(docId = '', data = {}) {
+    if (docId && inventoryCategory(data).expired) { alert('Expired vaccine batches cannot be updated.'); return; }
     document.getElementById('modalTitle').textContent = docId ? 'Update Stock' : 'Add New Stock';
     document.getElementById('vaccineDocId').value = docId;
-    document.getElementById('vacType').value = canonicalVaccineName(data.type);
+    setVaccineSelection(canonicalVaccineName(data.type || data.brand_name));
     document.getElementById('vacManufacturer').value = data.manufacturer || '';
     document.getElementById('vacBatch').value = data.batch || '';
     document.getElementById('vacQuantity').value = data.quantity ?? '';
@@ -469,7 +526,12 @@ vaccineForm.addEventListener('submit', async (event) => {
         return;
     }
     const docId = document.getElementById('vaccineDocId').value;
+    if (docId && inventoryCategory(inventoryItems.find(item => item.id === docId) || {}).expired) { alert('This batch has expired and cannot be updated.'); closeModal(); return; }
+    const selectedVaccine = vaccineBrands.find(item => item.value === vaccineBrandSelect.value);
+    if (!selectedVaccine || selectedVaccine.generic !== vaccineGenericSelect.value) { alert('Select a matching vaccine brand and generic name/type.'); return; }
     const payload = {
+        brand_name: selectedVaccine.brand,
+        generic_name: selectedVaccine.generic,
         clinic_id: currentClinicId,
         type: document.getElementById('vacType').value.trim(),
         manufacturer: document.getElementById('vacManufacturer').value.trim(),
@@ -480,7 +542,7 @@ vaccineForm.addEventListener('submit', async (event) => {
         updated_at: serverTimestamp()
     };
 
-    if (payload.expiry < manilaToday()) {
+    if (payload.expiry <= manilaToday()) {
         if (!confirm('This batch is already expired. Save it as an archived record?')) return;
         payload.archived = true;
     }
@@ -599,3 +661,9 @@ document.addEventListener('keydown', event => {
 // Keep the preview in step with what is being typed.
 ['declineReferralFacility', 'declineReferralContact', 'declineReferralReason', 'declineReferralNote']
     .forEach(id => document.getElementById(id)?.addEventListener('input', updateDeclineReferralPreview));
+
+let inventoryDisplayDate = manilaToday();
+setInterval(() => {
+    const date = manilaToday();
+    if (date !== inventoryDisplayDate) { inventoryDisplayDate = date; if (currentClinicId) renderInventory(); }
+}, 1000);

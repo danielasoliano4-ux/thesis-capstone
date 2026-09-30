@@ -7,28 +7,14 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
     <link rel="stylesheet" href="patient-tracking.css"/>
     <link rel="stylesheet" href="responsive.css">
+<link rel="stylesheet" href="clinic-layout.css">
 </head>
-<body>
+<body class="clinic-dashboard">
 
-    <header class="top-header">
-        <div class="logo-section">
-            <div class="logo-icon"><i class="fa-solid fa-location-dot"></i></div>
-            <div>
-                <h2>Anti-Rabies Locator</h2>
-                <p>Cabuyao, Laguna</p>
-            </div>
-        </div>
-        <div class="header-right">
-            <a href="staff.html" class="sidebar-link">
-                <i class="fa-regular fa-hospital"></i> Clinic Dashboard
-            </a>
-            <a href="index.html" style="text-decoration:none;">
-                <button class="signout-btn">
-                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
-                </button>
-            </a>
-        </div>
-    </header>
+    <header class="top-header clinic-header">
+  <div class="logo-section"><img class="system-logo" src="assets/system-logo.png" alt="Anti-Rabies Locator logo"><div><h2>Anti-Rabies Locator</h2><p>Cabuyao, Laguna</p></div></div>
+  <div class="header-right"><a href="staff.html" class="sidebar-link">Clinic Dashboard</a><button type="button" class="signout-btn" id="signOutBtn" data-clinic-signout>Sign Out</button></div>
+</header>
 
     <main class="main-container">
 
@@ -42,9 +28,11 @@
             <div class="tabs">
                 <a href="staff.html" class="tab-link"><button>Vaccine Inventory</button></a>
                 <a href="staff.html#resident-appointments" class="tab-link"><button>Resident Appointment</button></a>
-                <a href="patient-tracking.html" class="tab-link"><button class="active-tab">Patient Tracking</button></a>
+                <a href="confirmed-appointments.html" class="tab-link"><button>Confirmed Appointments</button></a>
+<a href="patient-tracking.html" class="tab-link"><button class="active-tab">Patient Tracking</button></a>
                 <a href="clinic-profile.html" class="tab-link"><button>Clinic Profile</button></a>
                 <a href="history.html" class="tab-link"><button>History</button></a>
+<a href="clinic-notifications.html" class="tab-link"><button>Notifications<span data-expiry-count></span></button></a>
             </div>
 
             <div style="padding: 24px;">
@@ -102,7 +90,7 @@
                 <div class="record-edit-grid">
                     <label>Administration Date<input id="completionDate" type="date" required></label>
                     <label>Dose Number<input id="completionDose" type="number" min="1" max="5" required></label>
-                    <label>Vaccine Brand / Type<select id="completionVaccine" required><option value="">Select vaccine / batch...</option></select><small>Completing this dose deducts 1 dose from the selected batch.</small></label>
+                    <label>Vaccine / Batch<select id="completionVaccine" size="4" aria-describedby="completionVaccineHint" required><option value="">Select vaccine / batch...</option></select><small id="completionVaccineHint">Scroll the list to see more batches, then select one.</small></label>
                     <label>Clinic Location<input id="completionLocation" type="text" required></label>
                 </div>
                 <div class="record-edit-actions">
@@ -174,5 +162,7 @@
             });
         </script>
 
+<script type="module" src="scripts/clinic-notifications.js"></script>
+<script type="module" src="scripts/clinic-layout.js"></script>
 </body>
 </html>

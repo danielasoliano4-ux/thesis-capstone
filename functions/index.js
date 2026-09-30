@@ -137,13 +137,13 @@ exports.sendAppointmentReminders = onSchedule(
 	}
 );
 
-const { lifecycleHandler, cleanupAppointments } = require('./appointment-lifecycle');
+const { lifecycleHandler, cleanupAppointments, expirePendingAppointments } = require('./appointment-lifecycle');
 exports.manageAppointment = onCall(lifecycleHandler({
   db, HttpsError, timestamp: () => admin.firestore.FieldValue.serverTimestamp()
 }));
 exports.expireAppointments = onSchedule(
   { schedule: '* * * * *', timeZone: 'Asia/Manila' },
-  async () => { await cleanupAppointments(db); }
+  async () => { await expirePendingAppointments(db); await cleanupAppointments(db); }
 );
 
 // Account lifecycle operations must run with the Admin SDK. Keeping these out
@@ -220,3 +220,12 @@ exports.findRecoveryAccount = onCall({ secrets: [emailOtpSecret] }, recovery.fin
 exports.sendRecoveryCode = onCall({ secrets: [emailOtpSecret, sendGridApiKey] }, recovery.sendCode);
 exports.verifyRecoveryCode = onCall({ secrets: [emailOtpSecret] }, recovery.verifyCode);
 exports.resetRecoveryPassword = onCall({ secrets: [emailOtpSecret] }, recovery.resetPassword);
+
+const { createClinicApproval } = require('./clinic-approval');
+
+exports.reviewClinicRegistration = onCall({ timeoutSeconds: 60, maxInstances: 1, concurrency: 1 }, createClinicApproval({
+  db, HttpsError, timestamp: () => admin.firestore.FieldValue.serverTimestamp()
+}));
+
+const { slotAvailabilityHandler } = require('./booking-capacity');
+exports.getSlotAvailability = onCall(slotAvailabilityHandler({ db, HttpsError }));

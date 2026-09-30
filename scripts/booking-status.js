@@ -10,8 +10,13 @@ export function appointmentDeadline(item) {
 // Firestore stores clinic acceptance as "confirmed".
 export function clinicBooking(bookings, clinicId, today, now = Date.now()) {
   const active = bookings.filter(item => item.clinic_id === clinicId &&
-    (item.status === 'pending' || item.status === 'in_progress' ||
+    ((item.status === 'pending' && !pendingAppointmentExpired(item, now)) || item.status === 'in_progress' ||
       (['confirmed', 'accepted', 'approved'].includes(item.status) &&
         (Number.isFinite(appointmentDeadline(item)) ? now < appointmentDeadline(item) : (!item.reservation_end_date || item.reservation_end_date >= today)))));
   return active.find(item => item.status !== 'pending') || active[0] || null;
+}
+
+export function pendingAppointmentExpired(item, now = Date.now()) {
+  const scheduled = Number.isFinite(item.scheduled_at_ms) ? item.scheduled_at_ms : appointmentDeadline({ ...item, arrival_deadline_ms: null }) - 90 * 60 * 1000;
+  return item.status === 'pending' && Number.isFinite(scheduled) && now >= scheduled;
 }

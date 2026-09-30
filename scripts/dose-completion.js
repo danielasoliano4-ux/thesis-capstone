@@ -12,7 +12,7 @@ export function watchDoseStock(clinicId) {
     const selected = select.value;
     const items = availableStock(snapshot.docs.map(item => ({...item.data(), id:item.id})), clinicId, today());
     select.replaceChildren(new Option(items.length ? 'Select vaccine / batch...' : 'No available vaccine stock', ''));
-    for (const item of items) select.add(new Option(item.type + ' ? ' + item.quantity + ' doses available | Batch ' + (item.batch || 'unspecified') + ' | Expires ' + item.expiry, item.id));
+    for (const item of items) select.add(new Option(item.type + ' | Batch ' + (item.batch || 'unspecified'), item.id));
     select.disabled = false;
     select.value = items.some(item => item.id === selected) ? selected : '';
     select.setCustomValidity(items.length ? '' : 'Add available vaccine stock before completing this dose.');

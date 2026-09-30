@@ -47,9 +47,14 @@ service cloud.firestore {
           || (request.resource.data.role == 'clinic_staff'
           && request.resource.data.is_active == false
           && request.resource.data.approval_status == 'pending'
+          && request.resource.data.clinic_lat is number
+          && request.resource.data.clinic_lng is number
+          && request.resource.data.clinic_lat >= 14.10 && request.resource.data.clinic_lat <= 14.35
+          && request.resource.data.clinic_lng >= 121.00 && request.resource.data.clinic_lng <= 121.25
           && request.resource.data.bplo_certificate_url is string
           && request.resource.data.bplo_certificate_url.size() > 0));
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['clinic_lat', 'clinic_lng']);
+      allow delete: if isAdmin();
     }
 
     match /residents/{residentId} {
@@ -60,9 +65,22 @@ service cloud.firestore {
       allow read: if isAdmin() || isClinicStaff();
     }
 
+    function validClinicPin() {
+      return request.resource.data.lat is number && request.resource.data.lng is number
+        && request.resource.data.lat >= 14.10 && request.resource.data.lat <= 14.35
+        && request.resource.data.lng >= 121.00 && request.resource.data.lng <= 121.25
+        && request.resource.data.location.latitude == request.resource.data.lat
+        && request.resource.data.location.longitude == request.resource.data.lng;
+    }
     match /clinics/{clinicId} {
       allow read: if true;
-      allow create, update: if isAdmin() || belongsToClinic(clinicId);
+      allow create: if (isAdmin() && !request.resource.data.keys().hasAny(['lat', 'lng', 'location'])) || (belongsToClinic(clinicId)
+        && !request.resource.data.keys().hasAny(['lat', 'lng', 'location', 'geocoding_provider', 'geocoding_accuracy', 'geocoded_at', 'approved_by', 'approval_status']));
+      allow update: if (isAdmin()
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['lat', 'lng', 'location']))
+        || (belongsToClinic(clinicId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['staff_uid', 'geocoding_provider', 'geocoding_accuracy', 'geocoded_at', 'approved_by', 'approval_status'])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lat', 'lng', 'location']) || validClinicPin()));
       allow delete: if isAdmin();
     }
 
@@ -97,6 +115,8 @@ service cloud.firestore {
       allow read: if isAdmin() || belongsToClinic(resource.data.clinic_id);
       allow update: if isAdmin()
         || (belongsToClinic(resource.data.clinic_id)
+          && resource.data.status != 'expired'
+          && (resource.data.status != 'pending' || (resource.data.get('scheduled_at_ms', null) != null && request.time.toMillis() < resource.data.scheduled_at_ms))
           && request.resource.data.clinic_id == resource.data.clinic_id
           && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
             'resident_uid', 'preferred_date', 'preferred_time', 'confirmed_at', 'arrived_at', 'arrived_by', 'arrival_deadline_ms', 'scheduled_at_ms',
@@ -113,13 +133,12 @@ service cloud.firestore {
         || (isResident()
           && resource.data.resident_uid == request.auth.uid
           && resource.data.status in ['pending', 'confirmed']
+          && (resource.data.status != 'pending' || (resource.data.get('scheduled_at_ms', null) != null && request.time.toMillis() < resource.data.scheduled_at_ms))
           && request.resource.data.status == 'cancelled'
           && request.resource.data.cancellation_reason is string
           && request.resource.data.cancellation_reason.size() > 0
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancellation_reason', 'cancelled_at', 'cancelled_by']));
-      allow delete: if isAdmin()
-        || belongsToClinic(resource.data.clinic_id)
-        || (isResident() && resource.data.resident_uid == request.auth.uid);
+      allow delete: if false; // Appointment history is retained; use cancellation instead.
     }
 
     match /patient_records/{recordId} {

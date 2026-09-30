@@ -577,7 +577,7 @@ tbody tr:last-child td {
 .report-preview-document { box-sizing: border-box; width: 210mm; min-height: 297mm; max-width: 100%; margin: 0 auto; padding: 17mm; background: #fff; color: #111827; font-family: Arial, sans-serif; font-size: 10pt; box-shadow: 0 2px 12px rgba(0,0,0,.18); }
 .report-document-header { display: flex; justify-content: space-between; gap: 18px; padding-bottom: 14px; border-bottom: 3px solid #ef0000; }
 .report-brand { display: flex; gap: 10px; align-items: center; color: #b91c1c; font-weight: 700; }
-.report-brand i { font-size: 20px; }
+.report-brand .report-system-logo { display: block; width: 40px; height: 40px; object-fit: contain; flex-shrink: 0; }
 .report-document-header h1 { margin: 6px 0 4px; color: #111827; font-size: 20pt; }
 .report-document-header p, .report-generated { margin: 0; color: #4b5563; font-size: 9pt; line-height: 1.45; }
 .report-generated { text-align: right; }
@@ -699,3 +699,29 @@ tbody tr:last-child td {
 .dashboard-pencil-btn { position: absolute; right: 16px; bottom: 12px; width: 32px; height: 32px; border: 1px solid #e5e7eb; border-radius: 50%; background: #fff; color: #6b7280; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
 .dashboard-pencil-btn:hover { color: #ef0000; border-color: #fecaca; background: #fffafa; }
 @media (max-width: 800px) { .animal-exposure-form { grid-template-columns: repeat(2, 1fr); } }
+
+#pendingApprovalsTab { font: inherit; background: transparent; border: 0; border-bottom: 3px solid transparent; }
+#pendingApprovalsTab.active { border-bottom-color: #ef0000; color: #ef0000; }
+.approval-count { display: inline-flex; align-items: center; justify-content: center; min-width: 23px; height: 23px; padding: 0 6px; margin-left: 6px; border-radius: 20px; background: #dc2626; color: white; font-size: 12px; font-weight: 700; }
+.approval-count[hidden] { display: none; }
+.approvals-panel { min-height: 480px; }
+.approval-subtitle { color: #64748b; font-size: 13px; margin-top: 8px; line-height: 1.5; }
+#pendingApprovalSummary { color: #b91c1c; font-size: 13px; font-weight: 700; }
+.bplo-view-button { display: inline-flex; align-items: center; gap: 8px; margin: 14px 0 4px; padding: 10px 14px; border: 1px solid #bfdbfe; border-radius: 8px; background: #eff6ff; color: #1d4ed8; font-weight: 700; cursor: pointer; }
+.bplo-view-button:hover { background: #dbeafe; }
+.bplo-preview { width: min(940px, calc(100% - 32px)); max-height: 90vh; max-height: 90dvh; margin: auto; padding: 0; border: 0; border-radius: 16px; box-shadow: 0 20px 70px #0005; }
+.bplo-preview::backdrop { background: #0f172ab3; }
+.bplo-preview[open] { display: flex; flex-direction: column; }
+.bplo-preview-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px 24px; border-bottom: 1px solid #e2e8f0; }
+.bplo-preview-header h2 { font-size: 21px; margin: 0 0 5px; }
+.bplo-preview-header p { color: #64748b; font-size: 13px; }
+#closeBploPreview { background: #f1f5f9; border: 0; border-radius: 8px; font-size: 26px; width: 40px; height: 40px; cursor: pointer; }
+.bplo-toolbar { display: flex; align-items: center; gap: 12px; padding: 12px 24px; flex-wrap: wrap; }
+.bplo-toolbar button, .bplo-toolbar a { padding: 8px 14px; background: white; border: 1px solid #cbd5e1; border-radius: 7px; color: #334155; text-decoration: none; cursor: pointer; }
+.bplo-toolbar a { margin-left: auto; font-size: 13px; }
+.bplo-image-stage { min-height: 0; overflow: auto; padding: 20px; background: #e2e8f0; overscroll-behavior: contain; }
+#bploPreviewImage { display: block; max-width: none; height: auto; margin: auto; background: white; }
+#bploPreviewImage[hidden] { display: none; }
+#bploImageStatus:not(:empty) { padding: 12px 24px; color: #64748b; }
+
+.clinic-pin-dialog{box-sizing:border-box;width:min(760px,94vw);max-height:90vh;overflow:auto;border:0;border-radius:18px;padding:24px;color:#172033;margin:auto}.clinic-pin-dialog::backdrop{background:rgba(15,23,42,.6)}.clinic-pin-dialog p{margin:12px 0;line-height:1.5}.pin-reason{color:#92400e;background:#fffbeb;padding:12px;border-radius:8px}.clinic-pin-map{height:350px;width:100%;border-radius:12px}.pin-actions{display:flex;justify-content:flex-end;gap:12px}.pin-actions button{padding:12px 18px;border:1px solid #d1d5db;border-radius:9px;cursor:pointer;font-weight:600}.pin-approve{background:#e60000;color:white}.pin-approve:disabled{opacity:.5;cursor:not-allowed}@media(max-width:600px){.clinic-pin-map{height:280px}.pin-actions{flex-wrap:wrap}}

@@ -23,3 +23,6 @@ The pure logic in functions/clinic-hours.js and scripts/clinic-hours.js is mirro
 ## Intake animal analytics
 
 Exposure choices match Patient Tracking. Animal choices are Dog, Cat and Other; Other requires a specific animal name, saved as animal_type. Saving intake atomically rebuilds system_settings/animal_exposure from permanent patient records, counting each course once and grouping custom animals as Other. Public and resident charts listen to this document without requiring an admin dashboard session. The first intake saved after deployment populates the summary, including existing patient records. This currently scans patient records per intake; larger datasets should migrate to incremental aggregation. Deploy manageAppointment and the updated frontend together.
+
+
+Pending appointment expiry: unconfirmed requests expire at their scheduled Asia/Manila time. The expireAppointments job persists expired status every minute in a transaction, retaining the original document. Late confirmation is rejected before the job runs. Resident history includes expired records and Book Again creates a new request through the existing booking flow. Clinic expired entries have disabled actions. Deploy functions, Firestore rules and hosting together.
