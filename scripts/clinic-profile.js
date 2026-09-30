@@ -1,9 +1,11 @@
+import { initializeHoursPickers, setHoursPicker } from './clinic-hours-picker.js';
 import { auth, db, fetchUserProfile } from './firebase.js';
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
 import { doc, getDoc, setDoc, addDoc, collection, serverTimestamp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 import { protectPage } from './role-guard.js';
 
 protectPage('clinic_staff');
+initializeHoursPickers();
 
 let currentClinicId = null;
 let currentClinicProfile = null;
@@ -33,7 +35,8 @@ async function loadProfile(clinicId) {
     try {
         const profileSnapshot = await getDoc(doc(db, 'clinics', clinicId));
         if (!profileSnapshot.exists()) return;
-        const profile = { ...defaultProfile, ...profileSnapshot.data() };
+        const savedProfile = profileSnapshot.data();
+        const profile = { ...defaultProfile, ...savedProfile };
         currentClinicProfile = profile;
         document.getElementById('profileName').value = profile.name || '';
         const clinicType = document.getElementById('profileType');
@@ -44,8 +47,8 @@ async function loadProfile(clinicId) {
         document.getElementById('profileContact').value = profile.contact || '';
         document.getElementById('profileEmail').value = profile.email || '';
         document.getElementById('profilePriceRange').value = profile.priceRange || '';
-        document.getElementById('profileWeekdayHours').value = profile.weekdayHours || '';
-        document.getElementById('profileWeekendHours').value = profile.weekendHours || '';
+        setHoursPicker('profileWeekdayHours', savedProfile.weekdayHours || savedProfile.hours || '');
+        setHoursPicker('profileWeekendHours', savedProfile.weekendHours || savedProfile.hours || '');
         document.getElementById('profileReservationDays').value = ['1', '2', '3'].includes(String(profile.reservationDays))
             ? String(profile.reservationDays)
             : '1';

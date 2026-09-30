@@ -531,8 +531,8 @@ tbody td {
 #doseCompletionForm { background: #fff; border-top: 3px solid #ef0000; border-radius: 0 0 10px 10px; padding: 20px 0 0; }
 #doseCompletionForm .record-edit-grid { gap: 14px 16px; }
 #doseCompletionForm label { color: #374151; display: flex; flex-direction: column; font-size: 13px; font-weight: 700; gap: 6px; }
-#doseCompletionForm input { width: 100%; border: 1px solid #d1d5db; border-radius: 7px; color: #111827; font: inherit; padding: 11px 12px; }
-#doseCompletionForm input:focus { border-color: #ef0000; outline: 2px solid #fee2e2; }
+#doseCompletionForm input, #doseCompletionForm select { width: 100%; border: 1px solid #d1d5db; border-radius: 7px; color: #111827; font: inherit; padding: 11px 12px; }
+#doseCompletionForm input:focus, #doseCompletionForm select:focus { border-color: #ef0000; outline: 2px solid #fee2e2; }
 #doseCompletionForm .record-edit-actions { margin-top: 4px; }
 #doseCompletionForm .add-btn { background: #ef0000; border-radius: 8px; font-size: 14px; padding: 13px 18px; width: 100%; }
 #doseCompletionForm .add-btn:hover { background: #c90000; }
@@ -619,15 +619,15 @@ tbody td {
     }
 }
 
-.record-id-preview {
-    display: block;
-    max-width: 220px;
-    max-height: 180px;
-    object-fit: contain;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-}
 .assessment-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .assessment-grid label { color: #374151; display: flex; flex-direction: column; font-size: 13px; font-weight: 700; gap: 6px; }
 .assessment-grid select { border: 1px solid #d1d5db; border-radius: 7px; color: #111827; font-size: 14px; padding: 10px; }
 @media (max-width: 700px) { .assessment-grid { grid-template-columns: 1fr; } }
+.patient-filters {display:flex;gap:16px;flex-wrap:wrap;margin:0 0 12px;padding:18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px}
+.patient-filters label {display:grid;gap:7px;font-size:12px;font-weight:700;color:#475569;flex:1;min-width:200px}
+.patient-filters input,.patient-filters select {width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;background:white;border:1px solid #cbd5e1;border-radius:8px;font:inherit;color:#172033}
+.patient-filters input:focus,.patient-filters select:focus {outline:2px solid #ef4444;outline-offset:2px}
+.patient-result-count,.course-note {font-size:13px;color:#64748b;margin-bottom:16px}
+.course-status {display:inline-block;padding:5px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+.course-status.ongoing {color:#1d4ed8;background:#dbeafe}.course-status.incomplete {color:#b45309;background:#fef3c7}.course-status.complete {color:#15803d;background:#dcfce7}
+.patient-intake-details {border-top:1px solid #e2e8f0;padding:14px 0;margin-bottom:12px}.patient-intake-details summary {cursor:pointer;font-size:13px;font-weight:700;color:#334155}.patient-intake-details dl {display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}.patient-intake-details dt {font-size:11px;color:#64748b}.patient-intake-details dd {margin:3px 0 0;font-size:13px;overflow-wrap:anywhere}.patient-empty {padding:24px;color:#64748b}

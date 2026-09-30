@@ -3,33 +3,29 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     function isLoggedIn() {
-      return request.auth != null;
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.secure_login == true
+        && request.auth.token.firebase.sign_in_provider == 'custom'
+        && (!firestore.exists(/databases/(default)/documents/_session_revocations/$(request.auth.uid))
+          || request.auth.token.auth_time > firestore.get(/databases/(default)/documents/_session_revocations/$(request.auth.uid)).data.revokedAt);
     }
 
     function userRole() {
-      return get(/databases/(default)/documents/users/$(request.auth.uid)).data.role;
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role;
     }
 
     function isStaffOrAdmin() {
       return isLoggedIn() && (userRole() == 'clinic_staff' || userRole() == 'admin' || userRole() == 'administrator');
     }
 
-    match /id-verification/{residentId}/{fileName} {
-      allow write: if isLoggedIn()
-        && request.auth.uid == residentId
-        && request.resource.size <= 5 * 1024 * 1024
-        && request.resource.contentType in ['image/jpeg', 'image/png', 'application/pdf'];
-      allow read: if isLoggedIn()
-        && (request.auth.uid == residentId || isStaffOrAdmin());
-    }
-
     match /staff-certificates/{staffId}/{fileName} {
-      allow create: if isLoggedIn()
+      allow create: if request.auth != null
         && request.auth.uid == staffId
         && request.resource.size <= 5 * 1024 * 1024
         && request.resource.contentType in ['image/jpeg', 'image/png'];
-      allow read: if isLoggedIn()
-        && (request.auth.uid == staffId || userRole() == 'admin' || userRole() == 'administrator');
+      allow read: if request.auth != null
+        && (request.auth.uid == staffId || (isLoggedIn() && (userRole() == 'admin' || userRole() == 'administrator')));
       allow update, delete: if false;
     }
 

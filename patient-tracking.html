@@ -67,6 +67,11 @@
                     <h2>Active Patient Records</h2>
                 </div>
 
+                <div class="patient-filters">
+                    <label>Find a patient<input id="patientSearch" type="search" placeholder="Search patient name"></label>
+                    <label>Treatment status<select id="patientStatusFilter"><option value="all">All patients</option><option value="ongoing">Ongoing</option><option value="incomplete">Incomplete</option><option value="complete">Complete</option></select></label>
+                </div>
+                <p id="patientResultCount" class="patient-result-count" role="status"></p>
                 <div class="patients-grid" id="patientsGrid">
                     <p style="color:#6b7280;padding:16px;">Loading patients…</p>
                 </div>
@@ -97,7 +102,7 @@
                 <div class="record-edit-grid">
                     <label>Administration Date<input id="completionDate" type="date" required></label>
                     <label>Dose Number<input id="completionDose" type="number" min="1" max="5" required></label>
-                    <label>Vaccine Brand / Type<input id="completionVaccine" type="text" required></label>
+                    <label>Vaccine Brand / Type<select id="completionVaccine" required><option value="">Select vaccine / batch...</option></select><small>Completing this dose deducts 1 dose from the selected batch.</small></label>
                     <label>Clinic Location<input id="completionLocation" type="text" required></label>
                 </div>
                 <div class="record-edit-actions">

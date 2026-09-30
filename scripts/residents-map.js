@@ -1,6 +1,72 @@
-import { db } from './firebase.js';
-import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
+import { auth, db, onAuthStateChanged, fetchUserProfile } from './firebase.js';
+import { clinicBooking } from './booking-status.js';
+import { collection, onSnapshot, query, where } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
+let bookingRows = [];
+let bookingState = 'loading';
+let bookingUnsubscribe;
+const bookingWidgets = new Set();
+function refreshBookingWidgets() {
+  for (const widget of bookingWidgets) {
+    if (!widget.host.isConnected) bookingWidgets.delete(widget);
+    else widget.render();
+  }
+}
+onAuthStateChanged(auth, async user => {
+  bookingUnsubscribe?.();
+  bookingRows = [];
+  bookingState = user ? 'loading' : 'ready';
+  refreshBookingWidgets();
+  if (!user) return;
+  const profile = await fetchUserProfile(user.uid);
+  if (auth.currentUser?.uid !== user.uid) return;
+  if (profile?.role !== 'resident') {
+    bookingState = 'error';
+    refreshBookingWidgets();
+    return;
+  }
+  // One live resident query serves all clinic markers; each widget filters by clinic_id.
+  bookingUnsubscribe = onSnapshot(query(collection(db, 'appointments'), where('resident_uid', '==', user.uid)), { includeMetadataChanges: true }, snapshot => {
+    bookingRows = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+    bookingState = snapshot.metadata.fromCache ? 'loading' : 'ready';
+    refreshBookingWidgets();
+  }, error => {
+    console.error('Unable to check booking status:', error);
+    bookingState = 'error';
+    refreshBookingWidgets();
+  });
+});
+function mountBookingWidget(host, clinic, mapId) {
+  for (const widget of bookingWidgets) {
+    if (!widget.host.isConnected || widget.host === host) bookingWidgets.delete(widget);
+  }
+  const render = () => {
+    host.replaceChildren();
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const booking = clinicBooking(bookingRows, clinic.id, today);
+    if (bookingState === 'ready' && booking && booking.status !== 'pending') {
+      const status = document.createElement('div');
+      status.style.cssText = 'margin-top:12px;padding:12px;border-radius:8px;background:#ecfdf5;color:#166534;';
+      status.textContent = 'Scheduled: ' + (booking.preferred_date || 'Contact clinic') + ' at ' + (booking.preferred_time || 'Contact clinic');
+      host.append(status);
+      return;
+    }
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'map-book-button';
+    button.disabled = bookingState !== 'ready' || Boolean(booking) || clinic.status === 'out';
+    button.textContent = bookingState === 'loading' ? 'Checking booking...' : bookingState === 'error' ? 'Unable to check booking' : booking ? 'Pending' : clinic.status === 'out' ? 'Out of Stock' : 'Book Appointment';
+    if (button.disabled) button.style.cssText = 'background:#e5e7eb;color:#4b5563;cursor:not-allowed;';
+    button.addEventListener('click', () => {
+      if (mapId === 'googleMap') window.checkAuthAndBook?.(clinic.name, clinic.id);
+      else window.openBookingModal?.(clinic.name, clinic.id);
+    });
+    host.append(button);
+  };
+  host.setAttribute('aria-live', 'polite');
+  bookingWidgets.add({ host, render });
+  render();
+}
 let CLINICS = [];
 let clinicProfileData = [];
 let inventoryByClinic = new Map();
@@ -37,6 +103,7 @@ function loadClinics() {
         address: data.address || '',
         hours: data.weekdayHours || data.hours || 'Contact clinic',
         weekendHours: data.weekendHours || '',
+        operatingHours: { weekdayHours: data.weekdayHours || '', weekendHours: data.weekendHours || '', hours: data.hours || '' },
         barangay: extractBarangay(data.address || '', data.barangay || ''),
         phone: data.contact || '',
         priceRange: data.priceRange || data.vaccination_price_range || 'Price not provided',
@@ -77,9 +144,32 @@ function rebuildClinicDirectory() {
     populateMapDirectoryFilters();
 }
 
+// Complete Cabuyao list, including barangays without registered clinics.
+// Source: https://psa.gov.ph/classification/psgc/barangays/0403404000
+const CABUYAO_BARANGAYS = [
+  'Baclaran', 'Banaybanay', 'Banlic', 'Barangay Dos', 'Barangay Tres',
+  'Barangay Uno', 'Bigaa', 'Butong', 'Casile', 'Diezmo', 'Gulod',
+  'Mamatid', 'Marinig', 'Niugan', 'Pittland', 'Pulo', 'Sala', 'San Isidro'
+];
+
+function normalizeBarangay(value) {
+  const name = String(value).toLowerCase()
+    .replace(/\b(?:brgy|barangay|poblacion|pob)\b\.?/g, '')
+    .replace(/\b(?:city of cabuyao|cabuyao(?: city)?|laguna)\b/g, '')
+    .replace(/[^a-z0-9]/g, '');
+  return CABUYAO_BARANGAYS.find(barangay =>
+    barangay.toLowerCase().replace(/^barangay /, '').replace(/[^a-z0-9]/g, '') === name
+  ) || '';
+}
+
 function extractBarangay(value, explicitValue = '') {
   const match = String(value).match(/(?:brgy\.?|barangay)\s+([^,]+)/i);
-  return match ? match[1].trim() : String(explicitValue).trim();
+  const candidates = [explicitValue, match?.[1], ...String(value).split(',')];
+  for (const candidate of candidates) {
+    const barangay = normalizeBarangay(candidate || '');
+    if (barangay) return barangay;
+  }
+  return String(explicitValue || match?.[1] || '').trim();
 }
 
 function normalizeVaccineTypes(value) {
@@ -155,22 +245,12 @@ function createMarkerForMap(map, clinic, mapId) {
   const color = STATUS_COLOR[clinic.status] || STATUS_COLOR.out;
   const icon = L.divIcon({ className: 'clinic-map-marker', html: `<span class="clinic-pin" style="--marker-color:${color}"><i class="fa-solid fa-hospital"></i></span>`, iconSize: [30, 38], iconAnchor: [15, 36] });
   const marker = L.marker([clinic.lat, clinic.lng], { icon, title: clinic.name }).addTo(map);
-  const bookingButton = clinic.status === 'out'
-    ? ''
-    : `<button type="button" class="map-book-button" data-clinic-id="${escapeHtml(clinic.id)}">Book Appointment</button>`;
+  const bookingButton = '<div class="clinic-booking-status"></div>';
   const directionsButton = '<button type="button" class="map-directions-button">Get Directions</button>';
   marker.bindPopup(`<strong>${escapeHtml(clinic.name)}</strong><br><b>${escapeHtml(clinic.type)}</b><br><b style="color:${color}">${STATUS_LABEL[clinic.status]}</b><br><br><b>Address:</b> ${escapeHtml(clinic.address)}<br><b>Hours:</b> ${escapeHtml(clinic.hours)}<br><b>Phone:</b> ${escapeHtml(clinic.phone)}<br><b>Vaccination price:</b> ${escapeHtml(clinic.priceRange)}<br><br><b>Stock:</b> ${escapeHtml(clinic.stock)}${bookingButton}${directionsButton}<div class="route-summary" aria-live="polite"></div><br><small>&copy; Google Maps</small>`);
   marker.on('popupopen', event => {
-    const button = event.popup.getElement()?.querySelector('.map-book-button');
-    if (button) button.addEventListener('click', () => {
-      if (mapId === 'googleMap') {
-        // Public map - check authentication first
-        if (window.checkAuthAndBook) window.checkAuthAndBook(clinic.name, clinic.id);
-      } else {
-        // Residents or other authenticated pages - open booking modal directly
-        if (window.openBookingModal) window.openBookingModal(clinic.name, clinic.id);
-      }
-    });
+    const host = event.popup.getElement()?.querySelector('.clinic-booking-status');
+    if (host) mountBookingWidget(host, clinic, mapId);
     const routeButton = event.popup.getElement()?.querySelector('.map-directions-button');
     if (routeButton) routeButton.addEventListener('click', () => {
       selectedDestination = clinic;
@@ -220,6 +300,12 @@ function buildSidebarFor(entry) {
       row.style.background = color === '#00b140' ? '#eefcf3' : color === '#d98a00' ? '#fffbe9' : '#fff1f1';
     });
 
+    const oldButton = row.querySelector('.book-btn');
+    if (oldButton) {
+      const host = document.createElement('div');
+      oldButton.replaceWith(host);
+      mountBookingWidget(host, mobj.clinic, entry.mapId);
+    }
     sidebar.appendChild(row);
   });
 }
@@ -232,7 +318,7 @@ function filterMarkers(filter, btn) {
 }
 
 function populateMapDirectoryFilters() {
-  const barangays = [...new Set(CLINICS.map(clinic => clinic.barangay).filter(Boolean))].sort();
+  const barangays = [...new Set([...CABUYAO_BARANGAYS, ...CLINICS.map(clinic => clinic.barangay).filter(Boolean)])].sort();
   document.querySelectorAll('.map-directory-barangay').forEach(select => {
     const currentValue = select.value;
     select.innerHTML = '<option value="all">All barangays</option>' + barangays.map(barangay => `<option value="${escapeHtml(barangay)}">${escapeHtml(barangay)}</option>`).join('');
@@ -422,4 +508,5 @@ window.refreshMaps = refreshMaps;
 window.initMap = initMap;
 window.filterMarkers = filterMarkers;
 window.focusNearestClinic = focusNearestClinic;
+populateMapDirectoryFilters();
 loadClinics();

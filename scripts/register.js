@@ -1,5 +1,6 @@
+import { openEmailOtp } from './email-otp.js';
 import { auth, db, storage } from './firebase.js';
-import { createUserWithEmailAndPassword, deleteUser } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
+import { createUserWithEmailAndPassword, deleteUser, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 import { doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
 
@@ -171,6 +172,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
       bplo_certificate_url: certificateUrl,
       is_active: role !== 'clinic_staff',
       approval_status: role === 'clinic_staff' ? 'pending' : 'approved',
+      email_verification_required: true,
       created_at: serverTimestamp()
     });
 
@@ -184,11 +186,13 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
       created_at: serverTimestamp()
     });
 
-    showToast(role === 'clinic_staff'
-      ? 'Registration submitted. An administrator must approve your clinic staff account before you can sign in.'
-      : 'Account created successfully! You can now sign in.', 'success');
-    setTimeout(() => { window.location.href = 'login.html'; }, 1800);
-
+    // Profile creation succeeded. Email delivery failures must not delete the account.
+    createdUser = null;
+    sessionStorage.setItem('registration-verification-uid', uid);
+    const verified = await openEmailOtp();
+    await signOut(auth);
+    if (verified) sessionStorage.removeItem('registration-verification-uid');
+    window.location.href = verified ? 'login.html?verified=1' : 'login.html?verify=1';
   } catch (err) {
     if (createdUser) {
       try { await deleteUser(createdUser); } catch (cleanupError) { console.error('Could not remove incomplete registration:', cleanupError); }
@@ -206,4 +210,17 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
       showToast('Registration failed: ' + err.message, 'error');
     }
   }
+});
+
+// Resume verification if the registration page is refreshed mid-flow.
+let initialAuthCheck = true;
+onAuthStateChanged(auth, async user => {
+  if (!initialAuthCheck) return;
+  initialAuthCheck = false;
+  if (!user || user.emailVerified || sessionStorage.getItem('registration-verification-uid') !== user.uid) return;
+  document.querySelector('.register-btn').disabled = true;
+  const verified = await openEmailOtp();
+  await signOut(auth);
+  if (verified) sessionStorage.removeItem('registration-verification-uid');
+    window.location.href = verified ? 'login.html?verified=1' : 'login.html?verify=1';
 });

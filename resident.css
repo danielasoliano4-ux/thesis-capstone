@@ -1637,3 +1637,44 @@ body {
       }
 
       
+
+/* Selectable completed doses and their native, keyboard-accessible dialog. */
+.completed-dose-button { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #475569; font: inherit; text-align: left; cursor: pointer; transition: background .15s, border-color .15s; }
+.completed-dose-button:hover { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+.completed-dose-button:focus-visible, .dose-preview-dialog button:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+.previous-dose-list .completed-dose-button { width: 100%; }
+.completed-dose-button span { flex: 1; }
+.previous-dose-list .completed-dose-button > i:last-child { color: #64748b; margin-left: auto; }
+.dose-preview-dialog { width: min(580px, calc(100% - 32px)); max-height: calc(100dvh - 40px); margin: auto; padding: 28px; border: 1px solid #e2e8f0; border-radius: 18px; background: #fff; color: #0f172a; box-sizing: border-box; box-shadow: 0 24px 80px #0f172a33; overflow-y: auto; }
+.dose-preview-dialog::backdrop { background: #0f172a88; }
+.dose-preview-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.dose-preview-heading p { font-size: 11px; font-weight: 700; letter-spacing: .1em; color: #2563eb; margin: 0 0 8px; }
+.dose-preview-heading h2 { font-size: 26px; margin: 0; }
+.dose-preview-close { border: 0; border-radius: 8px; background: #f1f5f9; color: #475569; font-size: 26px; width: 38px; height: 38px; cursor: pointer; }
+.dose-preview-intro { font-size: 13px; color: #64748b; margin: 12px 0 24px; }
+.dose-preview-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 0; }
+.dose-preview-fields > div { min-width: 0; }
+.dose-preview-fields dt { font-size: 12px; color: #64748b; margin-bottom: 5px; }
+.dose-preview-fields dd { font-size: 14px; font-weight: 600; margin: 0; overflow-wrap: anywhere; }
+.dose-preview-actions { margin-top: 24px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
+.dose-preview-download { width: 100%; border: 0; border-radius: 10px; background: #2563eb; color: #fff; padding: 14px; font: inherit; font-weight: 600; cursor: pointer; }
+.dose-preview-download:hover { background: #1d4ed8; }
+.dose-preview-download:disabled { opacity: .6; cursor: wait; }
+.dose-preview-error { color: #b91c1c; font-size: 13px; }
+@media (max-width: 480px) { .dose-preview-dialog { padding: 20px; } .dose-preview-fields { grid-template-columns: 1fr; gap: 16px; } }
+
+.dose-selection-row { display: flex; align-items: center; gap: 8px; }
+.dose-selection-row .completed-dose-button { flex: 1; min-width: 0; }
+.dose-report-checkbox { width: 18px; height: 18px; margin: 8px; flex-shrink: 0; accent-color: #2563eb; cursor: pointer; }
+.dose-report-checkbox:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+.dose-selection-help { margin: 0; color: #64748b; font-size: 12px; }
+.dose-selection-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0; }
+.dose-report-preview-button { border: 0; border-radius: 8px; padding: 12px 16px; background: #2563eb; color: white; font: inherit; font-weight: 600; cursor: pointer; }
+.dose-report-preview-button:disabled { opacity: .5; cursor: not-allowed; }
+.dose-report-preview-button:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+.dose-report-dialog { width: min(960px, calc(100% - 24px)); }
+.dose-report-frame { width: 100%; height: 55vh; border: 1px solid #cbd5e1; border-radius: 8px; background: #e2e8f0; }
+.dose-report-controls { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.dose-report-controls > button { flex: 1; width: auto; padding: 12px 16px; border-radius: 8px; font: inherit; cursor: pointer; }
+.dose-report-cancel, .dose-report-image { border: 1px solid #cbd5e1; background: white; color: #334155; }
+@media (max-width: 480px) { .dose-report-controls { flex-direction: column; } .dose-report-frame { height: 45vh; } }

@@ -12,8 +12,8 @@ const admin = require('firebase-admin');
 const sgMail = require('@sendgrid/mail');
 const { onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
-const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { defineSecret } = require('firebase-functions/params');
+const { onCall: firebaseOnCall, HttpsError } = require('firebase-functions/v2/https');
+const { defineSecret, defineString } = require('firebase-functions/params');
 
 // For cost control, you can set the maximum number of containers that can be
 // running at the same time. This helps mitigate the impact of unexpected
@@ -28,6 +28,19 @@ const { defineSecret } = require('firebase-functions/params');
 setGlobalOptions({ maxInstances: 10 });
 
 admin.initializeApp();
+function onCall(options, handler) {
+  if (typeof options === 'function') { handler = options; options = {}; }
+  return firebaseOnCall(options, async request => {
+    if (request.auth) {
+      const header = request.rawRequest.headers.authorization || '';
+      try { await admin.auth().verifyIdToken(header.replace(/^Bearer /i, ''), true); }
+      catch { throw new HttpsError('unauthenticated', 'Your session expired. Sign in again.'); }
+      const revocation = await admin.firestore().collection('_session_revocations').doc(request.auth.uid).get();
+      if (revocation.exists && request.auth.token.auth_time <= revocation.data().revokedAt) throw new HttpsError('unauthenticated', 'Your session expired. Sign in again.');
+    }
+    return handler(request);
+  });
+}
 
 const db = admin.firestore();
 const sendGridApiKey = defineSecret('SENDGRID_API_KEY');
@@ -81,32 +94,6 @@ exports.sendAppointmentConfirmation = onDocumentUpdated(
 	}
 );
 
-// Inclusive reservation window: a duration of N days keeps an appointment valid
-// through the (N-1)th day after its scheduled date.
-const DEFAULT_RESERVATION_DAYS = 1;
-const MAX_RESERVATION_DAYS = 7;
-
-function addDaysToDateString(dateString, daysToAdd) {
-	const parts = String(dateString || '').split('-').map(Number);
-	if (parts.length !== 3 || parts.some(value => Number.isNaN(value))) return '';
-	const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
-	date.setUTCDate(date.getUTCDate() + Number(daysToAdd || 0));
-	return date.toISOString().split('T')[0];
-}
-
-async function getReservationDaysFor(clinicId) {
-	if (!clinicId) return DEFAULT_RESERVATION_DAYS;
-	try {
-	const clinic = await db.collection('clinics').doc(clinicId).get();
-	const days = Number(clinic.data()?.reservation_days);
-	if (!Number.isFinite(days) || days < 1) return DEFAULT_RESERVATION_DAYS;
-	return Math.min(MAX_RESERVATION_DAYS, Math.floor(days));
-	} catch (error) {
-	console.error('Could not read reservation duration for clinic', clinicId, error);
-	return DEFAULT_RESERVATION_DAYS;
-	}
-}
-
 function getManilaDate(daysFromNow = 0) {
 	const date = new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000);
 	return new Intl.DateTimeFormat('en-CA', {
@@ -150,57 +137,27 @@ exports.sendAppointmentReminders = onSchedule(
 	}
 );
 
+const { lifecycleHandler, cleanupAppointments } = require('./appointment-lifecycle');
+exports.manageAppointment = onCall(lifecycleHandler({
+  db, HttpsError, timestamp: () => admin.firestore.FieldValue.serverTimestamp()
+}));
 exports.expireAppointments = onSchedule(
-		{
-			schedule: '0 * * * *',
-			timeZone: 'Asia/Manila'
-		},
-		async () => {
-				const today = getManilaDate();
-			const snapshot = await db.collection('appointments')
-			.where('status', '==', 'confirmed')
-			.get();
-
-			let expiredCount = 0;
-			for (const appointmentDoc of snapshot.docs) {
-			const appointment = appointmentDoc.data();
-			const endDate = appointment.reservation_end_date;
-			// Prefer the stored window. When an older appointment never had one
-			// written, derive it from the clinic setting (or the system default)
-			// so unfulfilled schedules cannot stay active forever.
-			let effectiveEnd = endDate;
-			if (!effectiveEnd) {
-			const days = await getReservationDaysFor(appointment.clinic_id);
-				effectiveEnd = addDaysToDateString(appointment.preferred_date, days - 1);
-			if (!effectiveEnd) continue;
-			}
-			// The end date is inclusive, so the appointment is only lapsed once
-			// today is strictly past it.
-			if (effectiveEnd >= today) continue;
-			appointmentDoc.ref.update({
-			status: 'expired',
-				expired_at: admin.firestore.FieldValue.serverTimestamp(),
-				expiration_reason: 'Reservation duration ended - resident did not attend',
-			reservation_end_date: effectiveEnd
-			});
-				expiredCount++;
-			}
-			if (expiredCount) console.log(`Expired ${expiredCount} unfulfilled appointment(s).`);
-		}
-	);
+  { schedule: '* * * * *', timeZone: 'Asia/Manila' },
+  async () => { await cleanupAppointments(db); }
+);
 
 // Account lifecycle operations must run with the Admin SDK. Keeping these out
 // of the browser prevents an administrator from accidentally creating a user
 // profile that has no corresponding Firebase Authentication account.
 exports.manageUserAccount = onCall(async request => {
-	if (!request.auth) throw new HttpsError('unauthenticated', 'Sign in first.');
+	if (!request.auth || request.auth.token.secure_login !== true || request.auth.token.email_verified !== true || request.auth.token.firebase?.sign_in_provider !== 'custom') throw new HttpsError('unauthenticated', 'Sign in with a verified account first.');
 	const requester = await db.collection('users').doc(request.auth.uid).get();
 	if (!['admin', 'administrator'].includes(requester.data()?.role)) throw new HttpsError('permission-denied', 'Administrator access is required.');
 	const { action, uid, email, password, profile = {} } = request.data || {};
 	if (action === 'create') {
 		if (!email || !password || password.length < 6) throw new HttpsError('invalid-argument', 'Email and a password of at least 6 characters are required.');
 		const user = await admin.auth().createUser({ email, password, displayName: profile.full_name || profile.username || undefined, disabled: false });
-		await db.collection('users').doc(user.uid).set({ email, role: profile.role || 'resident', is_active: true, created_at: admin.firestore.FieldValue.serverTimestamp(), updated_at: admin.firestore.FieldValue.serverTimestamp(), ...profile });
+		await db.collection('users').doc(user.uid).set({ email, role: profile.role || 'resident', is_active: true, created_at: admin.firestore.FieldValue.serverTimestamp(), updated_at: admin.firestore.FieldValue.serverTimestamp(), ...profile, email_verification_required: true });
 		return { uid: user.uid };
 	}
 	if (!uid) throw new HttpsError('invalid-argument', 'A user id is required.');
@@ -226,3 +183,40 @@ exports.manageUserAccount = onCall(async request => {
 //   logger.info("Hello logs!", {structuredData: true});
 //   response.send("Hello from Firebase!");
 // });
+
+const { createSecureLogin } = require('./login-security');
+const firebaseWebApiKey = defineString('WEB_AUTH_API_KEY');
+const legacyVerificationCutoff = defineString('LEGACY_EMAIL_VERIFICATION_CUTOFF', { default: '2026-09-17T12:52:25Z' });
+exports.secureLogin = onCall({ timeoutSeconds: 60 }, createSecureLogin({
+  db, auth: admin.auth(), HttpsError, apiKey: () => firebaseWebApiKey.value(),
+  legacyVerificationCutoff: () => legacyVerificationCutoff.value()
+}));
+
+const { createEmailOtp } = require('./email-otp');
+const emailOtpSecret = defineSecret('EMAIL_OTP_HMAC_KEY');
+const otpHandlers = createEmailOtp({
+  db, auth: admin.auth(), HttpsError, secret: () => emailOtpSecret.value(),
+  sendEmail: async (email, code) => {
+    configureEmail();
+    await sgMail.send({ to: email, from: senderEmail, subject: 'Your verification code',
+      text: `Your Anti-Rabies Locator verification code is ${code}. It expires in 5 minutes. Do not share this code. If you did not request it, ignore this email.` });
+  }
+});
+exports.requestEmailOtp = onCall({ secrets: [sendGridApiKey, emailOtpSecret] }, otpHandlers.requestCode);
+exports.verifyEmailOtp = onCall({ secrets: [emailOtpSecret] }, otpHandlers.verifyCode);
+const { createBookingHandler, rescheduleBookingHandler } = require('./booking');
+exports.rescheduleBooking = onCall(rescheduleBookingHandler({ db, HttpsError, timestamp: () => admin.firestore.FieldValue.serverTimestamp() }));
+exports.createBooking = onCall(createBookingHandler({ db, HttpsError, timestamp: () => admin.firestore.FieldValue.serverTimestamp() }));
+
+const { createPasswordRecovery } = require('./password-recovery');
+const recovery = createPasswordRecovery({
+  db, auth: admin.auth(), HttpsError, secret: () => emailOtpSecret.value(),
+  sendEmail: async (email, code) => {
+    configureEmail();
+    await sgMail.send({ to: email, from: senderEmail, subject: 'Reset your Anti-Rabies Locator password', text: 'Your password recovery code is ' + code + '. It expires in 5 minutes. Do not share this code. If you did not request it, ignore this email.' });
+  }
+});
+exports.findRecoveryAccount = onCall({ secrets: [emailOtpSecret] }, recovery.findAccount);
+exports.sendRecoveryCode = onCall({ secrets: [emailOtpSecret, sendGridApiKey] }, recovery.sendCode);
+exports.verifyRecoveryCode = onCall({ secrets: [emailOtpSecret] }, recovery.verifyCode);
+exports.resetRecoveryPassword = onCall({ secrets: [emailOtpSecret] }, recovery.resetPassword);

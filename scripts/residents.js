@@ -1,6 +1,14 @@
-import { auth, db, storage, fetchUserProfile, onAuthStateChanged, signOutUser } from './firebase.js';
+import { availableSlots, bookingTimeError } from './clinic-hours.js';
+import { listenPatientRecords } from './appointment-intake.js';
+import { openDosePreview, openDoseReportPreview } from './dose-preview.js';
+import { app, auth, db, storage, fetchUserProfile, onAuthStateChanged, signOutUser } from './firebase.js';
 import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
+
+import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-functions.js';
+import { clinicBooking, appointmentDeadline } from './booking-status.js';
+const createBooking = httpsCallable(getFunctions(app), 'createBooking');
+const rescheduleBooking = httpsCallable(getFunctions(app), 'rescheduleBooking');
 
 let currentUid = null;
 let currentResidentName = '';
@@ -29,8 +37,8 @@ function manilaToday() {
 
 function isReservationExpired(appointment) {
   return appointment.status === 'confirmed'
-    && appointment.reservation_end_date
-    && appointment.reservation_end_date < manilaToday();
+    && Number.isFinite(appointmentDeadline(appointment))
+    && Date.now() >= appointmentDeadline(appointment);
 }
 
 function appointmentStatus(appointment) {
@@ -150,6 +158,7 @@ window.filterNotifs = filterNotifs;
 async function loadResidentDashboard(uid, userProfile = {}) {
   currentUid = uid;
   loadResidentNotifications(uid);
+  listenPatientRecords(document.getElementById('panel-booking-records'), 'resident_uid', uid);
   const residentDoc = await getDoc(doc(db, 'residents', uid));
   const residentData = residentDoc.exists() ? residentDoc.data() : {};
   residentProfile = residentData;
@@ -396,9 +405,9 @@ async function loadResidentBookings(uid) {
       const bookingMarkup = `<div class="booking-progress-panel"><h3><i class="fa-regular fa-calendar-check"></i> Booking Records</h3>${bookings.map(booking => {
         const status = appointmentStatus(booking);
         return `
-        <div class="booking-progress-card"><div class="booking-progress-heading"><div><strong>${escapeHtml(booking.clinic_name || 'Clinic')}</strong><div>${escapeHtml(booking.preferred_date || '')} at ${escapeHtml(booking.preferred_time || '')} - ${escapeHtml(booking.dose_label || 'Dose 1')}</div></div><span class="booking-status status-${escapeHtml(status || 'pending')}">${status === 'confirmed' ? 'Confirmed' : status === 'completed' ? 'Completed' : status === 'declined' ? 'Declined' : status === 'expired' ? 'Expired' : 'Pending clinic review'}</span></div>
+        <div class="booking-progress-card"><div class="booking-progress-heading"><div><strong>${escapeHtml(booking.clinic_name || 'Clinic')}</strong><div>${escapeHtml(booking.preferred_date || '')} at ${escapeHtml(booking.preferred_time || '')} - ${escapeHtml(booking.dose_label || 'Dose 1')}</div></div><span class="booking-status status-${escapeHtml(status || 'pending')}">${status === 'in_progress' ? 'Arrived' : status === 'confirmed' ? 'Confirmed' : status === 'completed' ? 'Completed' : status === 'declined' ? 'Declined' : status === 'expired' ? 'Expired' : 'Pending clinic review'}</span></div>
         <button type="button" class="view-record-button" data-record-id="${escapeHtml(booking.id)}">View Full Record</button><div class="full-record-details" id="full-record-${escapeHtml(booking.id)}" hidden><strong>Vaccination progress</strong><p>${completedDoseCount} of 5 doses completed.</p><p>${completedDoseCount < 5 ? `Next: Dose ${nextDose} (Day ${doseDayOffsets[nextDose - 1]})${nextDoseDate ? ` on ${formatScheduleDate(firstDoseDate, doseDayOffsets[nextDose - 1])}` : ''}.` : 'Vaccination schedule complete.'}</p>${completedDoseCount < 5 && latestCompletedAppointment?.id === booking.id ? `<button type="button" class="next-dose-button" data-clinic-id="${escapeHtml(latestRecord?.clinic_id || booking.clinic_id || '')}">Book Dose ${nextDose}${nextDoseDate ? ` for ${formatScheduleDate(firstDoseDate, doseDayOffsets[nextDose - 1])}` : ''}</button>` : ''}</div>
-        ${status === 'declined' ? '<p class="booking-status-message">This appointment was declined by the clinic. Please choose another clinic or date.</p>' : status === 'expired' ? '<p class="booking-status-message">This reservation expired because its reservation period ended. Please book a new appointment.</p>' : `<div class="booking-steps"><div class="booking-step done"><span><i class="fa-solid fa-check"></i></span><small>Booked</small></div><div class="booking-step ${status === 'pending' ? 'current' : 'done'}"><span>${status === 'pending' ? '<i class="fa-solid fa-clock"></i>' : '<i class="fa-solid fa-check"></i>'}</span><small>${status === 'pending' ? 'Under review' : 'Confirmed'}</small></div><div class="booking-step ${status === 'completed' ? 'done' : ''}"><span>${status === 'completed' ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-calendar-day"></i>'}</span><small>${status === 'completed' ? 'Dose recorded' : 'Appointment'}</small></div></div>`}</div>`; }).join('')}</div>`;
+        ${status === 'declined' ? '<p class="booking-status-message">This appointment was declined by the clinic. Please choose another clinic or date.</p>' : status === 'expired' ? '<p class="booking-status-message">The 90-minute arrival window ended. Please book a new appointment.</p>' : `<div class="booking-steps"><div class="booking-step done"><span><i class="fa-solid fa-check"></i></span><small>Booked</small></div><div class="booking-step ${status === 'pending' ? 'current' : 'done'}"><span>${status === 'pending' ? '<i class="fa-solid fa-clock"></i>' : '<i class="fa-solid fa-check"></i>'}</span><small>${status === 'pending' ? 'Under review' : 'Confirmed'}</small></div><div class="booking-step ${status === 'completed' ? 'done' : ''}"><span>${status === 'completed' ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-calendar-day"></i>'}</span><small>${status === 'completed' ? 'Dose recorded' : 'Appointment'}</small></div></div>`}</div>`; }).join('')}</div>`;
       container.innerHTML = bookingMarkup;
       container.querySelectorAll('.view-record-button').forEach(button => button.addEventListener('click', () => { const details = document.getElementById(`full-record-${button.dataset.recordId}`); if (details) details.hidden = !details.hidden; }));
       container.querySelectorAll('.next-dose-button').forEach(button => button.addEventListener('click', () => { const clinic = window.clinicDirectory?.find(item => item.id === button.dataset.clinicId); openBookingModal(clinic?.name || '', clinic?.id || ''); }));
@@ -448,6 +457,8 @@ function formatScheduleDate(date, dayOffset) {
 function renderLiveDoseRecords(records, bookings = []) {
   const list = document.getElementById('liveDoseRecordList');
   if (!list) return;
+  const selectedKeys = new Set([...list.querySelectorAll('.current-dose-checkbox:checked')].map(input => input.dataset.recordKey));
+  const recordKey = record => JSON.stringify([record.vaccination_session_id || 'legacy', record.dose_number, record.date_given, record.clinic_id]);
   const completedByDose = new Map(records.map(record => [Number(record.dose_number), record]));
   const bookingByDose = new Map(bookings.map(booking => [Number(String(booking.dose_label || '').match(/\d+/)?.[0] || 0), booking]));
   list.innerHTML = Array.from({ length: 5 }, (_, index) => {
@@ -461,15 +472,36 @@ function renderLiveDoseRecords(records, bookings = []) {
       const location = completed.clinic_location ? ` | ${completed.clinic_location}` : '';
       const vaccine = completed.vaccine_name || completed.vaccine_type || 'Vaccine not specified';
       const administrator = completed.administered_by_name ? ` | ${completed.administered_by_name}` : '';
-      return `<div class="dose-record"><div class="dose-circle done-circle"><i class="fa-solid fa-check"></i></div><div class="dose-record-info"><h4>Dose ${doseNumber} - Day ${dayOffset}</h4><p>${escapeHtml(date)} | ${escapeHtml(clinic)}${escapeHtml(location)} | ${escapeHtml(vaccine)}${escapeHtml(administrator)}</p></div><div class="dose-record-status"><span class="r-done">Completed</span></div></div>`;
+      return `<div class="dose-record"><input type="checkbox" class="dose-report-checkbox current-dose-checkbox" data-dose-number="${doseNumber}" data-record-key="${escapeHtml(recordKey(completed))}" aria-label="Select Dose ${doseNumber} for report" ${selectedKeys.has(recordKey(completed)) ? 'checked' : ''}><div class="dose-circle done-circle"><i class="fa-solid fa-check"></i></div><div class="dose-record-info"><h4>Dose ${doseNumber} - Day ${dayOffset}</h4><p>${escapeHtml(date)} | ${escapeHtml(clinic)}${escapeHtml(location)} | ${escapeHtml(vaccine)}${escapeHtml(administrator)}</p></div><div class="dose-record-status"><span class="r-done">Completed</span><button type="button" class="completed-dose-button" data-completed-dose="${doseNumber}" aria-haspopup="dialog">View dose <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button></div></div>`;
     }
     if (booking && ['pending', 'confirmed'].includes(booking.status)) {
       return `<div class="dose-record"><div class="dose-circle next-circle"><i class="fa-regular fa-calendar"></i></div><div class="dose-record-info"><h4>Dose ${doseNumber} - Day ${dayOffset}</h4><p>Scheduled: ${escapeHtml(booking.preferred_date || '')} at ${escapeHtml(booking.preferred_time || '')} | ${escapeHtml(booking.clinic_name || 'Clinic')}</p></div><div class="dose-record-status"><span class="r-next">${booking.status === 'confirmed' ? 'Confirmed' : 'Upcoming'}</span></div></div>`;
     }
     return `<div class="dose-record"><div class="dose-circle pending-circle">${doseNumber}</div><div class="dose-record-info"><h4>Dose ${doseNumber} - Day ${dayOffset}</h4><p>Not yet scheduled</p></div><div class="dose-record-status"><span class="r-pending">Pending</span></div></div>`;
   }).join('');
+  if (list.querySelector('.current-dose-checkbox')) {
+    list.insertAdjacentHTML('afterbegin', '<p class="dose-selection-help">Select completed doses to preview and print a report.</p>');
+    list.insertAdjacentHTML('beforeend', '<div class="dose-selection-actions"><span class="dose-selection-count" role="status"></span><button type="button" class="dose-report-preview-button" aria-haspopup="dialog" disabled>Preview selected doses</button></div>');
+    const selected = () => [...list.querySelectorAll('.current-dose-checkbox:checked')]
+      .map(input => completedByDose.get(Number(input.dataset.doseNumber)));
+    const previewButton = list.querySelector('.dose-report-preview-button');
+    const updateSelection = () => {
+      const count = selected().length;
+      list.querySelector('.dose-selection-count').textContent = `${count} dose${count === 1 ? '' : 's'} selected`;
+      previewButton.disabled = count === 0;
+    };
+    list.querySelectorAll('.current-dose-checkbox').forEach(input => input.addEventListener('change', updateSelection));
+    previewButton.addEventListener('click', () => {
+      const selectedRecords = selected();
+      if (selectedRecords.length) openDoseReportPreview(selectedRecords, currentResidentName, formatRecordDate);
+    });
+    updateSelection();
+  }
+  list.querySelectorAll('[data-completed-dose]').forEach(button => button.addEventListener('click', () => {
+    const record = completedByDose.get(Number(button.dataset.completedDose));
+    openDosePreview(record, currentResidentName, formatRecordDate(record.date_given));
+  }));
 }
-
 function formatRecordDate(value) {
   const date = toDate(value);
   return date ? date.toLocaleDateString() : String(value || 'Date not specified');
@@ -568,8 +600,26 @@ function renderPreviousVaccinationRecords(allRecords) {
     const documentMarkup = courseDocuments.length
       ? `<div class="previous-record-documents"><strong>Uploaded documents</strong>${courseDocuments.map(document => renderDocumentPreview(document)).join('')}</div>`
       : '';
-    return `<details class="previous-record-card"><summary><div class="previous-record-main"><div class="previous-record-title-row"><strong>Vaccination Record - ${escapeHtml(first.clinic_name || 'Previous clinic')}</strong><span class="previous-completed-badge">${percent}% Complete</span></div><small>Started ${escapeHtml(formatRecordDate(first.date_given))} | ${completed} / 5 doses</small><div class="previous-progress-track"><span style="width:${percent}%;"></span></div></div><div class="previous-record-progress"><b>${percent}%</b><small>complete</small></div><i class="fa-solid fa-chevron-down previous-record-chevron"></i></summary><div class="previous-dose-list"><strong>Completed doses</strong>${ordered.map(record => `<span><i class="fa-solid fa-check"></i> Dose ${escapeHtml(record.dose_number)}: ${escapeHtml(formatRecordDate(record.date_given))} | ${escapeHtml(record.clinic_name || 'Clinic')}</span>`).join('')}</div>${documentMarkup}</details>`;
+    return `<details class="previous-record-card"><summary><div class="previous-record-main"><div class="previous-record-title-row"><strong>Vaccination Record - ${escapeHtml(first.clinic_name || 'Previous clinic')}</strong><span class="previous-completed-badge">${percent}% Complete</span></div><small>Started ${escapeHtml(formatRecordDate(first.date_given))} | ${completed} / 5 doses</small><div class="previous-progress-track"><span style="width:${percent}%;"></span></div></div><div class="previous-record-progress"><b>${percent}%</b><small>complete</small></div><i class="fa-solid fa-chevron-down previous-record-chevron"></i></summary><div class="previous-dose-list"><strong>Completed doses</strong><p class="dose-selection-help">Select doses to include in your report, or click a dose to view its details.</p>${ordered.map(record => `<div class="dose-selection-row"><input type="checkbox" class="dose-report-checkbox" data-record-index="${previousRecords.indexOf(record)}" aria-label="Select Dose ${escapeHtml(record.dose_number)} dated ${escapeHtml(formatRecordDate(record.date_given))}"><button type="button" class="completed-dose-button" data-dose-index="${previousRecords.indexOf(record)}" aria-haspopup="dialog"><i class="fa-solid fa-check" aria-hidden="true"></i><span>Dose ${escapeHtml(record.dose_number)}: ${escapeHtml(formatRecordDate(record.date_given))} | ${escapeHtml(record.clinic_name || 'Clinic')}</span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button></div>`).join('')}<div class="dose-selection-actions"><span class="dose-selection-count" role="status">0 doses selected</span><button type="button" class="dose-report-preview-button" disabled aria-haspopup="dialog">Preview selected doses</button></div></div>${documentMarkup}</details>`;
   }).join('')}`;
+  container.querySelectorAll('.previous-record-card').forEach(card => {
+    const previewButton = card.querySelector('.dose-report-preview-button');
+    const selected = () => [...card.querySelectorAll('.dose-report-checkbox:checked')]
+      .map(checkbox => previousRecords[Number(checkbox.dataset.recordIndex)]);
+    card.querySelectorAll('.dose-report-checkbox').forEach(checkbox => checkbox.addEventListener('change', () => {
+      const count = selected().length;
+      card.querySelector('.dose-selection-count').textContent = `${count} dose${count === 1 ? '' : 's'} selected`;
+      previewButton.disabled = count === 0;
+    }));
+    previewButton.addEventListener('click', () => {
+      const records = selected();
+      if (records.length) openDoseReportPreview(records, currentResidentName, formatRecordDate);
+    });
+  });
+  container.querySelectorAll('[data-dose-index]').forEach(button => button.addEventListener('click', () => {
+    const record = previousRecords[Number(button.dataset.doseIndex)];
+    openDosePreview(record, currentResidentName, formatRecordDate(record.date_given));
+  }));
   container.querySelectorAll('.previous-document-delete-button').forEach(button => button.addEventListener('click', () => deleteVaccinationDocument(button.dataset.documentId)));
 }
 
@@ -716,7 +766,7 @@ function renderLiveAppointments(bookings) {
     const vaccine = booking.vaccine_name || 'Vaccination';
     const detail = isCompleted ? `Administered on ${formatRecordDate(appointmentDate)}` : `${booking.preferred_time || 'Time not specified'} | ${booking.clinic_address || 'Clinic location not specified'}`;
     const status = appointmentStatus(booking);
-    return `<div class="appt-card ${isCompleted ? 'completed' : 'upcoming'}"><div class="appt-card-date"><div class="big-day">${escapeHtml(String(day))}</div><div class="month-yr">${escapeHtml(monthYear)}</div></div><div class="appt-card-body"><div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><h3>Dose ${escapeHtml(dose)} ${escapeHtml(vaccine)} Vaccination</h3><span class="appt-status ${isCompleted ? 'status-done' : status === 'expired' ? 'status-expired' : 'status-upcoming'}">${isCompleted ? 'Completed' : status === 'expired' ? 'Expired' : status === 'confirmed' ? 'Confirmed' : 'Pending'}</span></div><p><i class="fa-solid fa-hospital" style="color:#6b7280;"></i> ${escapeHtml(booking.clinic_name || 'Clinic not specified')}</p><p><i class="fa-regular fa-clock" style="color:#6b7280;"></i> ${escapeHtml(detail)}</p>${!isCompleted && status !== 'expired' ? `<div class="appt-card-actions"><button class="action-btn reschedule-button" data-appointment-id="${escapeHtml(booking.id)}"><i class="fa-solid fa-arrows-rotate"></i> Reschedule</button><button class="action-btn danger cancel-appointment-button" data-appointment-id="${escapeHtml(booking.id)}"><i class="fa-solid fa-xmark"></i> Cancel</button></div>` : ''}</div></div>`;
+    return `<div class="appt-card ${isCompleted ? 'completed' : 'upcoming'}"><div class="appt-card-date"><div class="big-day">${escapeHtml(String(day))}</div><div class="month-yr">${escapeHtml(monthYear)}</div></div><div class="appt-card-body"><div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><h3>Dose ${escapeHtml(dose)} ${escapeHtml(vaccine)} Vaccination</h3><span class="appt-status ${isCompleted ? 'status-done' : status === 'expired' ? 'status-expired' : 'status-upcoming'}">${isCompleted ? 'Completed' : status === 'expired' ? 'Expired' : status === 'in_progress' ? 'Arrived' : status === 'confirmed' ? 'Confirmed' : 'Pending'}</span></div><p><i class="fa-solid fa-hospital" style="color:#6b7280;"></i> ${escapeHtml(booking.clinic_name || 'Clinic not specified')}</p><p><i class="fa-regular fa-clock" style="color:#6b7280;"></i> ${escapeHtml(detail)}</p>${['pending', 'confirmed'].includes(status) ? `<div class="appt-card-actions"><button class="action-btn reschedule-button" data-appointment-id="${escapeHtml(booking.id)}"><i class="fa-solid fa-arrows-rotate"></i> Reschedule</button><button class="action-btn danger cancel-appointment-button" data-appointment-id="${escapeHtml(booking.id)}"><i class="fa-solid fa-xmark"></i> Cancel</button></div>` : ''}</div></div>`;
   };
   if (upcomingContainer) upcomingContainer.innerHTML = upcoming.length ? upcoming.map(booking => renderCard(booking, false)).join('') : '<p style="font-size:13px;color:#6b7280;padding:10px 0;">No upcoming appointments.</p>';
   if (completedContainer) completedContainer.innerHTML = completed.length ? completed.map(booking => renderCard(booking, true)).join('') : '<p style="font-size:13px;color:#6b7280;padding:10px 0;">No completed appointments yet.</p>';
@@ -764,7 +814,9 @@ function openRescheduleModal(appointment) {
   dateInput.value = date;
   dateInput.min = date;
   dateInput.max = nextDate;
-  document.getElementById('rescheduleTime').value = appointment.preferred_time || '9:00 AM';
+  refreshRescheduleSlots();
+  const timeSelect = document.getElementById('rescheduleTime');
+  if ([...timeSelect.options].some(option => option.value === appointment.preferred_time)) timeSelect.value = appointment.preferred_time;
   document.getElementById('rescheduleMsg').style.display = 'none';
   document.getElementById('rescheduleModal').classList.add('open');
 }
@@ -785,13 +837,7 @@ async function saveReschedule() {
     return;
   }
   try {
-    await updateDoc(doc(db, 'appointments', appointmentId), {
-      preferred_date: date,
-      preferred_time: time,
-      status: 'pending',
-      reschedule_requested: true,
-      rescheduled_at: serverTimestamp()
-    });
+    await rescheduleBooking({ appointment_id: appointmentId, preferred_date: date, preferred_time: time });
     if (appointment?.clinic_staff_uid) await addDoc(collection(db, 'notifications'), { recipient_uid: appointment.clinic_staff_uid, user_id: appointment.clinic_staff_uid, appointment_id: appointmentId, type: 'appointment', title: 'Appointment Rescheduled', message: `${currentResidentName} rescheduled an appointment to ${date} at ${time}.`, read: false, created_at: serverTimestamp() });
     document.getElementById('rescheduleModal').classList.remove('open');
   } catch (error) {
@@ -886,7 +932,7 @@ function normalizeAnimalExposure(animals) {
 }
 
 function listenToAnimalExposure() {
-  onSnapshot(doc(db, 'system_settings', 'live_analytics'), snapshot => {
+  onSnapshot(doc(db, 'system_settings', 'animal_exposure'), snapshot => {
     renderAnimalExposure(snapshot.exists() ? snapshot.data() : {});
   }, error => console.error('Failed to load live animal exposure data:', error));
 }
@@ -1064,474 +1110,88 @@ function doseLevelFromLabel(label, fallback = 1) {
 // even if an earlier one was never recorded by a clinic.
 function earliestBookingDate(doseLevel) {
   if (!firstDoseDate || doseLevel <= 1 || doseLevel > doseDayOffsets.length) {
-    return new Date().toISOString().split('T')[0];
+    return manilaToday();
   }
-  return formatInputDate(firstDoseDate, doseDayOffsets[doseLevel - 1]);
+  return [manilaToday(), formatInputDate(firstDoseDate, doseDayOffsets[doseLevel - 1])].sort().pop();
 }
 
 // --- Appointment time slots -------------------------------------------------
-
-// A slot must be booked far enough ahead to be a real appointment, and must end
-// before the clinic closes. Both are measured in minutes from midnight.
-const SLOT_INTERVAL_MINUTES = 30;
-const MIN_LEAD_TIME_MINUTES = 60;
-const CLINIC_CLOSE_BUFFER_MINUTES = 30;
-// Used only when a clinic has no parseable operating hours on record.
-const DEFAULT_CLOSING_MINUTES = 17 * 60;
-// Resolves the effective closing time in minutes, or null when unlimited.
-function effectiveClosingMinutes(clinic) {
-  const closing = clinicClosingMinutes(clinic);
-  return closing === null ? null : (closing ?? DEFAULT_CLOSING_MINUTES);
+function updateTimeSelect(selectId, dateId, clinic, hintId) {
+  const select = document.getElementById(selectId);
+  const date = document.getElementById(dateId)?.value;
+  if (!select) return;
+  const previous = select.value;
+  const result = availableSlots(clinic, date);
+  const signature = [date, result.known, result.hours, ...result.slots].join('|');
+  if (select.dataset.scheduleSignature === signature) return;
+  select.dataset.scheduleSignature = signature;
+  select.replaceChildren();
+  for (const time of result.slots) {
+    const option = document.createElement('option');
+    option.value = time;
+    option.textContent = time;
+    select.appendChild(option);
+  }
+  if (!result.slots.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = !result.known ? 'Operating hours unavailable' : !result.minutes.length ? 'Clinic closed' : 'No future slots available';
+    select.appendChild(option);
+  } else if (result.slots.includes(previous)) select.value = previous;
+  select.disabled = !result.slots.length;
+  const hint = document.getElementById(hintId);
+  if (hint) hint.textContent = !result.known ? 'Contact the clinic to confirm its operating hours.'
+    : !result.slots.length ? 'No available times for this date. Please choose another date.'
+    : 'Hours: ' + result.hours + '. Slots are every 30 minutes (Philippine time).';
 }
-
-// "09:30 AM" -> 570. Returns null when the label is not a clock time.
-function parseTimeLabelToMinutes(label) {
-  const match = String(label ?? '').trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
-  if (!match) return null;
-  let hours = Number(match[1]);
-  const minutes = Number(match[2] || 0);
-  const suffix = (match[3] || '').toLowerCase();
-  if (minutes > 59) return null;
-  if (suffix === 'pm' && hours < 12) hours += 12;
-  if (suffix === 'am' && hours === 12) hours = 0;
-  if (hours > 23) return null;
-  return hours * 60 + minutes;
-}
-
-// Minutes from midnight for the wall clock in Cabuyao, which is what the clinic
-// and the resident are both looking at regardless of the device timezone.
-// (Distinct from manilaToday(), which returns a date string.)
-function manilaMinutesNow() {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', hour12: false
-  }).formatToParts(new Date());
-  const read = type => Number(parts.find(part => part.type === type)?.value ?? 0);
-  return read('hour') * 60 + read('minute');
-}
-
-// Pulls the closing time out of free-text hours such as "8:00 AM - 5:00 PM".
-// Returns:
-//   a number  - the clinic closes at that time
-//   null      - the clinic is open 24 hours, so there is no closing limit
-//   undefined - hours are missing or unreadable, so DEFAULT_CLOSING_MINUTES applies
-function clinicClosingMinutes(clinic) {
-  const hoursText = String(clinic?.hours || '').trim();
-  if (!hoursText) return undefined;
-  if (/24\s*\/\s*7|24\s*hours?|open\s*24/i.test(hoursText)) return null;
-  if (/closed/i.test(hoursText) && !/\d/.test(hoursText)) return undefined;
-  // Ignore a "(Weekdays)" / "(Sat-Sun)" style qualifier before the times.
-  const body = hoursText.replace(/\([^)]*\)/g, '');
-  const times = body.match(/\d{1,2}(?::\d{2})?\s*(?:am|pm)?/gi) || [];
-  // The closing time is the last clock time in the range.
-  const closing = times.length >= 2 ? parseTimeLabelToMinutes(times[times.length - 1]) : null;
-  return closing === null ? null : closing;
-}
-
-// Rebuilds the time dropdown for the selected date. Every slot stays in the
-// list so the resident can see the full day, but past slots and slots that run
-// into the clinic's closing time are disabled rather than removed.
 function refreshTimeSlots() {
-  const timeSelect = document.getElementById('modalTime');
-  const dateEl = document.getElementById('modalDate');
-  const hint = document.getElementById('modalTimeHint');
-  if (!timeSelect) return;
-  const clinic = window.clinicDirectory?.find(item => item.id === document.getElementById('modalClinic')?.value) || selectedClinic;
-  const closingMinutes = effectiveClosingMinutes(clinic);
-  const isToday = Boolean(dateEl?.value) && dateEl.value === manilaToday();
-  const nowMinutes = manilaMinutesNow();
-
-  let firstOpen = null;
-  [...timeSelect.options].forEach(option => {
-    const slot = parseTimeLabelToMinutes(option.textContent);
-    let reason = '';
-    if (slot === null) {
-      option.disabled = false;
-      return;
-    }
-    // The appointment runs for SLOT_INTERVAL_MINUTES and must finish at least
-    // CLINIC_CLOSE_BUFFER_MINUTES before the clinic shuts. A null closing time
-    // means the clinic never closes, so only the past check applies.
-    if (closingMinutes !== null && slot + SLOT_INTERVAL_MINUTES + CLINIC_CLOSE_BUFFER_MINUTES > closingMinutes) reason = 'clinic closes';
-    else if (isToday && slot < nowMinutes + MIN_LEAD_TIME_MINUTES) reason = 'past';
-    option.disabled = Boolean(reason);
-    option.dataset.slotState = reason;
-    if (!reason && firstOpen === null) firstOpen = option.value;
-  });
-
-  // Never leave a disabled slot selected.
-  if (timeSelect.selectedOptions[0]?.disabled) {
-    timeSelect.value = firstOpen ?? '';
-    if (firstOpen === null) {
-      timeSelect.selectedIndex = -1;
-    }
-  }
-  if (hint) {
-    hint.textContent = firstOpen === null
-      ? `No appointment slots remain for this date. The clinic closes at ${formatMinutesLabel(closingMinutes)}, so please choose another date.`
-      : closingMinutes === null
-        ? 'Slots run every 30 minutes. This clinic is open 24 hours, so any remaining slot today can be booked.'
-      : "Slots run every 30 minutes. Times already past, or too close to the clinic's closing time, cannot be selected.";
-  }
+  const current = window.clinicDirectory?.find(item => item.id === selectedClinic?.id);
+  if (current) selectedClinic = current;
+  updateTimeSelect('modalTime', 'modalDate', selectedClinic, 'modalTimeHint');
 }
-
-function formatMinutesLabel(totalMinutes) {
-  const hours24 = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  const suffix = hours24 >= 12 ? 'PM' : 'AM';
-  const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
-  return `${hours12}:${String(minutes).padStart(2, '0')} ${suffix}`;
+function refreshRescheduleSlots() {
+  const id = document.getElementById('rescheduleAppointmentId')?.value;
+  const appointment = residentAppointments.find(item => item.id === id);
+  const clinic = window.clinicDirectory?.find(item => item.id === appointment?.clinic_id);
+  updateTimeSelect('rescheduleTime', 'rescheduleDate', clinic, 'rescheduleTimeHint');
 }
-
-// True when the time has already passed (today only) or leaves the clinic less
-// than the buffer before closing. Mirrors refreshTimeSlots so a booking cannot
-// slip through when a slot was disabled client-side but submitted anyway.
 function timeSlotError(date, time, clinic) {
-  const slot = parseTimeLabelToMinutes(time);
-  if (slot === null) return 'Please select a preferred time.';
-  const closingMinutes = effectiveClosingMinutes(clinic);
-  if (closingMinutes !== null && slot + SLOT_INTERVAL_MINUTES + CLINIC_CLOSE_BUFFER_MINUTES > closingMinutes) {
-    return `The clinic closes at ${formatMinutesLabel(closingMinutes)}, so the last bookable slot is ${formatMinutesLabel(closingMinutes - SLOT_INTERVAL_MINUTES - CLINIC_CLOSE_BUFFER_MINUTES)}. Please choose an earlier time or another date.`;
-  }
-  if (date === manilaToday() && slot < manilaMinutesNow() + MIN_LEAD_TIME_MINUTES) {
-    return `${time} has already passed. Please choose a later time today, or book for another date.`;
-  }
-  return '';
+  return bookingTimeError(clinic, date, time);
 }
-
-// A follow-up is a returning visit only when the resident has already dealt
-// with the clinic currently selected. A record at another clinic must not
-// waive this clinic's first-visit ID check.
-function isReturningClinicFollowUp(clinicId, dose) {
-  if (!clinicId || doseLevelFromLabel(dose) <= 1) return false;
-  const hasPreviousAppointment = residentAppointments.some(appointment =>
-    appointment.clinic_id === clinicId && appointment.status !== 'cancelled'
-  );
-  const hasVaccinationRecord = residentVaccinationRecords.some(record =>
-    record.clinic_id === clinicId
-  );
-  return hasPreviousAppointment || hasVaccinationRecord;
-}
-
-function updateBookingIdRequirement() {
-  const clinicId = document.getElementById('modalClinic')?.value || '';
-  const dose = document.getElementById('modalDose')?.value || '';
-  const optional = isReturningClinicFollowUp(clinicId, dose);
-  const description = document.getElementById('bookingIdRequirementText');
-  const label = document.getElementById('bookingIdRequirementLabel');
-  if (description) description.textContent = optional
-    ? 'Your previous appointment or vaccination record at this clinic is on file. Uploading your Valid ID again is optional.'
-    : 'A valid ID is required to confirm your appointment. Clinic staff will verify it when you arrive.';
-  if (label) {
-    label.textContent = optional ? '(optional - already on file)' : '(required)';
-    label.style.color = optional ? '#6b7280' : '#ef0000';
+// Refresh while a dialog is open so a time cannot remain selectable after it passes.
+setInterval(() => {
+  if (document.getElementById('bookingModal')?.classList.contains('open')) refreshTimeSlots();
+  if (document.getElementById('rescheduleModal')?.classList.contains('open')) refreshRescheduleSlots();
+}, 1000);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    if (document.getElementById('bookingModal')?.classList.contains('open')) refreshTimeSlots();
+    if (document.getElementById('rescheduleModal')?.classList.contains('open')) refreshRescheduleSlots();
   }
-  return optional;
-}
+});
 
 function openBookingModal(clinic, clinicId = '') {
-  const startsNewVaccination = completedDoseCount >= doseDayOffsets.length;
-  confirmedClinicChangeId = '';
-  pendingClinicChangeId = '';
-  const sel = document.getElementById('modalClinic');
-  const nextDose = startsNewVaccination ? 1 : Math.min(5, completedDoseCount + 1);
-  const primaryClinicId = nextDose > 1 ? getPrimaryClinicId() : '';
-  if (sel && primaryClinicId) {
-    sel.value = primaryClinicId;
-  } else if (sel && clinicId) {
-    sel.value = clinicId;
-  } else if (clinic && sel) {
-    const option = [...sel.options].find(item => item.dataset.name === clinic || item.text.startsWith(clinic));
-    if (option) sel.value = option.value;
-  }
-  selectedClinic = window.clinicDirectory?.find(item => item.id === sel?.value) || null;
-  const { courseAppointments, intake } = courseBookingContext();
-  const clinicBookings = residentAppointments
-    .filter(item => item.clinic_id === sel?.value && item.status !== 'declined')
-    .sort((first, second) => String(second.created_at?.toMillis?.() || '').localeCompare(String(first.created_at?.toMillis?.() || '')));
-  const previousBooking = clinicBookings[0];
-  const bookingWithDetails = courseAppointments.find(item => item.bite_date && item.animal_type && item.bite_body_part) || previousBooking;
-  bookingClinicContext = { clinicId: sel?.value || '', previousBooking, bookingWithDetails, intake, primaryClinicId };
-  const returningClinic = nextDose > 1 && Boolean(intake?.bite_date || intake?.animal_type || bookingWithDetails);
-  const saved = {
-    address: intake.resident_address || residentProfile.address || bookingWithDetails?.resident_address || '',
-    dateOfBirth: intake.date_of_birth || residentProfile.birthday || bookingWithDetails?.date_of_birth || '',
-    sex: intake.patient_sex || residentProfile.gender || bookingWithDetails?.patient_sex || '',
-    biteDate: intake.bite_date || bookingWithDetails?.bite_date || '',
-    animal: intake.animal_type || bookingWithDetails?.animal_type || '',
-    bitePart: intake.bite_body_part || bookingWithDetails?.bite_body_part || '',
-    woundWashed: intake.wound_washed || bookingWithDetails?.wound_washed || '',
-    biteType: intake.bite_type || bookingWithDetails?.bite_type || ''
-  };
-  document.getElementById('modalAddress').value = saved.address;
-  document.getElementById('modalDateOfBirth').value = saved.dateOfBirth;
-  document.getElementById('modalSex').value = saved.sex;
-  document.getElementById('modalBiteDate').value = saved.biteDate;
-  document.getElementById('modalAnimal').value = saved.animal;
-  document.getElementById('modalBitePart').value = saved.bitePart;
-  document.getElementById('modalWoundWashed').value = saved.woundWashed;
-  document.getElementById('modalBiteType').value = saved.biteType;
-  document.getElementById('modalPriorVaccinationHistory').value = residentProfile.prior_vaccination_history_declared ? 'declared' : 'not_declared';
-  document.getElementById('modalPriorVaccinationNotes').value = residentProfile.prior_vaccination_history_notes || '';
-  document.getElementById('modalPriorVaccinationDocument').value = '';
-  resetBookingSteps();
-  document.getElementById('bookingPatientDetails').hidden = returningClinic;
-  document.getElementById('returningClinicMessage').hidden = !returningClinic;
-  document.getElementById('returningClinicMessage').textContent = 'Your locked intake details and vaccination history are saved for this course. Only choose your next dose date and time, then proceed to confirm.';
-  document.getElementById('modalAddress').readOnly = returningClinic;
-  document.getElementById('modalDateOfBirth').required = !returningClinic;
-  document.getElementById('modalSex').required = !returningClinic;
-  document.getElementById('modalBiteDate').required = !returningClinic;
-  document.getElementById('modalAnimal').required = !returningClinic;
-  document.getElementById('modalBitePart').required = !returningClinic;
-  document.getElementById('modalWoundWashed').required = !returningClinic;
-  document.getElementById('modalBiteType').required = !returningClinic;
-  // The Valid ID is never marked required in step 1 - it belongs to step 2 and
-  // is enforced there, after the resident has reviewed their details.
-  document.getElementById('modalValidId').required = false;
-  document.getElementById('modalWoundPhoto').required = false;
-  const dateEl = document.getElementById('modalDate');
-  const doseSelect = document.getElementById('modalDose');
-  if (startsNewVaccination) {
-    currentVaccinationSessionId = crypto.randomUUID();
-    bookingClinicContext.newVaccinationSessionId = currentVaccinationSessionId;
-  }
-  // Every dose level is selectable from the start. A first-time resident may
-  // already be catching up on dose 2, 3, or later, so nothing is hidden here -
-  // the suggested dose is only a default.
-  if (doseSelect) {
-    [...doseSelect.options].forEach(option => {
-      option.hidden = false;
-    });
-    doseSelect.value = `Dose ${nextDose} (Day ${doseDayOffsets[nextDose - 1]})`;
-    selectedDose = doseSelect.value;
-  }
-  updateBookingIdRequirement();
-  if (dateEl) {
-    const suggestedDate = firstDoseDate && nextDose > 1
-      ? formatInputDate(firstDoseDate, doseDayOffsets[nextDose - 1])
-      : new Date().toISOString().split('T')[0];
-    dateEl.value = suggestedDate;
-    dateEl.min = suggestedDate;
-  }
-  // Enable/disable slots for whichever date and clinic ended up selected.
+  const select = document.getElementById('modalClinic');
+  const directory = window.clinicDirectory || [];
+  selectedClinic = directory.find(item => item.id === clinicId) || directory.find(item => item.name === clinic) || directory.find(item => item.id === select.value);
+  if (!selectedClinic) { alert('Choose a clinic from the map or directory first.'); return; }
+  select.value = selectedClinic.id;
+  document.getElementById('bookingClinicName').textContent = selectedClinic.name;
+  const nextDose = completedDoseCount >= doseDayOffsets.length ? 1 : Math.min(5, completedDoseCount + 1);
+  selectedDose = 'Dose ' + nextDose + ' (Day ' + doseDayOffsets[nextDose - 1] + ')';
+  if (completedDoseCount >= doseDayOffsets.length) currentVaccinationSessionId = crypto.randomUUID();
+  const date = document.getElementById('modalDate');
+  date.min = earliestBookingDate(nextDose);
+  date.value = date.min;
+  document.getElementById('bookingMsg').style.display = 'none';
+  document.getElementById('confirmBookingBtn').disabled = false;
   refreshTimeSlots();
   document.getElementById('bookingModal').classList.add('open');
 }
-
 function closeBookingModal() {
   document.getElementById('bookingModal').classList.remove('open');
-  document.getElementById('bookingReviewModal')?.classList.remove('open');
-  document.getElementById('bookingReviewModal')?.setAttribute('aria-hidden', 'true');
-  resetBookingSteps();
 }
-
-// --- Booking steps ----------------------------------------------------------
-// Step 1 collects the appointment details. "Proceed" validates them and opens a
-// review dialog; confirming that reveals step 2, where a Valid ID is mandatory.
-
-function resetBookingSteps() {
-  const idStep = document.getElementById('bookingIdStep');
-  const detailsStep = document.getElementById('bookingPatientDetails');
-  const backBtn = document.getElementById('bookingBackBtn');
-  const cancelBtn = document.getElementById('bookingCancelBtn');
-  const proceedBtn = document.getElementById('confirmBookingBtn');
-  if (idStep) idStep.hidden = true;
-  // bookingPatientDetails may have been hidden for returning-clinic bookings;
-  // openBookingModal() re-applies that state the next time it runs.
-  if (detailsStep) detailsStep.hidden = false;
-  if (backBtn) backBtn.hidden = true;
-  if (cancelBtn) cancelBtn.hidden = false;
-  if (proceedBtn) proceedBtn.disabled = false;
-  const idInput = document.getElementById('modalValidId');
-  if (idInput) idInput.value = '';
-  const reviewSummary = document.getElementById('bookingReviewSummary');
-  if (reviewSummary) reviewSummary.innerHTML = '';
-}
-
-function bookingStepBack() {
-  const idStep = document.getElementById('bookingIdStep');
-  const detailsStep = document.getElementById('bookingPatientDetails');
-  const backBtn = document.getElementById('bookingBackBtn');
-  const proceedBtn = document.getElementById('confirmBookingBtn');
-  if (idStep) idStep.hidden = true;
-  if (detailsStep) detailsStep.hidden = false;
-  if (backBtn) backBtn.hidden = true;
-  if (proceedBtn) {
-    proceedBtn.disabled = false;
-    proceedBtn.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Proceed';
-  }
-  const msgEl = document.getElementById('bookingMsg');
-  if (msgEl) msgEl.style.display = 'none';
-}
-
-function showBookingIdStep() {
-  const idStep = document.getElementById('bookingIdStep');
-  if (idStep) idStep.hidden = false;
-  const backBtn = document.getElementById('bookingBackBtn');
-  if (backBtn) backBtn.hidden = false;
-  const proceedBtn = document.getElementById('confirmBookingBtn');
-  if (proceedBtn) proceedBtn.innerHTML = '<i class="fa-solid fa-check"></i> Confirm Booking';
-  updateBookingIdRequirement();
-  const reviewModal = document.getElementById('bookingReviewModal');
-  reviewModal?.classList.remove('open');
-  reviewModal?.setAttribute('aria-hidden', 'true');
-  document.getElementById('bookingIdStep')?.scrollIntoView({ block: 'nearest' });
-}
-
-// Step 2 is the active step exactly when its panel is visible. Both the button
-// handler and the inline onclick use this to decide what a click should do.
-function isBookingIdStepActive() {
-  const idStep = document.getElementById('bookingIdStep');
-  return Boolean(idStep) && idStep.hidden === false;
-}
-
-// Single entry point for the shared Proceed / Confirm Booking button. Used by
-// the inline onclick attribute; the direct listener below calls the same logic.
-function bookingPrimaryAction() {
-  if (isBookingIdStepActive()) {
-    confirmBooking();
-  } else {
-    proceedBooking();
-  }
-}
-
-// Snapshot of the step-1 fields, used for both the review dialog and the save.
-function readBookingDetails() {
-  const clinicSelect = document.getElementById('modalClinic');
-  const clinicId = clinicSelect?.value || '';
-  const clinic = window.clinicDirectory?.find(item => item.id === clinicId) || selectedClinic;
-  const dose = document.getElementById('modalDose')?.value || '';
-  const idFile = document.getElementById('modalValidId')?.files?.[0] || null;
-  return {
-    clinic,
-    clinicId,
-    dose,
-    date: document.getElementById('modalDate')?.value || '',
-    time: document.getElementById('modalTime')?.value || '',
-    address: document.getElementById('modalAddress')?.value.trim() || '',
-    dateOfBirth: document.getElementById('modalDateOfBirth')?.value || '',
-    sex: document.getElementById('modalSex')?.value || '',
-    biteDate: document.getElementById('modalBiteDate')?.value || '',
-    animal: document.getElementById('modalAnimal')?.value || '',
-    bitePart: document.getElementById('modalBitePart')?.value.trim() || '',
-    woundWashed: document.getElementById('modalWoundWashed')?.value || '',
-    biteType: document.getElementById('modalBiteType')?.value.trim() || '',
-    woundPhoto: document.getElementById('modalWoundPhoto')?.files?.[0] || null,
-    priorVaccinationHistory: document.getElementById('modalPriorVaccinationHistory')?.value === 'declared',
-    priorVaccinationNotes: document.getElementById('modalPriorVaccinationNotes')?.value.trim() || '',
-    priorVaccinationDocument: document.getElementById('modalPriorVaccinationDocument')?.files?.[0] || null,
-    idFile,
-    returningClinic: doseLevelFromLabel(dose) > 1
-      && Boolean(bookingClinicContext?.intake?.bite_date || bookingClinicContext?.bookingWithDetails),
-    returningClinicFollowUp: isReturningClinicFollowUp(clinicId, dose)
-  };
-}
-
-// Returns an error string for the first problem with the step-1 fields, or ''.
-// `forReview` skips the Valid ID, which is not collected until step 2.
-function validateBookingDetails(details) {
-  if (!details.clinic) return 'Please select an available clinic before booking.';
-  if (!details.date) return 'Please select a preferred date.';
-  if (details.returningClinic) return '';
-  if (!details.address) return 'Please provide your address.';
-  if (!details.dateOfBirth) return 'Please enter your date of birth.';
-  if (!details.sex) return 'Please select your sex.';
-  if (!details.biteDate) return 'Please enter the date of the bite.';
-  if (!details.animal) return 'Please select the animal that bit you.';
-  if (!details.bitePart) return 'Please select the body part of the bite.';
-  if (!details.woundWashed) return 'Please state whether the wound was washed.';
-  if (!details.biteType) return 'Please select the exposure type.';
-  return '';
-}
-
-function buildReviewRows(details) {
-  const rows = [
-    ['Patient', currentResidentName],
-    ['Clinic', details.clinic?.name || 'Not selected'],
-    ['Dose', details.dose],
-    ['Date', details.date],
-    ['Time', details.time]
-  ];
-  if (!details.returningClinic) {
-    rows.push(
-      ['Address', details.address],
-      ['Date of birth', details.dateOfBirth],
-      ['Sex', details.sex],
-      ['Date of bite', details.biteDate],
-      ['Animal', details.animal],
-      ['Body part', details.bitePart],
-      ['Wound washed', details.woundWashed],
-      ['Exposure type', details.biteType],
-      ['Wound photo', details.woundPhoto ? details.woundPhoto.name : 'Not provided (optional)']
-    );
-  }
-  if (details.priorVaccinationHistory || details.priorVaccinationNotes || details.priorVaccinationDocument) {
-    rows.push(
-      ['Previous vaccination history', details.priorVaccinationHistory ? 'Declared' : 'Notes provided'],
-      ['Supporting record', details.priorVaccinationDocument ? details.priorVaccinationDocument.name : 'Not provided (optional)']
-    );
-  }
-  return rows.filter(([, value]) => value !== undefined && value !== null && value !== '');
-}
-
-// Step 1 -> review dialog.
-function proceedBooking() {
-  const btn = document.getElementById('confirmBookingBtn');
-  const msgEl = document.getElementById('bookingMsg');
-  if (!btn || btn.disabled) return;
-  const details = readBookingDetails();
-  const error = validateBookingDetails(details);
-  if (error) {
-    if (msgEl) {
-      msgEl.style.display = 'block';
-      msgEl.style.background = '#fff5f5';
-      msgEl.style.color = '#ef0000';
-      msgEl.style.border = '1px solid #fecaca';
-      msgEl.textContent = error;
-    }
-    return;
-  }
-  const slotError = timeSlotError(details.date, details.time, details.clinic);
-  if (slotError) {
-    if (msgEl) {
-      msgEl.style.display = 'block';
-      msgEl.style.background = '#fff5f5';
-      msgEl.style.color = '#ef0000';
-      msgEl.style.border = '1px solid #fecaca';
-      msgEl.textContent = slotError;
-    }
-    return;
-  }
-  const today = new Date().toISOString().split('T')[0];
-  if (details.dateOfBirth && details.dateOfBirth > today) {
-    if (msgEl) { msgEl.style.display = 'block'; msgEl.style.color = '#ef0000'; msgEl.style.background = '#fff5f5'; msgEl.style.border = '1px solid #fecaca'; msgEl.textContent = 'Date of birth cannot be in the future.'; }
-    return;
-  }
-  if (details.biteDate && details.biteDate > today) {
-    if (msgEl) { msgEl.style.display = 'block'; msgEl.style.color = '#ef0000'; msgEl.style.background = '#fff5f5'; msgEl.style.border = '1px solid #fecaca'; msgEl.textContent = 'Date of bite cannot be in the future.'; }
-    return;
-  }
-  const earliestDate = earliestBookingDate(doseLevelFromLabel(details.dose));
-  if (details.date < earliestDate) {
-    if (msgEl) { msgEl.style.display = 'block'; msgEl.style.color = '#ef0000'; msgEl.style.background = '#fff5f5'; msgEl.style.border = '1px solid #fecaca'; msgEl.textContent = `Dose ${doseLevelFromLabel(details.dose)} should be scheduled on or after ${earliestDate}.`; }
-    return;
-  }
-  if (msgEl) msgEl.style.display = 'none';
-
-  // Clear any message left over from a failed attempt on step 1, so the review
-  // dialog never shows a stale error next to the details being confirmed.
-  if (msgEl) msgEl.style.display = 'none';
-
-  const summary = document.getElementById('bookingReviewSummary');
-  if (summary) {
-    summary.innerHTML = buildReviewRows(details)
-      .map(([label, value]) => `<div class="review-row"><dt>${escapeHtml(String(label))}</dt><dd>${escapeHtml(String(value))}</dd></div>`)
-      .join('');
-  }
-  const reviewModal = document.getElementById('bookingReviewModal');
-  reviewModal?.classList.add('open');
-  reviewModal?.setAttribute('aria-hidden', 'false');
-}
+function bookingPrimaryAction() { return confirmBooking(); }
 
 function withBookingTimeout(promise, operation, timeoutMs = 30000) {
   let timeoutId;
@@ -1541,331 +1201,38 @@ function withBookingTimeout(promise, operation, timeoutMs = 30000) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
 }
 
-// Formats a Date as YYYY-MM-DD using its LOCAL calendar fields. toISOString()
-// converts to UTC first, which shifts the date back a day for any timezone
-// ahead of UTC (Asia/Manila is UTC+8) and made reservations expire a day early.
-function toLocalDateString(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-// The last day the appointment is still valid. `durationDays` is the inclusive
-// grace period the clinic allows: a duration of 1 means the appointment is
-// valid only on its scheduled date, 2 adds one day after it, and so on.
-// Parsed as local midnight so the arithmetic cannot slip across a day boundary.
-function getReservationEndDate(startDate, durationDays) {
-  if (!startDate) return '';
-  const parts = String(startDate).split('-').map(Number);
-  if (parts.length !== 3 || parts.some(value => Number.isNaN(value))) return startDate;
-  const endDate = new Date(parts[0], parts[1] - 1, parts[2]);
-  endDate.setDate(endDate.getDate() + Math.max(1, Number(durationDays) || 1) - 1);
-  return toLocalDateString(endDate);
-}
-
 async function confirmBooking() {
-  const btn = document.getElementById('confirmBookingBtn');
-  const msgEl = document.getElementById('bookingMsg');
-  if (!btn || !msgEl) return;
-  if (btn.disabled) return;
-  const resetBookingButton = () => {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fa-solid fa-check"></i> Confirm Booking';
-  };
-
-  const showError = message => {
-    msgEl.style.display = 'block';
-    msgEl.style.background = '#fff5f5';
-    msgEl.style.color = '#ef0000';
-    msgEl.style.border = '1px solid #fecaca';
-    msgEl.textContent = message;
-  };
-
-  // Read the step-1 fields and re-check them, so a booking cannot be submitted
-  // by reaching step 2 and then editing a value behind the review dialog.
-  const details = readBookingDetails();
-  const {
-    clinic, dose, date, time, address, dateOfBirth, sex,
-    biteDate, animal, bitePart, woundWashed, biteType, woundPhoto, idFile,
-    priorVaccinationHistory, priorVaccinationNotes, priorVaccinationDocument
-  } = details;
-  const returningClinic = details.returningClinic;
-  const savedBooking = bookingClinicContext?.bookingWithDetails || bookingClinicContext?.previousBooking || {};
-
-  const detailError = validateBookingDetails(details);
-  if (detailError) {
-    showError(detailError);
-    bookingStepBack();
-    return;
+  const button = document.getElementById('confirmBookingBtn');
+  const message = document.getElementById('bookingMsg');
+  if (button.disabled) return;
+  const date = document.getElementById('modalDate').value;
+  const time = document.getElementById('modalTime').value;
+  message.style.display = 'block';
+  message.style.color = '#b91c1c';
+  if (!currentUid || !selectedClinic || !date || !time) { message.textContent = 'Choose a preferred date and time.'; return; }
+  if (selectedClinic.status === 'out') { message.textContent = 'This clinic is out of stock. Choose another clinic.'; return; }
+  const latestClinic = window.clinicDirectory?.find(item => item.id === selectedClinic.id) || selectedClinic;
+  const error = timeSlotError(date, time, latestClinic);
+  if (error || date < earliestBookingDate(doseLevelFromLabel(selectedDose))) {
+    message.textContent = error || 'Choose a date on or after the earliest available date.'; return;
   }
-  const recheckSlotError = timeSlotError(date, time, clinic);
-  if (recheckSlotError) {
-    showError(recheckSlotError);
-    return;
-  }
-
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking...';
-
-  const reservationDays = Math.min(3, Math.max(1, Number(clinic.reservationDays || 1)));
-  const reservationEndDate = date ? getReservationEndDate(date, reservationDays) : '';
-
+  button.disabled = true;
+  button.textContent = 'Booking...';
+  message.textContent = '';
   try {
-    const activeAppointments = await withBookingTimeout(getDocs(query(
-      collection(db, 'appointments'),
-      where('resident_uid', '==', currentUid)
-    )), 'Checking your existing appointments');
-  if (activeAppointments.docs.some(item => isActiveAcceptedAppointment(item.data()))) {
-    msgEl.style.display = 'block';
-    msgEl.style.background = '#fff5f5';
-    msgEl.style.color = '#ef0000';
-    msgEl.style.border = '1px solid #fecaca';
-    msgEl.textContent = 'You already have an active accepted appointment. Complete that visit before booking another appointment.';
-    resetBookingButton();
-    return;
-  }
-
-  const allowedIdTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-  const allowedIdExtensions = ['jpg', 'jpeg', 'png', 'pdf'];
-  const maxIdSize = 5 * 1024 * 1024;
-
-  // A Dose 2+ resident who already has an appointment or vaccination record at
-  // this same clinic has already been verified there. They may upload a newer
-  // ID, but do not need to do so again to continue their course.
-  const sameClinicBooking = bookingClinicContext?.previousBooking?.clinic_id === clinic.id
-    ? bookingClinicContext.previousBooking
-    : null;
-  const hasSavedId = Boolean(details.returningClinicFollowUp && sameClinicBooking?.valid_id_url);
-  if (!idFile && !hasSavedId && !details.returningClinicFollowUp) {
-    showError('Please upload a valid ID to complete your booking.');
-    resetBookingButton();
-    showBookingIdStep();
-    return;
-  }
-
-  const idExtension = idFile?.name?.split('.').pop()?.toLowerCase();
-  const validIdFormat = idFile && (allowedIdTypes.includes(idFile.type) || allowedIdExtensions.includes(idExtension));
-  if (idFile && (!validIdFormat || idFile.size > maxIdSize)) {
-    showError('The ID must be a JPG, PNG, or PDF file no larger than 5 MB.');
-    resetBookingButton();
-    return;
-  }
-
-  if (priorVaccinationDocument) {
-    const priorExtension = priorVaccinationDocument.name?.split('.').pop()?.toLowerCase();
-    const validPriorDocument = allowedIdTypes.includes(priorVaccinationDocument.type) || allowedIdExtensions.includes(priorExtension);
-    if (!validPriorDocument || priorVaccinationDocument.size > 10 * 1024 * 1024) {
-      showError('The previous vaccination record must be a JPG, PNG, or PDF file no larger than 10 MB.');
-      resetBookingButton();
-      return;
-    }
-  }
-
-  // The wound photo is optional, but when one is supplied it must be a usable
-  // image, otherwise clinic staff would receive a file they cannot open.
-  const allowedPhotoTypes = ['image/jpeg', 'image/png'];
-  const allowedPhotoExtensions = ['jpg', 'jpeg', 'png'];
-  if (woundPhoto) {
-    const photoExtension = woundPhoto.name?.split('.').pop()?.toLowerCase();
-    const validPhoto = allowedPhotoTypes.includes(woundPhoto.type) || allowedPhotoExtensions.includes(photoExtension);
-    if (!validPhoto || woundPhoto.size > maxIdSize) {
-      showError('The wound photo must be a JPG or PNG file no larger than 5 MB, or leave it blank.');
-      resetBookingButton();
-      return;
-    }
-  }
-
-  // The date floor follows the dose the resident actually picked, not the dose
-  // the system would suggest. Inventory batches are restricted to clinic staff
-  // by Firestore rules, so do not make a forbidden client-side inventory query -
-  // the resident already sees the clinic's public availability.
-  const selectedDoseLevel = doseLevelFromLabel(dose);
-  const earliestDate = earliestBookingDate(selectedDoseLevel);
-  if (date < earliestDate) {
-    msgEl.style.display = 'block';
-    msgEl.style.background = '#fff5f5';
-    msgEl.style.color = '#ef0000';
-    msgEl.style.border = '1px solid #fecaca';
-    msgEl.textContent = `Dose ${selectedDoseLevel} should be scheduled on or after ${earliestDate}.`;
-    resetBookingButton();
-    return;
-  }
-
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Booking...';
-
-    // Carry an ID forward only from this clinic. An ID attached to a booking at
-    // another clinic is not used to satisfy this clinic's verification flow.
-    let idDownloadUrl = sameClinicBooking?.valid_id_url || '';
-    let idContentType = sameClinicBooking?.valid_id_type || '';
-    let idName = sameClinicBooking?.valid_id_name || '';
-    if (idFile) {
-      const idStorageRef = ref(storage, `id-verification/${currentUid}/${Date.now()}-${idFile.name}`);
-      idContentType = idFile.type || (idExtension === 'pdf' ? 'application/pdf' : idExtension === 'png' ? 'image/png' : 'image/jpeg');
-      msgEl.style.display = 'block';
-      msgEl.style.background = '#eff6ff';
-      msgEl.style.color = '#1d4ed8';
-      msgEl.style.border = '1px solid #bfdbfe';
-      msgEl.textContent = 'Uploading your valid ID...';
-      const idUpload = await withBookingTimeout(uploadBytes(idStorageRef, idFile, { contentType: idContentType }), 'Uploading your valid ID');
-      idDownloadUrl = await withBookingTimeout(getDownloadURL(idUpload.ref), 'Preparing your valid ID');
-      idName = idFile.name;
-    }
-
-    // The wound photo is optional; clinic staff use it to assess the exposure
-    // type and prepare supplies. Nothing is stored when it is left blank.
-    let woundPhotoUrl = '';
-    let woundPhotoName = '';
-    if (woundPhoto) {
-      const photoContentType = woundPhoto.type || (woundPhoto.name?.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
-      const photoRef = ref(storage, `wound-photos/${currentUid}/${Date.now()}-${woundPhoto.name}`);
-      msgEl.style.display = 'block';
-      msgEl.style.background = '#eff6ff';
-      msgEl.style.color = '#1d4ed8';
-      msgEl.style.border = '1px solid #bfdbfe';
-      msgEl.textContent = 'Uploading your wound photo...';
-      const photoUpload = await withBookingTimeout(uploadBytes(photoRef, woundPhoto, { contentType: photoContentType }), 'Uploading your wound photo');
-      woundPhotoUrl = await withBookingTimeout(getDownloadURL(photoUpload.ref), 'Preparing your wound photo');
-      woundPhotoName = woundPhoto.name;
-    }
-
-    // This optional document may be from a past incident or another clinic.
-    // Keep it on the resident profile and copy its reference to this booking.
-    let priorDocumentUrl = '';
-    let priorDocumentName = '';
-    let priorDocumentType = '';
-    let priorDocumentPath = '';
-    if (priorVaccinationDocument) {
-      priorDocumentType = priorVaccinationDocument.type || 'application/octet-stream';
-      const priorRef = ref(storage, `vaccination-documents/${currentUid}/${Date.now()}-${priorVaccinationDocument.name}`);
-      msgEl.textContent = 'Uploading previous vaccination record...';
-      const priorUpload = await withBookingTimeout(uploadBytes(priorRef, priorVaccinationDocument, { contentType: priorDocumentType }), 'Uploading previous vaccination record');
-      priorDocumentUrl = await withBookingTimeout(getDownloadURL(priorUpload.ref), 'Preparing previous vaccination record');
-      priorDocumentName = priorVaccinationDocument.name;
-      priorDocumentPath = priorRef.fullPath;
-    }
-    msgEl.textContent = 'Saving your appointment...';
-    const appointmentRef = await withBookingTimeout(addDoc(collection(db, 'appointments'), {
-      resident_uid: currentUid,
-      resident_name: currentResidentName,
-      resident_email: residentProfile.email || auth.currentUser?.email || '',
-      clinic_id: clinic.id,
-      clinic_name: clinic.name,
-      clinic_address: clinic.address || '',
-      clinic_staff_uid: clinic.staff_uid || '',
-      vaccination_session_id: bookingClinicContext?.newVaccinationSessionId || currentVaccinationSessionId || 'legacy',
-      primary_clinic_id: bookingClinicContext?.primaryClinicId || clinic.id,
-      primary_clinic_name: window.clinicDirectory?.find(item => item.id === (bookingClinicContext?.primaryClinicId || clinic.id))?.name || clinic.name,
-      clinic_changed_for_dose: Boolean(bookingClinicContext?.primaryClinicId && clinic.id !== bookingClinicContext.primaryClinicId),
-      dose_label: dose,
-      vaccine_name: latestVaccineBrand || '',
-      preferred_date: date,
-      reservation_days: reservationDays,
-      reservation_end_date: reservationEndDate,
-      preferred_time: time,
-      resident_address: address,
-      date_of_birth: dateOfBirth || savedBooking.date_of_birth || null,
-      patient_sex: sex || savedBooking.patient_sex || '',
-      bite_date: biteDate || savedBooking.bite_date || '',
-      animal_type: animal || savedBooking.animal_type || '',
-      bite_body_part: bitePart || savedBooking.bite_body_part || '',
-      valid_id_url: idDownloadUrl,
-      valid_id_name: idName,
-      valid_id_type: idContentType,
-      // Optional; empty when the resident skipped it (e.g. a wound that cannot
-      // be photographed). Staff still see the exposure type they selected.
-      wound_photo_url: woundPhotoUrl,
-      wound_photo_name: woundPhotoName,
-      prior_vaccination_history_declared: priorVaccinationHistory,
-      prior_vaccination_history_notes: priorVaccinationNotes,
-      prior_vaccination_document_url: priorDocumentUrl,
-      prior_vaccination_document_name: priorDocumentName,
-      prior_vaccination_document_type: priorDocumentType,
-      // carried forward from an earlier booking in this course when available
-      patient_category: savedBooking.patient_category || '',
-      wound_washed: woundWashed || savedBooking.wound_washed || '',
-      bite_type: biteType || savedBooking.bite_type || '',
-      // This immutable snapshot is deliberately copied to every appointment
-      // in the course so a receiving clinic can review it without querying a
-      // clinic it does not belong to.
-      course_intake_data: {
-        resident_address: address,
-        date_of_birth: dateOfBirth || savedBooking.date_of_birth || '',
-        patient_sex: sex || savedBooking.patient_sex || '',
-        bite_date: biteDate || savedBooking.bite_date || '',
-        animal_type: animal || savedBooking.animal_type || '',
-        bite_body_part: bitePart || savedBooking.bite_body_part || '',
-        patient_category: savedBooking.patient_category || '',
-        wound_washed: woundWashed || savedBooking.wound_washed || '',
-        bite_type: biteType || savedBooking.bite_type || ''
-      },
-      course_vaccination_history: buildCourseHistory(),
-      status: 'pending',
-      created_at: serverTimestamp()
+    await withBookingTimeout(createBooking({
+      clinic_id: selectedClinic.id, preferred_date: date, preferred_time: time,
+      dose_label: selectedDose, vaccine_name: latestVaccineBrand || '',
+      vaccination_session_id: currentVaccinationSessionId || 'legacy',
+      primary_clinic_id: getPrimaryClinicId() || selectedClinic.id
     }), 'Saving your appointment');
-
-    await updateDoc(doc(db, 'residents', currentUid), {
-      address,
-      birthday: dateOfBirth,
-      gender: sex,
-      prior_vaccination_history_declared: priorVaccinationHistory || Boolean(residentProfile.prior_vaccination_history_declared),
-      prior_vaccination_history_notes: priorVaccinationNotes || residentProfile.prior_vaccination_history_notes || '',
-      prior_vaccination_document_url: priorDocumentUrl || residentProfile.prior_vaccination_document_url || '',
-      prior_vaccination_document_name: priorDocumentName || residentProfile.prior_vaccination_document_name || '',
-      updated_at: serverTimestamp()
-    });
-    if (priorDocumentUrl) {
-      await addDoc(collection(db, 'vaccination_documents'), {
-        resident_uid: currentUid,
-        appointment_id: appointmentRef.id,
-        document_category: 'prior_vaccination_history',
-        file_name: priorDocumentName,
-        file_type: priorDocumentType,
-        file_size: priorVaccinationDocument.size,
-        storage_path: priorDocumentPath,
-        download_url: priorDocumentUrl,
-        uploaded_at: serverTimestamp()
-      });
-    }
-    residentProfile = { ...residentProfile, address, birthday: dateOfBirth, gender: sex,
-      prior_vaccination_history_declared: priorVaccinationHistory || Boolean(residentProfile.prior_vaccination_history_declared),
-      prior_vaccination_document_url: priorDocumentUrl || residentProfile.prior_vaccination_document_url || '' };
-
-    if (clinic.staff_uid) {
-      await withBookingTimeout(addDoc(collection(db, 'notifications'), {
-        recipient_uid: clinic.staff_uid,
-        user_id: clinic.staff_uid,
-        clinic_id: clinic.id,
-        appointment_id: appointmentRef.id,
-        type: 'appointment',
-        title: 'New appointment request',
-        message: `${currentResidentName} requested an appointment on ${date} at ${time}.`,
-        read: false,
-        created_at: serverTimestamp()
-      }), 'Sending the clinic notification');
-    }
-
-    msgEl.style.display = 'block';
-    msgEl.style.background = '#f0fdf4';
-    msgEl.style.color = '#16a34a';
-    msgEl.style.border = '1px solid #bbf7d0';
-    msgEl.textContent = 'Appointment booked! Waiting for clinic confirmation.';
-
-    setTimeout(() => {
-      closeBookingModal();
-      loadResidentBookings(currentUid);
-      msgEl.style.display = 'none';
-    }, 2000);
-  } catch (err) {
-    msgEl.style.display = 'block';
-    msgEl.style.background = '#fff5f5';
-    msgEl.style.color = '#ef0000';
-    msgEl.style.border = '1px solid #fecaca';
-    msgEl.textContent = 'Booking failed: ' + err.message;
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fa-solid fa-check"></i> Confirm Booking';
-  }
+    message.style.color = '#15803d';
+    message.textContent = 'Appointment sent to the clinic for review.';
+    setTimeout(closeBookingModal, 1500);
+  } catch (error) {
+    message.textContent = error.message || 'Could not book the appointment. Please try again.';
+    button.disabled = false;
+  } finally { button.textContent = 'Book Appointment'; }
 }
 
 function filterMap(btn) {
@@ -1982,72 +1349,8 @@ function resApplyFilter(q = '') {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-  const clinicSelect = document.getElementById('modalClinic');
-  const doseSelect = document.getElementById('modalDose');
-  const clinicChangeModal = document.getElementById('clinicChangeModal');
-  const closeClinicChange = () => {
-    clinicChangeModal?.classList.remove('open');
-    clinicChangeModal?.setAttribute('aria-hidden', 'true');
-  };
-  clinicSelect?.addEventListener('change', () => {
-    const primaryClinicId = bookingClinicContext?.primaryClinicId;
-    const selectedId = clinicSelect.value;
-    if (!primaryClinicId || selectedId === primaryClinicId || selectedId === confirmedClinicChangeId) return;
-    pendingClinicChangeId = selectedId;
-    clinicChangeModal?.classList.add('open');
-    clinicChangeModal?.setAttribute('aria-hidden', 'false');
-  });
-  clinicSelect?.addEventListener('change', updateBookingIdRequirement);
-  // Switching dose level moves the earliest bookable date, because doses 2-5
-  // are anchored to the start of the course. Re-anchor the date input, but only
-  // when the chosen date would otherwise fall before that floor.
-  doseSelect?.addEventListener('change', () => {
-    selectedDose = doseSelect.value;
-    const el = document.getElementById('modalDate');
-    if (!el) return;
-    const floor = earliestBookingDate(doseLevelFromLabel(doseSelect.value));
-    el.min = floor;
-    if (!el.value || el.value < floor) el.value = floor;
-    refreshTimeSlots();
-    updateBookingIdRequirement();
-  });
-  // A different date can turn today's passed slots into valid ones, and another
-  // clinic may open or close at a different time, so both re-filter the list.
   document.getElementById('modalDate')?.addEventListener('change', refreshTimeSlots);
-  clinicSelect?.addEventListener('change', refreshTimeSlots);
-  // Review dialog: "Go back and edit" returns to step 1, "Yes, continue"
-  // reveals the mandatory Valid ID step.
-  const reviewModal = document.getElementById('bookingReviewModal');
-  document.getElementById('reviewBackBtn')?.addEventListener('click', () => {
-    reviewModal?.classList.remove('open');
-    reviewModal?.setAttribute('aria-hidden', 'true');
-  });
-  document.getElementById('reviewConfirmBtn')?.addEventListener('click', showBookingIdStep);
-  reviewModal?.addEventListener('click', event => {
-    if (event.target === reviewModal) {
-      reviewModal.classList.remove('open');
-      reviewModal.setAttribute('aria-hidden', 'true');
-    }
-  });
-  document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && reviewModal?.classList.contains('open')) {
-      reviewModal.classList.remove('open');
-      reviewModal.setAttribute('aria-hidden', 'true');
-    }
-  });
-  document.getElementById('cancelClinicChangeBtn')?.addEventListener('click', () => {
-    if (clinicSelect && bookingClinicContext?.primaryClinicId) clinicSelect.value = bookingClinicContext.primaryClinicId;
-    pendingClinicChangeId = '';
-    closeClinicChange();
-  });
-  document.getElementById('confirmClinicChangeBtn')?.addEventListener('click', () => {
-    confirmedClinicChangeId = pendingClinicChangeId;
-    pendingClinicChangeId = '';
-    closeClinicChange();
-  });
-  clinicChangeModal?.addEventListener('click', event => {
-    if (event.target === clinicChangeModal) document.getElementById('cancelClinicChangeBtn')?.click();
-  });
+  document.getElementById('rescheduleDate')?.addEventListener('change', refreshRescheduleSlots);
   document.getElementById('closeRescheduleBtn')?.addEventListener('click', () => document.getElementById('rescheduleModal').classList.remove('open'));
   document.getElementById('saveRescheduleBtn')?.addEventListener('click', saveReschedule);
   document.getElementById('closeCancelBtn')?.addEventListener('click', () => document.getElementById('cancelModal').classList.remove('open'));
@@ -2109,16 +1412,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (e.target === this) closeBookingModal();
   });
 
-  // Bind the booking buttons directly instead of relying only on the inline
-  // onclick attributes below. Module scripts are deferred, so this block can run
-  // after DOMContentLoaded has already fired - in which case the window.* bridge
-  // is never reached and every inline onclick is dead. Direct listeners keep the
-  // booking flow working either way.
-  // One button serves both steps, so it dispatches on the active step. Binding
-  // it to proceedBooking alone would make "Confirm Booking" reopen the review
-  // dialog forever and never submit.
+
   document.getElementById('confirmBookingBtn')?.addEventListener('click', bookingPrimaryAction);
-  document.getElementById('bookingBackBtn')?.addEventListener('click', bookingStepBack);
   document.getElementById('bookingCancelBtn')?.addEventListener('click', closeBookingModal);
 
   const signOutBtn = document.getElementById('signOutBtn');
@@ -2126,19 +1421,16 @@ document.addEventListener('DOMContentLoaded', function() {
     signOutUser().then(() => window.location.href = 'login.html');
   });
 
-  // Expose some functions to window for inline onclick attributes (module scope isn't global).
-  // This block only runs when the handler above actually fires, so the booking
-  // buttons are also bound directly - see the listeners above.
+
   window.showTab = showTab;
   window.openBookingModal = openBookingModal;
   window.closeBookingModal = closeBookingModal;
   window.confirmBooking = confirmBooking;
-  // The booking form is a two-step flow: Proceed validates the details and opens
-  // the review dialog, Back returns from the Valid ID step to the details.
-  window.proceedBooking = proceedBooking;
+  // Booking requires only the selected clinic's preferred date and time.
+  window.proceedBooking = confirmBooking;
   window.confirmBookingPrimary = confirmBooking;
   window.bookingPrimaryAction = bookingPrimaryAction;
-  window.bookingStepBack = bookingStepBack;
+
   window.filterMap = filterMap;
   window.handleUpload = handleUpload;
   window.updateNearestClinicSummary = updateNearestClinicSummary;

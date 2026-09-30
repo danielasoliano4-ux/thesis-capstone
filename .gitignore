@@ -68,3 +68,6 @@ runtime-config.js
 
 # dataconnect generated files
 .dataconnect
+
+.env.*
+!.env.example

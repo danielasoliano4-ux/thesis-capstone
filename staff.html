@@ -271,7 +271,7 @@
                 <div class="dose-completion-grid">
                     <label>Administration Date<input id="completionDate" type="date" required></label>
                     <label>Dose Number<input id="completionDose" type="number" min="1" max="5" required></label>
-                    <label class="full-field">Vaccine Brand / Type<input id="completionVaccine" placeholder="e.g., Verorab (PVRV)" required></label>
+                    <label class="full-field">Vaccine Brand / Type<select id="completionVaccine" required><option value="">Select vaccine / batch...</option></select><small>Completing this dose deducts 1 dose from the selected batch.</small></label>
                     <label class="full-field">Clinic Location<input id="completionLocation" required></label>
                 </div>
                 <button type="submit" class="add-btn dose-completion-submit"><i class="fa-solid fa-syringe"></i> Complete Dose</button>
@@ -324,7 +324,7 @@
                 </label>
                 <label class="decline-referral-field">
                     Note to the resident <span class="optional-note">(optional)</span>
-                    <textarea id="declineReferralNote" rows="3" placeholder="e.g., Please bring your bite record and a valid ID." maxlength="400"></textarea>
+                    <textarea id="declineReferralNote" rows="3" placeholder="e.g., Please bring your bite record" maxlength="400"></textarea>
                 </label>
                 <div class="decline-referral-preview">
                     <span class="preview-label">What the resident will see</span>

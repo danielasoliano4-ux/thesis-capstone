@@ -1339,7 +1339,7 @@
       <p class="sub">You may move this appointment by up to one day.</p>
       <input type="hidden" id="rescheduleAppointmentId">
       <div class="modal-field"><label for="rescheduleDate">Date</label><input id="rescheduleDate" type="date" required></div>
-      <div class="modal-field"><label for="rescheduleTime">Time</label><select id="rescheduleTime"><option>8:00 AM</option><option>9:00 AM</option><option>10:00 AM</option><option>11:00 AM</option><option>1:00 PM</option><option>2:00 PM</option><option>3:00 PM</option></select></div>
+      <div class="modal-field"><label for="rescheduleTime">Time</label><select id="rescheduleTime" required><option value="">Choose a date first</option></select><small id="rescheduleTimeHint"></small></div>
       <div id="rescheduleMsg" style="display:none;margin-top:10px;padding:10px;border-radius:8px;font-size:13px;"></div>
       <div class="modal-actions"><button type="button" class="modal-cancel" id="closeRescheduleBtn">Cancel</button><button type="button" class="modal-submit" id="saveRescheduleBtn"><i class="fa-solid fa-check"></i> Save Changes</button></div>
     </div>
@@ -1358,189 +1358,22 @@
 
   <!-- BOOKING MODAL -->
   <div class="modal-overlay" id="bookingModal">
-    <div class="modal-box">
-      <h2><i class="fa-regular fa-calendar-plus" style="color:#ef0000;margin-right:8px;"></i>Book Appointment</h2>
-      <p class="sub">Schedule your anti-rabies vaccination appointment</p>
-      <div class="modal-field">
-        <label>Select Clinic</label>
-        <select id="modalClinic">
-          <option>Cabuyao City Health Center – Available</option>
-          <option>St. Mary's Medical Clinic – Low Stock</option>
-          <option>Laguna Medical Clinic – Available</option>
-        </select>
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="bookingTitle">
+      <h2 id="bookingTitle">Book Appointment</h2>
+      <p class="sub" id="bookingClinicName"></p>
+      <select id="modalClinic" hidden aria-label="Selected clinic"></select>
+      <div class="modal-field"><label for="modalDate">Preferred Date</label><input id="modalDate" type="date" required></div>
+      <div class="modal-field"><label for="modalTime">Preferred Time</label>
+        <select id="modalTime" required><option value="">Choose a date first</option></select><small id="modalTimeHint"></small>
       </div>
-      <div class="modal-field">
-        <label>Dose Number</label>
-        <select id="modalDose">
-          <option selected>Dose 1 (Day 0)</option>
-          <option>Dose 2 (Day 3)</option>
-          <option>Dose 3 (Day 7)</option>
-          <option>Dose 4 (Day 14)</option>
-          <option>Dose 5 (Day 28)</option>
-        </select>
-</div>
-      <div class="modal-field">
-        <label>Preferred Date</label>
-        <input id="modalDate" type="date" value="2026-06-25" />
+      <p>Clinic staff will collect your medical details when you arrive.</p>
+      <div id="bookingMsg" role="status" style="display:none;margin-top:12px;"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-cancel" id="bookingCancelBtn">Cancel</button>
+        <button type="button" class="modal-submit" id="confirmBookingBtn">Book Appointment</button>
       </div>
-      <div class="modal-field">
-        <label>Preferred Time</label>
-        <select id="modalTime">
-          <option>8:00 AM</option>
-          <option>8:30 AM</option>
-          <option>9:00 AM</option>
-          <option>9:30 AM</option>
-          <option>10:00 AM</option>
-          <option>10:30 AM</option>
-          <option>11:00 AM</option>
-          <option>11:30 AM</option>
-          <option>1:00 PM</option>
-          <option>1:30 PM</option>
-          <option>2:00 PM</option>
-          <option>2:30 PM</option>
-          <option>3:00 PM</option>
-          <option>3:30 PM</option>
-          <option>4:00 PM</option>
-          <option>4:30 PM</option>
-        </select>
     </div>
-      <div id="bookingPatientDetails">
-        <div class="modal-field">
-          <label for="modalAddress">Address</label>
-          <input id="modalAddress" type="text" placeholder="House number, street, barangay" required />
-        </div>
-<div class="modal-field">
-          <label for="modalDateOfBirth">Date of Birth</label>
-          <input id="modalDateOfBirth" type="date" required />
-        </div>
-        <div class="modal-field">
-          <label for="modalSex">Sex</label>
-          <select id="modalSex" required>
-            <option value="">Select sex</option>
-            <option value="Female">Female</option>
-            <option value="Male">Male</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-        <div class="modal-field">
-          <label for="modalBiteDate">Date of Bite</label>
-          <input id="modalBiteDate" type="date" required />
-        </div>
-        <div class="modal-field">
-          <label for="modalAnimal">Animal That Bit You</label>
-          <select id="modalAnimal" required>
-            <option value="">Select animal</option>
-            <option value="Dog">Dog</option>
-            <option value="Cat">Cat</option>
-            <option value="Rat">Rat</option>
-            <option value="Bat">Bat</option>
-          </select>
-        </div>
-        <div class="modal-field">
-          <label for="modalBitePart">Body Part of the Bite</label>
-          <select id="modalBitePart" required>
-            <option value="">Select body part</option>
-            <option>Head</option>
-            <option>Face</option>
-            <option>Neck</option>
-            <option>Shoulder</option>
-            <option>Arm</option>
-            <option>Elbow</option>
-            <option>Forearm</option>
-            <option>Wrist</option>
-            <option>Hand</option>
-            <option>Finger</option>
-            <option>Chest</option>
-            <option>Back</option>
-            <option>Abdomen</option>
-            <option>Hip</option>
-            <option>Thigh</option>
-            <option>Knee</option>
-            <option>Lower Leg</option>
-            <option>Ankle</option>
-            <option>Foot</option>
-            <option>Multiple Sites</option>
-          </select>
-        </div>
-        <div class="modal-field">
-          <label for="modalWoundWashed">Was the wound washed immediately?</label>
-          <select id="modalWoundWashed" required><option value="">Select answer</option><option value="Yes">Yes</option><option value="No">No</option></select>
-        </div>
-               <div class="modal-field">
-                 <label for="modalBiteType">Exposure Type</label>
-                 <select id="modalBiteType" required>
-                   <option value="">Select exposure type</option>
-                   <option>Bite</option>
-                   <option>Scratch</option>
-                   <option>Lick / Saliva Contact</option>
-                   <option>Nibble</option>
-                   <option>Claw Mark</option>
-                   <option>Other</option>
-                 </select>
-               </div>
-               <div class="modal-field">
-                 <label for="modalWoundPhoto">Wound Photo <span class="optional-tag">(optional)</span></label>
-                 <input id="modalWoundPhoto" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" />
-                 <small style="display:block;margin-top:6px;color:#6b7280;line-height:1.5;">A photo helps clinic staff assess your exposure type and prepare the right medical supplies before you arrive. Skip this if the wound is on a body area that cannot be photographed — your booking will still be accepted.</small>
-               </div>
-             </div>
-
-             <fieldset class="booking-history-declaration">
-               <legend><i class="fa-solid fa-clock-rotate-left"></i> Previous anti-rabies vaccination <span class="optional-tag">(optional)</span></legend>
-               <p>If you were vaccinated before, including for a separate bite incident, tell the clinic so they can review your history.</p>
-               <label for="modalPriorVaccinationHistory">Previous vaccination history</label>
-               <select id="modalPriorVaccinationHistory">
-                 <option value="not_declared">No history to declare / not sure</option>
-                 <option value="declared">Yes, I was vaccinated previously</option>
-               </select>
-               <label for="modalPriorVaccinationNotes">Details for the clinic <span class="optional-tag">(optional)</span></label>
-               <textarea id="modalPriorVaccinationNotes" rows="2" maxlength="500" placeholder="For example: completed a series in 2024 at another clinic."></textarea>
-               <label for="modalPriorVaccinationDocument">Past vaccination card or issuance paper <span class="optional-tag">(optional)</span></label>
-               <input id="modalPriorVaccinationDocument" type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf">
-               <small>JPG, PNG, or PDF, maximum 10 MB. This is optional and is shared only with authorized clinic staff and administrators.</small>
-             </fieldset>
-
-             <div id="returningClinicMessage" hidden style="margin:14px 0 8px;font-size:12px;color:#6b7280;"></div>
-             <div id="bookingMsg" style="display:none;margin-top:10px;padding:10px;border-radius:8px;font-size:13px;"></div>
-
-             <!-- Step 2: valid ID. Shown only after the details step is confirmed. -->
-             <div id="bookingIdStep" hidden>
-               <div class="booking-step-header">
-                 <span class="step-badge">Step 2 of 2</span>
-                 <h3>Upload your Valid ID</h3>
-                 <p id="bookingIdRequirementText">A valid ID is required to confirm your appointment. Clinic staff will verify it when you arrive.</p>
-               </div>
-               <div class="modal-field">
-                 <label for="modalValidId">Valid ID <span id="bookingIdRequirementLabel" style="font-weight:400;color:#ef0000;">(required)</span></label>
-                 <input id="modalValidId" type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" />
-                 <small style="display:block;margin-top:6px;color:#6b7280;line-height:1.5;">Upload one clear JPG, PNG, or PDF (maximum 5 MB). Accepted IDs: PhilID/ePhilID, passport, driver's license, UMID, SSS, GSIS, PRC, Postal ID, Voter's ID, Senior Citizen ID, or PWD ID.</small>
-               </div>
-             </div>
-
-             <div class="modal-actions">
-               <button class="modal-cancel" id="bookingBackBtn" hidden onclick="bookingStepBack()">
-                 <i class="fa-solid fa-arrow-left"></i> Back
-               </button>
-               <button class="modal-cancel" id="bookingCancelBtn" onclick="closeBookingModal()">Cancel</button>
-               <button type="button" class="modal-submit" id="confirmBookingBtn" onclick="bookingPrimaryAction()">
-                 <i class="fa-solid fa-arrow-right"></i> Proceed
-               </button>
-             </div>
-           </div>
-        </div>
-
-         <!-- Review step: shown after Proceed, before the Valid ID step. -->
-        <div class="modal-overlay" id="bookingReviewModal" aria-hidden="true">
-           <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="bookingReviewTitle">
-             <h2 id="bookingReviewTitle"><i class="fa-regular fa-circle-question" style="color:#ef0000;margin-right:8px;"></i>Confirm your booking details</h2>
-             <p class="sub">Please check these details. You will upload your Valid ID in the next step.</p>
-             <div id="bookingReviewSummary" class="review-summary"></div>
-             <div class="modal-actions">
-               <button type="button" class="modal-cancel" id="reviewBackBtn"><i class="fa-solid fa-arrow-left"></i> Go back and edit</button>
-               <button type="button" class="modal-submit" id="reviewConfirmBtn"><i class="fa-solid fa-check"></i> Yes, continue</button>
-             </div>
-           </div>
-        </div>
+  </div>
 
   <!-- Shown before a subsequent-dose appointment is moved away from the course's primary clinic. -->
   <div class="modal-overlay" id="clinicChangeModal" aria-hidden="true">

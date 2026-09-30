@@ -1,128 +1,68 @@
+import { watchDoseStock, saveStockDose } from './dose-completion.js';
+import { manageAppointment } from './appointment-intake.js';
+import { courseKey, courseStatus } from './patient-course.js';
 import { auth, db, fetchUserProfile } from './firebase.js';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 import {
   collection, query, where, orderBy, getDocs,
-  doc, updateDoc, addDoc, serverTimestamp, getDoc, runTransaction
+  doc, updateDoc, addDoc, serverTimestamp, getDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+function manilaToday() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
 
 let pendingCount = 0;
 let currentClinicId = null;
 let activeAppointment = null;
 
-async function loadPatients() {
-  const grid = document.getElementById('patientsGrid');
-  grid.innerHTML = '<p style="color:#6b7280;padding:16px;">Loading patients…</p>';
-
-  try {
-    console.log('Current clinic ID:', currentClinicId);
-    
-    if (!currentClinicId) {
-      throw new Error('Clinic ID not loaded. Please refresh the page.');
-    }
-
-    const appointments = await getDocs(query(
-      collection(db, 'appointments'),
-      where('clinic_id', '==', currentClinicId)
-    ));
-
-    console.log('Appointments found:', appointments.size);
-
-    const uniqueResidents = new Map();
-    const clinicVaccinationSnap = await getDocs(query(
-      collection(db, 'vaccination_records'),
-      where('clinic_id', '==', currentClinicId)
-    ));
-    const clinicVaccinationRecords = clinicVaccinationSnap.docs.map(item => item.data());
-    const appointmentDocs = [...appointments.docs].sort((first, second) => {
-      const priority = { pending: 0, confirmed: 1, in_progress: 2, completed: 3, cancelled: 4, declined: 5 };
-      return (priority[first.data().status] ?? 6) - (priority[second.data().status] ?? 6);
-    });
-    for (const apptDoc of appointmentDocs) {
-      const appt = apptDoc.data();
-      if (['pending', 'declined', 'cancelled'].includes(appt.status)) continue;
-      console.log('Processing appointment:', appt.resident_name, appt.resident_uid);
-      
-      if (!uniqueResidents.has(appt.resident_uid)) {
-        try {
-          const recordsForAppointment = clinicVaccinationRecords.filter(record => record.resident_uid === appt.resident_uid
-            && (!appt.vaccination_session_id || record.vaccination_session_id === appt.vaccination_session_id));
-          const completedDoses = new Set(recordsForAppointment
-            .map(record => Number(record.dose_number || 0))
-            .filter(doseNumber => doseNumber >= 1 && doseNumber <= 5));
-          const doses = completedDoses.size;
-          uniqueResidents.set(appt.resident_uid, {
-            name: appt.resident_name,
-            uid: appt.resident_uid,
-            doses,
-            vaccinationSessionId: appt.vaccination_session_id || 'legacy',
-            nextAppt: appt.preferred_date,
-            appointments: []
-          });
-        } catch (vaccErr) {
-          console.warn('Could not load vaccination records for', appt.resident_uid, ':', vaccErr.message);
-          uniqueResidents.set(appt.resident_uid, {
-            name: appt.resident_name,
-            uid: appt.resident_uid,
-            doses: 0,
-            vaccinationSessionId: appt.vaccination_session_id || 'legacy',
-            nextAppt: appt.preferred_date,
-            appointments: []
-          });
-        }
-      }
-      uniqueResidents.get(appt.resident_uid).appointments.push({ id: apptDoc.id, ...appt });
-    }
-
-    if (!uniqueResidents.size) {
-      grid.innerHTML = '<p style="color:#6b7280;padding:16px;"><i class="fa-solid fa-circle-check" style="color:#22c55e;margin-right:6px;"></i>No patients with appointments.</p>';
-      return;
-    }
-
-    grid.innerHTML = '';
-    const colors = ['blue-tint', 'yellow-tint', 'green-tint', 'red-tint'];
-    let colorIndex = 0;
-    for (const resident of uniqueResidents.values()) {
-      const pct = Math.round((resident.doses / 5) * 100);
-      const tintClass = colors[colorIndex % colors.length];
-      const completedBadge = resident.doses === 5 ? '<span class="completed-badge">Completed</span>' : '';
-      const nextApptText = resident.doses < 5 ? `<div class="appointment-info"><i class="fa-regular fa-calendar"></i><span><strong>Next Appointment:</strong> ${resident.nextAppt}</span></div>` : '';
-      const card = `
-        <div class="patient-card ${tintClass}">
-          <div class="patient-header">
-            <div class="header-with-badge">
-              <h3>${resident.name}</h3>
-              ${completedBadge}
-            </div>
-          </div>
-          <div class="treatment-section">
-            <label>Treatment Progress</label>
-            <div><span class="doses-badge">${resident.doses}/5 doses</span></div>
-            <div class="progress-bar-container"><div class="progress-bar" style="width:${pct}%;"></div></div>
-            <p class="progress-text">${pct}% Complete</p>
-          </div>
-          ${nextApptText}
-          <button class="view-record-btn" data-resident-uid="${resident.uid}">View Full Record</button>
-        </div>`;
-      grid.innerHTML += card;
-      colorIndex++;
-    }
-
-
-    grid.querySelectorAll('.view-record-btn').forEach(btn => btn.addEventListener('click', () => {
-      const uid = btn.dataset.residentUid;
-      const resident = uniqueResidents.get(uid);
-      if (resident) {
-        const appointment = resident.appointments.find(item => item.status === 'confirmed')
-          || resident.appointments.find(item => item.status === 'pending')
-          || resident.appointments[0];
-        if (appointment?.id) openRecordModal(appointment.id);
-      }
-    }));
-  } catch (err) {
-    console.error('Failed to load patients:', err);
-    const errorMsg = err.message || err.code || 'Unknown error';
-    grid.innerHTML = `<p style="color:#ef0000;padding:16px;"><strong>Error loading patients:</strong> ${errorMsg}</p><p style="color:#666;padding:0 16px;font-size:12px;">Check browser console for details.</p>`;
-  }
+let patientAppointments = [], patientVaccinations = [], patientIntakes = [];
+let patientUnsubscribes = [], patientTimer;
+function startPatientListeners() {
+ patientUnsubscribes.forEach(unsubscribe => unsubscribe());
+ clearInterval(patientTimer);
+ patientAppointments = []; patientVaccinations = []; patientIntakes = [];
+ patientUnsubscribes = ['appointments','vaccination_records','patient_records'].map(name =>
+  onSnapshot(query(collection(db,name),where('clinic_id','==',currentClinicId)), snapshot => {
+   const rows = snapshot.docs.map(item => ({...item.data(),id:item.id}));
+   if(name === 'appointments') patientAppointments = rows;
+   if(name === 'vaccination_records') patientVaccinations = rows;
+   if(name === 'patient_records') patientIntakes = rows;
+   loadPatients();
+  }, error => { document.getElementById('patientsGrid').textContent = 'Could not load patient records: ' + error.message; }));
+ patientTimer = setInterval(loadPatients, 30000);
+}
+function loadPatients() {
+ const grid = document.getElementById('patientsGrid');
+ const groups = new Map();
+ for (const item of [...patientIntakes,...patientAppointments,...patientVaccinations]) {
+  const key = courseKey(item);
+  if(!groups.has(key)) groups.set(key,{key, source:item});
+ }
+ const patients = [...groups.values()].map(group => {
+  const appointments = patientAppointments.filter(item => courseKey(item) === group.key);
+  const records = patientVaccinations.filter(item => courseKey(item) === group.key);
+  const intake = patientIntakes.find(item => courseKey(item) === group.key);
+  if (!intake && !records.length && !appointments.some(item => item.status === 'in_progress')) return null;
+  const source = intake || appointments.find(item=>item.intake_completed_at) || group.source;
+  const appointment = appointments.find(item=>item.status === 'in_progress') || appointments.find(item=>item.status === 'confirmed') || appointments[0];
+  return {...group, source, intake, appointment, ...courseStatus(appointments,records)};
+ }).filter(Boolean).sort((a,b)=>String(a.source.resident_name || '').localeCompare(String(b.source.resident_name || '')));
+ const selected = document.getElementById('patientStatusFilter').value;
+ const search = document.getElementById('patientSearch').value.trim().toLowerCase();
+ for(const status of ['all','ongoing','incomplete','complete']) {
+  const count = status === 'all' ? patients.length : patients.filter(item=>item.status===status).length;
+  document.querySelector('#patientStatusFilter option[value="'+status+'"]').textContent = (status === 'all' ? 'All patients' : status.charAt(0).toUpperCase()+status.slice(1)) + ' ('+count+')';
+ }
+ const visible = patients.filter(item => (selected==='all'||item.status===selected) && String(item.source.resident_name||'').toLowerCase().includes(search));
+ document.getElementById('patientResultCount').textContent = visible.length + ' of ' + patients.length + ' patient courses';
+ grid.innerHTML = visible.map((patient,index) => {
+  const source=patient.source, pct=patient.doses*20;
+  const fields = {bite_type:'Exposure type',animal_type:'Animal',wound_washed:'Wound washed',bite_body_part:'Body part',bite_date:'Date of bite',patient_age:'Age',patient_sex:'Sex'};
+  const details = Object.entries(fields).map(([key,label])=>'<div><dt>'+label+'</dt><dd>'+displayValue(source[key])+'</dd></div>').join('');
+  return '<article class="patient-card"><div class="patient-header"><h3>'+escapeHtml(source.resident_name||'Resident')+'</h3><span class="course-status '+patient.status+'">'+patient.status.charAt(0).toUpperCase()+patient.status.slice(1)+'</span></div><div class="treatment-section"><label>Treatment progress</label><span class="doses-badge">'+patient.doses+'/5 doses</span><div class="progress-bar-container"><div class="progress-bar" style="width:'+pct+'%"></div></div></div><p class="course-note">'+escapeHtml(patient.note)+'</p><details class="patient-intake-details"><summary>Patient intake details</summary><dl>'+details+'</dl></details>'+(patient.appointment ? '<button class="view-record-btn" data-patient-index="'+index+'">View Full Record</button>':'')+'</article>';
+ }).join('') || '<p class="patient-empty">No patients match these filters.</p>';
+ grid.querySelectorAll('[data-patient-index]').forEach(button=>button.onclick=()=>openRecordModal(visible[Number(button.dataset.patientIndex)].appointment.id));
 }
 
 async function loadAppointments() {
@@ -230,11 +170,7 @@ window.confirmAppt = async function(apptId) {
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Updating…';
 
   try {
-    await updateDoc(doc(db, 'appointments', apptId), {
-      status: 'confirmed',
-      reschedule_requested: false,
-      confirmed_at: serverTimestamp()
-    });
+    await manageAppointment({ appointment_id: apptId, action: 'confirm' });
 
     await addDoc(collection(db, 'notifications'), {
       recipient_uid: card.dataset.residentUid,
@@ -327,6 +263,8 @@ function showToast(msg) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('patientSearch').addEventListener('input', loadPatients);
+  document.getElementById('patientStatusFilter').addEventListener('change', loadPatients);
   document.getElementById('todayDate').textContent =
     new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -335,6 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const staff = await fetchUserProfile(user.uid);
       currentClinicId = staff?.clinic_id || user.uid;
       await loadAppointments();
+      startPatientListeners();
       await loadPatients();
       const appointmentId = new URLSearchParams(window.location.search).get('appointment');
       if (appointmentId) openRecordModal(appointmentId);
@@ -367,12 +306,14 @@ async function openRecordModal(id) {
         where('resident_uid', '==', appointment.resident_uid)
       ))
       : { docs: [] };
-    const relatedAppointments = relatedAppointmentsSnap.docs.map(item => item.data());
-    const firstWith = field => appointment[field] || relatedAppointments.find(item => item[field])?.[field] || '';
+    const relatedAppointments = relatedAppointmentsSnap.docs.map(item => item.data()).filter(item => courseKey(item) === courseKey(appointment));
+    const savedIntake = patientIntakes.find(item => courseKey(item) === courseKey(appointment)) || {};
+    const firstWith = field => savedIntake[field] ?? (appointment[field] || relatedAppointments.find(item => item[field])?.[field] || '');
     const details = {
       ...appointment,
       resident_address: firstWith('resident_address') || resident.address,
       date_of_birth: firstWith('date_of_birth') || resident.birthday,
+      patient_age: firstWith('patient_age'),
       patient_sex: firstWith('patient_sex') || resident.gender,
       bite_date: firstWith('bite_date'),
       animal_type: firstWith('animal_type'),
@@ -380,28 +321,19 @@ async function openRecordModal(id) {
       patient_category: firstWith('patient_category'),
       wound_washed: firstWith('wound_washed'),
       bite_type: firstWith('bite_type'),
-      valid_id_url: firstWith('valid_id_url'),
-      valid_id_name: firstWith('valid_id_name'),
-      valid_id_type: firstWith('valid_id_type')
     };
     activeAppointment = { id, ...details };
     document.getElementById('recordAppointmentId').value = id;
     document.getElementById('recordModalTitle').textContent = `${details.resident_name || 'Resident'} — Full Record`;
-    const isImage = ['image/jpeg', 'image/png'].includes(details.valid_id_type) || /\.(jpe?g|png)$/i.test(details.valid_id_name || details.valid_id_url || '');
-    const validIdMarkup = details.valid_id_url
-      ? (isImage
-        ? `<a href="${escapeHtml(details.valid_id_url)}" target="_blank" rel="noopener"><img class="record-id-preview" src="${escapeHtml(details.valid_id_url)}" alt="Uploaded valid ID"></a>`
-        : `<a href="${escapeHtml(details.valid_id_url)}" target="_blank" rel="noopener">View uploaded ID${details.valid_id_name ? ` (${escapeHtml(details.valid_id_name)})` : ''}</a>`)
-      : 'Not provided';
     document.getElementById('recordDetails').innerHTML = `
       <div class="record-detail-grid">
         <div><strong>Address</strong><span>${displayValue(details.resident_address)}</span></div>
         <div><strong>Date of Birth</strong><span>${displayValue(details.date_of_birth)}</span></div>
+        <div><strong>Age</strong><span>${displayValue(details.patient_age)}</span></div>
         <div><strong>Sex</strong><span>${displayValue(details.patient_sex)}</span></div>
         <div><strong>Date of Bite</strong><span>${displayValue(details.bite_date)}</span></div>
         <div><strong>Animal</strong><span>${displayValue(details.animal_type)}</span></div>
         <div><strong>Body Part</strong><span>${displayValue(details.bite_body_part)}</span></div>
-        <div><strong>Valid ID</strong><span>${validIdMarkup}</span></div>
         <div><strong>Reservation</strong><span>${displayValue(details.preferred_date)}${details.reservation_end_date && details.reservation_end_date !== details.preferred_date ? ` to ${displayValue(details.reservation_end_date)}` : ''} at ${displayValue(details.preferred_time)}</span></div>
         <div><strong>Dose</strong><span>${displayValue(details.dose_label)}</span></div>
         <div><strong>Was the Bite Washed?</strong><span>${displayValue(details.wound_washed)}</span></div>
@@ -410,7 +342,10 @@ async function openRecordModal(id) {
     document.getElementById('editAddress').value = details.resident_address || '';
     document.getElementById('editDateOfBirth').value = details.date_of_birth || '';
     document.getElementById('editSex').value = details.patient_sex || '';
-    document.getElementById('editBiteDate').value = details.bite_date || '';
+    const biteDateInput = document.getElementById('editBiteDate');
+    biteDateInput.max = manilaToday();
+    biteDateInput.onfocus = () => { biteDateInput.max = manilaToday(); };
+    biteDateInput.value = details.bite_date || '';
     document.getElementById('editAnimal').value = details.animal_type || '';
     document.getElementById('editBitePart').value = details.bite_body_part || '';
     document.getElementById('recordCategory').value = details.patient_category || '';
@@ -418,13 +353,15 @@ async function openRecordModal(id) {
     document.getElementById('recordBiteType').value = details.bite_type || '';
     document.getElementById('staffRecordForm').hidden = true;
     const completionForm = document.getElementById('doseCompletionForm');
-    completionForm.hidden = appointment.status === 'completed' || appointment.status === 'declined';
+    completionForm.hidden = appointment.status !== 'in_progress' || !appointment.intake_completed_at;
     document.getElementById('completionAppointmentId').value = id;
-    document.getElementById('completionDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('completionDate').value = manilaToday();
+    document.getElementById('completionDate').max = manilaToday();
+    document.getElementById('completionDose').readOnly = true;
     document.getElementById('completionDose').value = Number(String(appointment.dose_label || '1').match(/\d+/)?.[0] || 1);
-    document.getElementById('completionVaccine').value = appointment.vaccine_name || '';
+    watchDoseStock(currentClinicId);
     document.getElementById('completionLocation').value = appointment.clinic_address || '';
-    document.getElementById('editRecordBtn').hidden = false;
+    document.getElementById('editRecordBtn').hidden = Boolean(activeAppointment?.intake_completed_at);
     const modal = document.getElementById('recordModal');
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
@@ -448,62 +385,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('cancelEditBtn').addEventListener('click', () => {
     document.getElementById('staffRecordForm').hidden = true;
-    document.getElementById('editRecordBtn').hidden = false;
+    document.getElementById('editRecordBtn').hidden = Boolean(activeAppointment?.intake_completed_at);
   });
   document.getElementById('doseCompletionForm').addEventListener('submit', async event => {
     event.preventDefault();
-    const appointmentId = document.getElementById('completionAppointmentId').value;
-    const vaccineName = document.getElementById('completionVaccine').value.trim();
-    const location = document.getElementById('completionLocation').value.trim();
     const doseNumber = Number(document.getElementById('completionDose').value);
-    if (!activeAppointment || !vaccineName || !location || !Number.isInteger(doseNumber)) return;
     try {
-      const inventorySnap = await getDocs(query(
-        collection(db, 'inventory'),
-        where('clinic_id', '==', currentClinicId)
-      ));
-      const inventoryItem = inventorySnap.docs.find(item => item.data().type === vaccineName && Number(item.data().quantity || 0) > 0);
-      if (!inventoryItem) {
-        throw new Error(`This clinic has no available inventory for ${vaccineName}.`);
-      }
-      const existingRecordSnap = await getDocs(query(
-        collection(db, 'vaccination_records'),
-        where('resident_uid', '==', activeAppointment.resident_uid),
-        where('dose_number', '==', doseNumber)
-      ));
-      const matchingExistingRecord = existingRecordSnap.docs.some(recordDoc => {
-        const record = recordDoc.data();
-        return record.clinic_id === currentClinicId
-          && (!activeAppointment.vaccination_session_id || record.vaccination_session_id === activeAppointment.vaccination_session_id);
-      });
-      if (matchingExistingRecord) throw new Error(`Dose ${doseNumber} is already recorded and cannot be replaced.`);
-      await runTransaction(db, async transaction => {
-        const currentInventory = await transaction.get(inventoryItem.ref);
-        const quantity = Number(currentInventory.data()?.quantity || 0);
-        if (quantity <= 0) throw new Error(`This clinic has no available inventory for ${vaccineName}.`);
-        transaction.update(inventoryItem.ref, { quantity: quantity - 1 });
-      });
-      await addDoc(collection(db, 'vaccination_records'), {
-        resident_uid: activeAppointment.resident_uid,
-        resident_name: activeAppointment.resident_name || '',
-        appointment_id: appointmentId,
-        vaccination_session_id: activeAppointment.vaccination_session_id || 'legacy',
-        dose_number: doseNumber,
-        vaccine_name: vaccineName,
-        vaccine_type: vaccineName,
-        clinic_id: currentClinicId,
-        clinic_name: activeAppointment.clinic_name || '',
-        clinic_location: location,
-        date_given: document.getElementById('completionDate').value,
-        administered_by: auth.currentUser.uid,
-        recorded_at: serverTimestamp()
-      });
-      await updateDoc(doc(db, 'appointments', appointmentId), {
-        status: 'completed',
-        completed_at: serverTimestamp(),
-        completed_dose_number: doseNumber,
-        completed_vaccine_name: vaccineName
-      });
+      if (!await saveStockDose(currentClinicId)) return;
       closeRecordModal();
       showToast(`Dose ${doseNumber} recorded. The vaccination history is immutable.`);
       await loadAppointments();
@@ -517,6 +405,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('staffRecordForm').addEventListener('submit', async event => {
     event.preventDefault();
+    const biteDate = document.getElementById('editBiteDate').value;
+    if (biteDate && biteDate > manilaToday()) {
+      alert('Date of bite must be today or earlier.');
+      return;
+    }
     const appointmentId = document.getElementById('recordAppointmentId').value;
     if (!appointmentId || appointmentId === 'appointments') {
       alert('This patient record is missing a valid appointment ID. Please close it and open the appointment again.');
@@ -543,11 +436,11 @@ document.addEventListener('DOMContentLoaded', () => {
           where('resident_uid', '==', activeAppointment.resident_uid)
         ))
         : { docs: [] };
-      const appointmentIds = new Set([appointmentId, ...relatedAppointments.docs.map(item => item.id)]);
+      const appointmentIds = new Set([appointmentId, ...relatedAppointments.docs.filter(item => !item.data().intake_completed_at).map(item => item.id)]);
       await Promise.all([...appointmentIds].map(id => updateDoc(doc(db, 'appointments', id), assessment)));
       closeRecordModal();
       document.getElementById('staffRecordForm').hidden = true;
-      document.getElementById('editRecordBtn').hidden = false;
+      document.getElementById('editRecordBtn').hidden = Boolean(activeAppointment?.intake_completed_at);
       showToast('Patient record saved.');
     } catch (error) {
       alert('Failed to save patient record: ' + error.message);

@@ -1,4 +1,7 @@
-import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp, runTransaction, setDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { watchDoseStock, saveStockDose } from './dose-completion.js';
+import { appointmentDeadline } from './booking-status.js';
+import { manageAppointment, markArrivalAndOpenIntake, openIntake } from './appointment-intake.js';
+import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 // signOutUser comes from the app's own firebase.js, so sign-out acts on the same
 // auth instance that set the session persistence.
 import { auth, db, fetchUserProfile, signOutUser } from './firebase.js';
@@ -8,6 +11,8 @@ import { protectPage } from './role-guard.js';
 protectPage('clinic_staff');
 
 let currentClinicId = null;
+let staffIntakeController;
+let apparentDeclineAppointment = {};
 let appointmentsUnsubscribe = null;
 let appointmentSourceUnsubscribes = [];
 let pendingBadgeUnsubscribe = null;
@@ -32,105 +37,6 @@ function canonicalVaccineName(value) {
 
 function manilaToday() {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-}
-
-// An appointment has lapsed only when the clinic confirmed it, the resident did
-// not turn up, and the inclusive reservation window has fully passed. The end
-// date itself is still valid, so the comparison is strictly "less than today".
-function isReservationExpired(appointment) {
-    if (!appointment || appointment.status !== 'confirmed') return false;
-    if (!appointment.reservation_end_date) return false;
-    return appointment.reservation_end_date < manilaToday();
-}
-
-// Default grace period in days, used when a clinic has not configured one.
-// A duration of 1 means the appointment is valid only on its scheduled date.
-const DEFAULT_RESERVATION_DAYS = 1;
-const MAX_RESERVATION_DAYS = 7;
-// Cached from the clinic document so confirmation does not need an extra read
-// on every render. Updated whenever clinic settings load.
-let clinicReservationDays = null;
-
-function normaliseReservationDays(value) {
-    const days = Number(value);
-    if (!Number.isFinite(days) || days < 1) return DEFAULT_RESERVATION_DAYS;
-    return Math.min(MAX_RESERVATION_DAYS, Math.floor(days));
-}
-
-// Prefers the clinic's configured duration, then the value already stored on the
-// appointment, then the system default.
-function getConfiguredReservationDays(appointment) {
-    if (clinicReservationDays) return normaliseReservationDays(clinicReservationDays);
-    if (appointment?.reservation_days) return normaliseReservationDays(appointment.reservation_days);
-    return DEFAULT_RESERVATION_DAYS;
-}
-
-// Inclusive reservation window: a duration of N days keeps the appointment
-// valid through the (N-1)th day after the scheduled date.
-function getReservationEndDateFor(startDate, durationDays) {
-    if (!startDate) return '';
-    const parts = String(startDate).split('-').map(Number);
-    if (parts.length !== 3 || parts.some(value => Number.isNaN(value))) return startDate;
-    const end = new Date(parts[0], parts[1] - 1, parts[2]);
-    end.setDate(end.getDate() + normaliseReservationDays(durationDays) - 1);
-    const year = end.getFullYear();
-    const month = String(end.getMonth() + 1).padStart(2, '0');
-    const day = String(end.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-// Guards against the confirmed-then-instantly-expired bug: an appointment is
-// never expired before its own scheduled date has passed.
-function isReservationWindowOpen(appointment) {
-    if (!appointment?.reservation_end_date) return true;
-    return appointment.reservation_end_date >= manilaToday();
-}
-
-// Marks lapsed appointments as expired in Firestore. A resident no-show is the
-// only way an appointment reaches this state: the dose was never completed and
-// the reservation window has passed. Failures are logged rather than surfaced,
-// because the scheduled Cloud Function performs the same transition server-side.
-const expiringAppointmentIds = new Set();
-async function persistExpiredAppointments(appointments) {
-    const due = appointments.filter(appointment =>
-        appointment.status === 'expired' &&
-        !appointment.expired_at &&
-        !expiringAppointmentIds.has(appointment.id)
-    );
-    for (const appointment of due) {
-        expiringAppointmentIds.add(appointment.id);
-        try {
-            await updateDoc(doc(db, 'appointments', appointment.id), {
-                status: 'expired',
-                expired_at: serverTimestamp(),
-                expiration_reason: 'Reservation duration ended - resident did not attend'
-            });
-            await addDoc(collection(db, 'history'), {
-                clinic_id: currentClinicId,
-                type: 'appointment',
-                action: 'expired',
-                appointment_id: appointment.id,
-                resident_name: appointment.resident_name || 'Resident',
-                performed_by: auth.currentUser?.uid || '',
-                created_at: serverTimestamp()
-            });
-            if (appointment.resident_uid) {
-                await addDoc(collection(db, 'notifications'), {
-                    recipient_uid: appointment.resident_uid,
-                    user_id: appointment.resident_uid,
-                    appointment_id: appointment.id,
-                    type: 'appointment',
-                    title: 'Appointment Expired',
-                    message: `Your appointment at ${appointment.clinic_name || 'the clinic'} on ${appointment.preferred_date || ''} ${appointment.preferred_time || ''} has expired because it was not completed within the reservation period. Please book a new appointment.`,
-                    read: false,
-                    created_at: serverTimestamp()
-                });
-            }
-        } catch (error) {
-            console.error('Could not mark appointment expired:', appointment.id, error);
-            expiringAppointmentIds.delete(appointment.id);
-        }
-    }
 }
 
 function applyStaffTab() {
@@ -171,20 +77,10 @@ onAuthStateChanged(auth, async (user) => {
     const startListener = (label, start) => {
         try { start(); } catch (error) { console.error(`Could not start ${label}:`, error); }
     };
-    startListener('reservation settings', () => listenToClinicReservationDays(currentClinicId));
     startListener('inventory', () => listenToInventory(currentClinicId));
     startListener('pending badge', () => listenToPendingAppointmentBadge(currentClinicId, user.uid));
     startListener('appointments', () => loadStaffAppointments(currentClinicId, user.uid));
 });
-
-// The grace period is a clinic setting, so it is read from the clinic document
-// and kept live: changing it affects appointments confirmed from then on.
-function listenToClinicReservationDays(clinicId) {
-    onSnapshot(doc(db, 'clinics', clinicId), snapshot => {
-        const value = snapshot.data()?.reservation_days;
-        clinicReservationDays = value === undefined || value === null ? null : normaliseReservationDays(value);
-    }, error => console.error('Could not read the clinic reservation duration:', error));
-}
 
 function listenToPendingAppointmentBadge(clinicId, staffUid = auth.currentUser?.uid) {
     const badge = document.getElementById('pendingAppointmentBadge');
@@ -221,12 +117,10 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
     const appointmentSources = new Map();
     const renderAppointments = () => {
         const appointments = [...new Map([...appointmentSources.values()].flat().map(item => [item.id, item])).values()]
-            .map(appointment => isReservationExpired(appointment) ? { ...appointment, status: 'expired' } : appointment)
-            .filter(appointment => ['pending', 'confirmed', 'expired'].includes(appointment.status))
+            .filter(appointment => ['pending', 'confirmed', 'in_progress'].includes(appointment.status))
             .sort((first, second) => `${second.preferred_date || ''} ${second.preferred_time || ''}`.localeCompare(`${first.preferred_date || ''} ${first.preferred_time || ''}`));
-        // Persist the no-show transitions so the status survives a reload and is
-        // visible to the resident, not just rendered locally for this session.
-        persistExpiredAppointments(appointments);
+        // The server removes no-shows; recorded arrivals remain available for intake.
+
         if (!appointments.length) {
             container.innerHTML = '<p class="empty-appointments">No resident appointments for this clinic.</p>';
             return;
@@ -241,10 +135,10 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
                             </div>
                             <div class="resident-appointment-actions">
                                 <span class="appointment-status appointment-${escapeHtml(appointment.status || 'pending')}">${escapeHtml(appointment.status || 'pending')}</span>
-                                <button type="button" class="view-appointment-btn" data-view-id="${appointment.id}"><i class="fa-regular fa-id-card"></i> View Course Record</button>
                                 ${appointment.status === 'pending' ? `<button type="button" class="confirm-appointment-btn" data-confirm-id="${appointment.id}"><i class="fa-solid fa-circle-check"></i> Confirm</button><button type="button" class="decline-appointment-btn" data-decline-id="${appointment.id}"><i class="fa-solid fa-xmark"></i> Decline</button>` : ''}
-                                ${appointment.status === 'expired' ? `<span class="appointment-expired-label"><i class="fa-regular fa-clock"></i> Reservation expired</span><button type="button" class="delete-expired-appointment-btn" data-delete-expired-id="${appointment.id}"><i class="fa-solid fa-trash"></i> Delete</button>` : ''}
-                                ${appointment.status === 'confirmed' ? `<button type="button" class="confirm-appointment-btn" data-complete-id="${appointment.id}"><i class="fa-solid fa-syringe"></i> Complete Dose</button>` : ''}
+                                ${appointment.status === 'confirmed' ? `<button type="button" class="confirm-appointment-btn" data-arrive-id="${appointment.id}">Mark Arrived</button><small>Arrival deadline: ${escapeHtml(new Date(appointmentDeadline(appointment)).toLocaleString('en-PH', { timeZone: 'Asia/Manila', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }))}</small>` : ''}
+                                ${appointment.status === 'in_progress' && !appointment.intake_completed_at ? `<button type="button" class="confirm-appointment-btn" data-intake-id="${appointment.id}">Complete Intake</button>` : ''}
+                                ${appointment.status === 'in_progress' && appointment.intake_completed_at ? `<button type="button" class="confirm-appointment-btn" data-complete-id="${appointment.id}">Complete Dose</button>` : ''}
                                 ${appointment.status === 'completed' ? '<span class="dose-completed-label"><i class="fa-solid fa-circle-check"></i> Dose recorded</span>' : ''}
                             </div>
                         </article>`).join('')}</div>`;
@@ -252,8 +146,23 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
         container.querySelectorAll('[data-confirm-id]').forEach(button => button.addEventListener('click', () => acceptStaffAppointment(button.dataset.confirmId)));
                 container.querySelectorAll('[data-decline-id]').forEach(button => button.addEventListener('click', () => declineStaffAppointment(button.dataset.declineId)));
                 container.querySelectorAll('[data-complete-id]').forEach(button => button.addEventListener('click', () => openDoseCompletion(button.dataset.completeId, appointments.find(item => item.id === button.dataset.completeId))));
-                container.querySelectorAll('[data-delete-expired-id]').forEach(button => button.addEventListener('click', () => deleteExpiredAppointment(button.dataset.deleteExpiredId)));
     };
+
+    staffIntakeController?.abort();
+    staffIntakeController = new AbortController();
+    container.addEventListener('click', async event => {
+        const button = event.target.closest('[data-arrive-id], [data-intake-id]');
+        if (!button || button.disabled) return;
+        const id = button.dataset.arriveId || button.dataset.intakeId;
+        button.disabled = true;
+        try {
+            const snapshot = await getDoc(doc(db, 'appointments', id));
+            if (button.dataset.arriveId) await markArrivalAndOpenIntake(id, snapshot.data());
+            else openIntake(id, snapshot.data());
+        } catch (error) { alert(error.message); }
+        finally { button.disabled = false; }
+    }, { signal: staffIntakeController.signal });
+
     const listenToSource = (sourceKey, appointmentQuery) => {
         const unsubscribe = onSnapshot(appointmentQuery, snapshot => {
             appointmentSources.set(sourceKey, snapshot.docs.map(item => ({ id: item.id, ...item.data() })));
@@ -271,43 +180,9 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
 }
 
 async function acceptStaffAppointment(appointmentId) {
-    try {
-        const appointment = (await getDoc(doc(db, 'appointments', appointmentId))).data();
-        // Recompute the reservation window at confirmation time from the clinic's
-        // current setting, so an appointment booked before the duration was
-        // configured still gets the correct grace period.
-        const reservationDays = getConfiguredReservationDays(appointment);
-        const reservationEndDate = getReservationEndDateFor(appointment?.preferred_date, reservationDays);
-        await updateDoc(doc(db, 'appointments', appointmentId), {
-            status: 'confirmed',
-            reschedule_requested: false,
-            confirmed_at: serverTimestamp(),
-            reservation_days: reservationDays,
-            reservation_end_date: reservationEndDate
-        });
-        await addDoc(collection(db, 'history'), { clinic_id: currentClinicId, type: 'appointment', action: 'confirmed', appointment_id: appointmentId, resident_name: appointment?.resident_name || 'Resident', performed_by: auth.currentUser.uid, created_at: serverTimestamp() });
-        if (appointment?.resident_uid) {
-            await addDoc(collection(db, 'notifications'), {
-                recipient_uid: appointment.resident_uid, user_id: appointment.resident_uid, appointment_id: appointmentId,
-                type: 'appointment', title: appointment.reschedule_requested ? 'Reschedule Confirmed' : 'Appointment Confirmed',
-                message: appointment.reschedule_requested
-                    ? `Your rescheduled appointment at ${appointment.clinic_name || 'the clinic'} on ${appointment.preferred_date} at ${appointment.preferred_time} was confirmed by the clinic.`
-                    : `Your appointment at ${appointment.clinic_name || 'the clinic'} on ${appointment.preferred_date} at ${appointment.preferred_time} was confirmed.`, read: false, created_at: serverTimestamp()
-            });
-            await addDoc(collection(db, 'notifications'), {
-                recipient_uid: appointment.resident_uid, user_id: appointment.resident_uid, appointment_id: appointmentId,
-                type: 'appointment', title: 'Appointment Reminder',
-                message: `Reminder: your appointment at ${appointment.clinic_name || 'the clinic'} is scheduled for ${appointment.preferred_date} at ${appointment.preferred_time}.`, read: false, created_at: serverTimestamp()
-            });
-        }
-        await loadStaffAppointments(currentClinicId);
-    } catch (error) {
-        alert('Could not accept appointment: ' + error.message);
-    }
+    try { await manageAppointment({ appointment_id: appointmentId, action: 'confirm' }); }
+    catch (error) { alert('Could not confirm appointment: ' + error.message); }
 }
-
-// Holds the appointment being declined so the live preview can quote it.
-let apparentDeclineAppointment = {};
 
 // Opening the decline dialog replaces the old one-click decline, so staff can
 // point a turned-away resident at a facility that can actually treat them.
@@ -429,9 +304,11 @@ async function submitDeclineReferral(event) {
 
 function openDoseCompletion(appointmentId, appointment) {
     document.getElementById('completionAppointmentId').value = appointmentId;
-    document.getElementById('completionDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('completionDate').value = manilaToday();
+    document.getElementById('completionDate').max = manilaToday();
+    document.getElementById('completionDose').readOnly = true;
     document.getElementById('completionDose').value = Number(String(appointment?.dose_label || '1').match(/\d+/)?.[0] || 1);
-    document.getElementById('completionVaccine').value = appointment?.vaccine_name || '';
+    watchDoseStock(currentClinicId);
     document.getElementById('completionLocation').value = appointment?.clinic_address || '';
     document.getElementById('doseCompletionModal').style.display = 'flex';
     document.getElementById('doseCompletionModal').setAttribute('aria-hidden', 'false');
@@ -439,42 +316,8 @@ function openDoseCompletion(appointmentId, appointment) {
 
 async function completeStaffDose(event) {
     event.preventDefault();
-    const appointmentId = document.getElementById('completionAppointmentId').value;
-    const vaccineName = canonicalVaccineName(document.getElementById('completionVaccine').value.trim());
-    const location = document.getElementById('completionLocation').value.trim();
-    const doseNumber = Number(document.getElementById('completionDose').value);
     try {
-        const appointmentSnap = await getDoc(doc(db, 'appointments', appointmentId));
-        const appointment = appointmentSnap.exists() ? appointmentSnap.data() : null;
-        if (!appointment) throw new Error('Appointment was not found.');
-        const inventorySnap = await getDocs(query(collection(db, 'inventory'), where('clinic_id', '==', currentClinicId)));
-        const inventoryItem = inventorySnap.docs.filter(item => canonicalVaccineName(item.data().type) === vaccineName && !item.data().archived && item.data().expiry >= manilaToday() && Number(item.data().quantity || 0) > 0).sort((a, b) => String(a.data().expiry).localeCompare(String(b.data().expiry)))[0];
-        if (!inventoryItem) throw new Error(`No available ${vaccineName} stock at this clinic.`);
-        const existing = await getDocs(query(collection(db, 'vaccination_records'), where('appointment_id', '==', appointmentId)));
-        if (!existing.empty) throw new Error('This appointment already has a completed dose.');
-        await runTransaction(db, async transaction => {
-            const currentInventory = await transaction.get(inventoryItem.ref);
-            const item = currentInventory.data();
-            const quantity = Number(item?.quantity || 0);
-            if (quantity <= 0 || item?.archived || item?.expiry < manilaToday()) throw new Error(`No usable ${vaccineName} stock at this clinic.`);
-            transaction.update(inventoryItem.ref, { quantity: quantity - 1 });
-        });
-        await addDoc(collection(db, 'vaccination_records'), {
-            resident_uid: appointment.resident_uid, resident_name: appointment.resident_name || '', appointment_id: appointmentId,
-            vaccination_session_id: appointment.vaccination_session_id || 'legacy',
-            dose_number: doseNumber, vaccine_name: vaccineName, vaccine_type: vaccineName, clinic_id: currentClinicId,
-            clinic_name: appointment.clinic_name || '', clinic_location: location, date_given: document.getElementById('completionDate').value,
-            administered_by: auth.currentUser.uid, recorded_at: serverTimestamp()
-        });
-        await updateDoc(doc(db, 'appointments', appointmentId), { status: 'completed', completed_at: serverTimestamp(), completed_dose_number: doseNumber, completed_vaccine_name: vaccineName });
-        if (appointment.resident_uid) {
-            await addDoc(collection(db, 'notifications'), {
-                recipient_uid: appointment.resident_uid, user_id: appointment.resident_uid, appointment_id: appointmentId,
-                type: 'vaccine', title: `Dose ${doseNumber} Completed`,
-                message: `Your Dose ${doseNumber} vaccination was recorded at ${appointment.clinic_name || 'the clinic'} on ${document.getElementById('completionDate').value}.`,
-                read: false, created_at: serverTimestamp()
-            });
-        }
+        if (!await saveStockDose(currentClinicId)) return;
         document.getElementById('doseCompletionModal').style.display = 'none';
         document.getElementById('doseCompletionForm').reset();
         await loadStaffAppointments(currentClinicId);
@@ -538,23 +381,6 @@ function listenToInventory(clinicId) {
     });
 }
 
-async function deleteExpiredAppointment(appointmentId) {
-    if (!confirm('Delete this expired reservation? This cannot be undone.')) return;
-    try {
-        const appointmentSnap = await getDoc(doc(db, 'appointments', appointmentId));
-        if (!appointmentSnap.exists()) throw new Error('This reservation no longer exists.');
-        const appointment = appointmentSnap.data();
-        if (!isReservationExpired(appointment)) throw new Error('Only expired reservations can be deleted.');
-        await addDoc(collection(db, 'history'), {
-            clinic_id: currentClinicId, type: 'appointment', action: 'expired_reservation_deleted',
-            appointment_id: appointmentId, resident_name: appointment.resident_name || 'Resident',
-            performed_by: auth.currentUser.uid, created_at: serverTimestamp()
-        });
-        await deleteDoc(doc(db, 'appointments', appointmentId));
-    } catch (error) {
-        alert('Could not delete expired reservation: ' + error.message);
-    }
-}
 
 function expiryState(expiry) {
     if (!expiry || expiry < manilaToday()) return ['expired', 'Expired'];
@@ -701,16 +527,10 @@ async function openAppointmentDetails(appointmentId) {
         const historyMarkup = priorDoses.length
             ? `<ol class="appointment-course-history">${priorDoses.map(record => `<li><strong>Dose ${displayStaffValue(record.dose_number)}</strong> — ${displayStaffValue(record.date_given)} | ${displayStaffValue(record.vaccine_name)} | ${displayStaffValue(record.clinic_name)}</li>`).join('')}</ol>`
             : '<span>No previous administered doses recorded yet.</span>';
-        const isImage = ['image/jpeg', 'image/png'].includes(appointment.valid_id_type) || /\.(jpe?g|png)$/i.test(appointment.valid_id_name || appointment.valid_id_url || '');
-        const idMarkup = appointment.valid_id_url
-            ? (isImage
-                ? `<a href="${escapeHtml(appointment.valid_id_url)}" target="_blank" rel="noopener"><img class="appointment-id-preview" src="${escapeHtml(appointment.valid_id_url)}" alt="Uploaded valid ID"></a>`
-                : `<a class="appointment-file-link" href="${escapeHtml(appointment.valid_id_url)}" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> View uploaded ID${appointment.valid_id_name ? ` (${escapeHtml(appointment.valid_id_name)})` : ''}</a>`)
-            : '<span>Not provided</span>';
         // The resident may skip the wound photo, so "not provided" is a normal
         // outcome rather than an error to chase.
         const woundPhotoMarkup = appointment.wound_photo_url
-            ? `<a href="${escapeHtml(appointment.wound_photo_url)}" target="_blank" rel="noopener"><img class="appointment-id-preview" src="${escapeHtml(appointment.wound_photo_url)}" alt="Resident wound photo"></a>`
+            ? `<a href="${escapeHtml(appointment.wound_photo_url)}" target="_blank" rel="noopener"><img class="appointment-photo-preview" src="${escapeHtml(appointment.wound_photo_url)}" alt="Resident wound photo"></a>`
             : '<span>Not provided (optional)</span>';
         const priorVaccinationDocumentMarkup = appointment.prior_vaccination_document_url
             ? `<a class="appointment-file-link" href="${escapeHtml(appointment.prior_vaccination_document_url)}" target="_blank" rel="noopener"><i class="fa-solid fa-file-medical"></i> View ${escapeHtml(appointment.prior_vaccination_document_name || 'previous vaccination record')}</a>`
@@ -731,7 +551,6 @@ async function openAppointmentDetails(appointmentId) {
             <div><strong>Dose</strong><span>${displayStaffValue(appointment.dose_label)}</span></div>
             <div><strong>Preferred Date</strong><span>${displayStaffValue(appointment.preferred_date)}</span></div>
             <div><strong>Preferred Time</strong><span>${displayStaffValue(appointment.preferred_time)}</span></div>
-            <div><strong>Uploaded ID / Photo</strong><span>${idMarkup}</span></div>
             <div><strong>Wound Photo (for exposure assessment)</strong><span>${woundPhotoMarkup}</span></div>
             <div><strong>Previous Vaccination Declared</strong><span>${appointment.prior_vaccination_history_declared ? 'Yes' : 'No / not declared'}</span></div>
             <div><strong>Previous Vaccination Record</strong><span>${priorVaccinationDocumentMarkup}</span></div>

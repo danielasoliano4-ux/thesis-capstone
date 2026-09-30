@@ -451,3 +451,20 @@ tbody td {
         gap: 15px;
     }
 }
+/* Clock-based clinic operating-hours controls. */
+.hours-box { flex: 1; min-width: 0; }
+.hours-box > strong { display: block; margin-bottom: 14px; }
+.hours-box > strong i { color: #4a90e2; margin-right: 8px; }
+.hours-box label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.hours-mode { width: 100%; padding: 10px; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 14px; }
+.hours-times { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.hours-times[hidden] { display: none; }
+.hours-time-control { display: flex; align-items: stretch; margin-top: 6px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; overflow: hidden; }
+.hours-time-control input { width: 100%; min-width: 0; padding: 10px 6px; border: 0; background: transparent; font: inherit; }
+.hours-clock-button { flex-shrink: 0; border: 0; border-left: 1px solid #dbeafe; background: #eff6ff; color: #2563eb; padding: 10px 12px; cursor: pointer; font-size: 18px; }
+.hours-clock-button:hover { background: #dbeafe; }
+.hours-clock-button:focus-visible, .hours-mode:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.hours-note, .hours-help { display: block; color: #64748b; font-size: 13px; line-height: 1.5; }
+.hours-note { margin-top: 8px; }
+.hours-help { margin: 0 0 14px; }
+@media (max-width: 600px) { .hours-times { grid-template-columns: 1fr; } }

@@ -1,10 +1,7 @@
 import { db } from './firebase.js';
 import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
-const defaultAnimals = [
-  { name: 'Dog', percent: 68 }, { name: 'Cat', percent: 20 },
-  { name: 'Bat', percent: 8 }, { name: 'Others', percent: 4 }
-];
+const defaultAnimals = [];
 
 function escapeHtml(value = '') {
   const element = document.createElement('div');
@@ -17,6 +14,7 @@ function renderAnimalExposure(data = {}) {
   if (!chart) return;
   const colors = ['#e60000', '#d98a00', '#00b140', '#6b7280'];
   const animals = normalizeAnimals(Array.isArray(data.animals) && data.animals.length ? data.animals : defaultAnimals);
+  if (!animals.length) { chart.innerHTML = '<p>No exposure records have been collected yet.</p>'; return; }
   let offset = 0;
   const stops = animals.map((animal, index) => {
     const start = offset;
@@ -26,9 +24,13 @@ function renderAnimalExposure(data = {}) {
   chart.innerHTML = `<div class="animal-donut" style="background:conic-gradient(${stops});"><div><strong>${escapeHtml(animals[0].percent)}%</strong><small>${escapeHtml(animals[0].name)}</small></div></div><div class="donut-legend">${animals.map((animal, index) => `<div class="donut-legend-item"><span class="donut-dot" style="background:${colors[index % colors.length]};"></span> ${escapeHtml(animal.name)} — ${escapeHtml(animal.percent)}%</div>`).join('')}</div>`;
 }
 
+onSnapshot(doc(db, 'system_settings', 'animal_exposure'), snapshot => {
+  renderAnimalExposure(snapshot.exists() ? snapshot.data() : {});
+}, error => console.error('Failed to load animal exposure:', error));
+
 onSnapshot(doc(db, 'system_settings', 'live_analytics'), snapshot => {
   const data = snapshot.exists() ? snapshot.data() : {};
-  renderAnimalExposure(data);
+
   const defaults = { monthlyCases: Array(12).fill(0), monthlyVaccinations: Array(12).fill(0), caseTrend: Array(12).fill(0), ageGroups: [0, 0, 0, 0, 0], barangays: [] };
   const values = { ...defaults, ...data };
   setText('publicTotalCases', values.totalCases || 0);

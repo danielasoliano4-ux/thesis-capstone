@@ -3,7 +3,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function isLoggedIn() {
-      return request.auth != null;
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.secure_login == true
+        && request.auth.token.firebase.sign_in_provider == 'custom'
+        && (!exists(/databases/$(database)/documents/_session_revocations/$(request.auth.uid))
+          || request.auth.token.auth_time > get(/databases/$(database)/documents/_session_revocations/$(request.auth.uid)).data.revokedAt);
     }
 
     function userProfile() {
@@ -15,7 +20,9 @@ service cloud.firestore {
     }
 
     function isClinicStaff() {
-      return isLoggedIn() && userProfile().role == 'clinic_staff';
+      return isLoggedIn() && userProfile().role == 'clinic_staff'
+        && userProfile().is_active == true
+        && userProfile().get('approval_status', 'approved') == 'approved';
     }
 
     function isResident() {
@@ -29,8 +36,10 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isLoggedIn() && (request.auth.uid == userId || isAdmin());
-      allow create: if isLoggedIn() && request.auth.uid == userId
+      allow create: if request.auth != null && request.auth.uid == userId
         && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email_verification_required == true
+        && !request.resource.data.keys().hasAny(['email_verification_source', 'email_verification_migrated_at'])
         && request.resource.data.role in ['resident', 'clinic_staff']
         && ((request.resource.data.role == 'resident'
           && request.resource.data.is_active == true
@@ -44,7 +53,9 @@ service cloud.firestore {
     }
 
     match /residents/{residentId} {
-      allow create: if isResident() && request.auth.uid == residentId;
+      // Registration may create only its own initial resident profile before verification.
+      allow create: if request.auth != null && request.auth.uid == residentId
+        && userProfile().role == 'resident' && request.resource.data.uid == request.auth.uid;
       allow read, update, delete: if isResident() && request.auth.uid == residentId;
       allow read: if isAdmin() || isClinicStaff();
     }
@@ -79,20 +90,26 @@ service cloud.firestore {
     }
 
     match /appointments/{appointmentId} {
-      allow create: if isResident()
-        && request.resource.data.resident_uid == request.auth.uid;
+      // createBooking performs the atomic duplicate check with the Admin SDK.
+      allow create: if false;
       allow read: if isResident()
         && resource.data.resident_uid == request.auth.uid;
       allow read: if isAdmin() || belongsToClinic(resource.data.clinic_id);
       allow update: if isAdmin()
         || (belongsToClinic(resource.data.clinic_id)
-          && request.resource.data.clinic_id == resource.data.clinic_id)
-        || (isResident()
-          && resource.data.resident_uid == request.auth.uid
-          && resource.data.status == 'confirmed'
-          && request.resource.data.status == 'pending'
-          && request.resource.data.reschedule_requested == true
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['preferred_date', 'preferred_time', 'status', 'reschedule_requested', 'rescheduled_at']))
+          && request.resource.data.clinic_id == resource.data.clinic_id
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'resident_uid', 'preferred_date', 'preferred_time', 'confirmed_at', 'arrived_at', 'arrived_by', 'arrival_deadline_ms', 'scheduled_at_ms',
+            'intake_completed_at', 'patient_record_id', 'course_intake_data'
+          ])
+          && (resource.data.get('intake_completed_at', null) == null
+            || !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+              'bite_type', 'wound_washed', 'animal_type', 'bite_body_part', 'bite_date', 'patient_age', 'patient_sex'
+            ]))
+          && (request.resource.data.status == resource.data.status
+            || (resource.data.status == 'pending' && request.resource.data.status == 'declined')
+            || (resource.data.status == 'in_progress' && resource.data.get('intake_completed_at', null) != null
+              && request.resource.data.status == 'completed')))
         || (isResident()
           && resource.data.resident_uid == request.auth.uid
           && resource.data.status in ['pending', 'confirmed']
@@ -103,6 +120,13 @@ service cloud.firestore {
       allow delete: if isAdmin()
         || belongsToClinic(resource.data.clinic_id)
         || (isResident() && resource.data.resident_uid == request.auth.uid);
+    }
+
+    match /patient_records/{recordId} {
+      allow read: if isAdmin() || belongsToClinic(resource.data.clinic_id)
+        || (isResident() && resource.data.resident_uid == request.auth.uid);
+      // Written atomically by manageAppointment. Permanent records are immutable.
+      allow write: if false;
     }
 
     match /notifications/{notificationId} {
@@ -139,6 +163,9 @@ service cloud.firestore {
         && request.resource.data.clinic_name is string
         && request.resource.data.clinic_location is string
         && request.resource.data.date_given is string
+        && belongsToClinic(request.resource.data.clinic_id)
+        && get(/databases/$(database)/documents/appointments/$(request.resource.data.appointment_id)).data.status == 'in_progress'
+        && get(/databases/$(database)/documents/appointments/$(request.resource.data.appointment_id)).data.get('intake_completed_at', null) != null
         && request.resource.data.administered_by == request.auth.uid);
       allow update, delete: if false;
     }

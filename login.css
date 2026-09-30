@@ -480,3 +480,17 @@ hr {
     height: 104px;
     margin: 0 auto;
 }
+
+.email-otp-dialog { margin: auto; width: min(440px, calc(100% - 32px)); max-height: calc(100vh - 32px); overflow: auto; border: 1px solid #e2e8f0; border-radius: 16px; padding: 28px; color: #0f172a; background: white; box-sizing: border-box; }
+.email-otp-dialog::backdrop { background: #0f172a99; }
+.email-otp-dialog h2 { margin: 0 0 14px; font-size: 24px; }
+.email-otp-dialog p { margin: 12px 0; line-height: 1.6; overflow-wrap: anywhere; }
+.email-otp-dialog label { display: block; margin-top: 18px; font-weight: 600; }
+.email-otp-dialog input { width: 100%; box-sizing: border-box; font-size: 28px; text-align: center; letter-spacing: .35em; padding: 12px; border: 1px solid #94a3b8; border-radius: 8px; margin-top: 8px; }
+.email-otp-dialog .otp-expiry { color: #64748b; font-size: 13px; }
+.otp-resend, .otp-close { width: 100%; margin-top: 12px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; cursor: pointer; }
+.email-otp-dialog button:disabled, .login-btn:disabled { opacity: .6; cursor: not-allowed; }
+.email-otp-dialog button:focus-visible, .email-otp-dialog input:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+.forgot-password-btn { background: none; border: 0; padding: 0; color: red; font: inherit; cursor: pointer; }
+.forgot-password-btn:hover { text-decoration: underline; }
+.forgot-password-btn:disabled { opacity: .6; cursor: wait; }

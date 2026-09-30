@@ -1,0 +1,60 @@
+#appointmentIntakeDialog {
+  box-sizing: border-box; width: min(660px, calc(100vw - 32px)); max-height: 90vh;
+  max-height: 90dvh; margin: auto; padding: 0; overflow-y: auto;
+  border: 1px solid #e5e7eb; border-radius: 22px; background: #fff;
+  color: #172033; font-family: inherit; font-size: 14px; line-height: 1.5;
+  box-shadow: 0 24px 80px #11182740;
+}
+#appointmentIntakeDialog::backdrop { background: #11182799; backdrop-filter: blur(4px); }
+#appointmentIntakeDialog * { box-sizing: border-box; }
+#appointmentIntakeDialog .intake-header { display: flex; align-items: center; gap: 14px; padding: 24px 28px; border-bottom: 1px solid #edf0f4; }
+#appointmentIntakeDialog .intake-heading-icon { display: grid; place-items: center; width: 48px; height: 48px; flex-shrink: 0; border-radius: 14px; background: #fff0f0; color: #dc2626; font-size: 26px; }
+#appointmentIntakeDialog .intake-eyebrow { margin: 0 0 2px; color: #b91c1c; font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
+#appointmentIntakeDialog h2 { margin: 0; color: #172033; font-size: 24px; font-weight: 750; line-height: 1.3; }
+#appointmentIntakeDialog button { font: inherit; cursor: pointer; transition: background .15s, border-color .15s; }
+#appointmentIntakeDialog .intake-dismiss { margin-left: auto; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 10px; background: #f3f4f6; color: #64748b; font-size: 25px; }
+#appointmentIntakeDialog .intake-dismiss:hover { background: #e5e7eb; }
+#appointmentIntakeDialog .intake-patient { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 22px 28px 12px; padding: 16px 18px; border: 1px solid #e5eaf0; border-radius: 12px; background: #f8fafc; }
+#appointmentIntakeDialog .intake-caption { display: block; margin-bottom: 3px; color: #64748b; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+#appointmentIntakeDialog .intake-patient strong { display: block; font-size: 16px; overflow-wrap: anywhere; }
+#appointmentIntakeDialog .intake-arrived { flex-shrink: 0; padding: 5px 10px; border-radius: 20px; background: #dcfce7; color: #166534; font-size: 11px; font-weight: 700; }
+#appointmentIntakeDialog #intakeDescription { margin: 0 28px 24px; color: #64748b; font-size: 12px; }
+#appointmentIntakeDialog form { margin: 0; }
+#appointmentIntakeDialog fieldset { min-width: 0; margin: 0 28px 24px; padding: 0; border: 0; }
+#appointmentIntakeDialog legend { display: flex; align-items: center; gap: 9px; width: 100%; margin-bottom: 16px; padding: 0; font-size: 14px; font-weight: 750; }
+#appointmentIntakeDialog legend span { padding: 3px 6px; border-radius: 5px; color: #b91c1c; background: #fff1f2; font-size: 10px; }
+#appointmentIntakeDialog .intake-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 20px; }
+#appointmentIntakeDialog label { display: block; margin: 0 0 7px; color: #374151; font-size: 12px; font-weight: 650; }
+#appointmentIntakeDialog label span { color: #dc2626; }
+#appointmentIntakeDialog input, #appointmentIntakeDialog select { display: block; width: 100%; min-width: 0; min-height: 44px; margin: 0; padding: 11px 12px; border: 1px solid #d8dee8; border-radius: 9px; background-color: #fff; color: #172033; font: inherit; font-size: 13px; transition: border-color .15s, box-shadow .15s; }
+#appointmentIntakeDialog select { appearance: none; padding-right: 34px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2364748b' stroke-width='1.8'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; cursor: pointer; }
+#appointmentIntakeDialog input::placeholder { color: #94a3b8; }
+#appointmentIntakeDialog input:hover, #appointmentIntakeDialog select:hover { border-color: #9ca3af; }
+#appointmentIntakeDialog input:focus, #appointmentIntakeDialog select:focus { outline: none; border-color: #dc2626; box-shadow: 0 0 0 3px #fee2e2; }
+#appointmentIntakeDialog button:focus-visible { outline: 3px solid #f87171; outline-offset: 3px; }
+#appointmentIntakeDialog .other-animal { margin-top: 10px; padding: 12px; border-left: 3px solid #ef4444; border-radius: 0 8px 8px 0; background: #fff5f5; }
+#appointmentIntakeDialog [hidden] { display: none !important; }
+#appointmentIntakeDialog .intake-footer { padding: 18px 28px; border-top: 1px solid #e5e7eb; background: #f8fafc; }
+#appointmentIntakeDialog .intake-message { margin: 0 0 12px; color: #b91c1c; font-size: 12px; overflow-wrap: anywhere; }
+#appointmentIntakeDialog .intake-message:empty { display: none; }
+#appointmentIntakeDialog .intake-actions { display: flex; justify-content: flex-end; gap: 10px; }
+#appointmentIntakeDialog .intake-actions button { min-height: 44px; padding: 11px 18px; border: 1px solid #d8dee8; border-radius: 9px; font-size: 13px; font-weight: 700; }
+#appointmentIntakeDialog .intake-close { background: #fff; color: #475569; }
+#appointmentIntakeDialog .intake-close:hover { background: #f1f5f9; }
+#appointmentIntakeDialog .intake-actions .intake-save { display: flex; align-items: center; justify-content: center; gap: 18px; border-color: #dc2626; background: #dc2626; color: #fff; box-shadow: 0 3px 7px #dc262620; }
+#appointmentIntakeDialog .intake-save:hover { background: #b91c1c; }
+#appointmentIntakeDialog .intake-save:disabled { opacity: .6; cursor: wait; }
+@media (max-width: 520px) {
+  #appointmentIntakeDialog { width: calc(100vw - 20px); border-radius: 16px; }
+  #appointmentIntakeDialog .intake-header { padding: 18px; }
+  #appointmentIntakeDialog .intake-patient { margin: 18px 18px 12px; flex-wrap: wrap; }
+  #appointmentIntakeDialog #intakeDescription { margin-left: 18px; margin-right: 18px; }
+  #appointmentIntakeDialog fieldset { margin-left: 18px; margin-right: 18px; }
+  #appointmentIntakeDialog .intake-grid { grid-template-columns: 1fr; gap: 16px; }
+  #appointmentIntakeDialog .intake-footer { padding: 16px 18px; }
+  #appointmentIntakeDialog .intake-actions { flex-direction: column-reverse; }
+  #appointmentIntakeDialog .intake-actions button { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #appointmentIntakeDialog input, #appointmentIntakeDialog select, #appointmentIntakeDialog button { transition: none; }
+}

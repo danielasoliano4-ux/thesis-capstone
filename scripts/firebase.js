@@ -15,17 +15,23 @@ import {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-// Do not retain authentication after the browser is closed.  Firebase defaults
-// to LOCAL persistence, which was the source of the apparent cross-session
-// "auto-login" behaviour.
-const authPersistenceReady = setPersistence(auth, browserSessionPersistence);
+// Preserve restored sessions; new sessions default to this browser session.
+const authPersistenceReady = new Promise((resolve, reject) => {
+  const unsubscribe = onAuthStateChanged(auth, user => {
+    unsubscribe();
+    if (user) resolve();
+    else setPersistence(auth, browserSessionPersistence).then(resolve, reject);
+  }, reject);
+});
 const db = getFirestore(app);
 const storage = getStorage(app);
 
 // Helper: fetch a user profile document from 'users' collection by uid
 async function fetchUserProfile(uid) {
-  if (!uid) return null;
+  if (!uid || auth.currentUser?.uid !== uid) return null;
   try {
+    const token = await auth.currentUser.getIdTokenResult();
+    if (!auth.currentUser.emailVerified || token.claims.secure_login !== true || token.signInProvider !== 'custom') return null;
     const docRef = doc(db, 'users', uid);
     const snap = await getDoc(docRef);
     if (!snap.exists()) return null;
@@ -66,3 +72,17 @@ async function signOutUser() {
 }
 
 export { signOutUser };
+
+// Refresh regularly so devices with a revoked session return to sign-in.
+let checkingSession = false;
+async function checkSession() {
+  const user = auth.currentUser;
+  if (!user || checkingSession) return;
+  checkingSession = true;
+  try { await user.getIdToken(true); }
+  catch (error) {
+    if (['auth/user-token-expired', 'auth/invalid-user-token', 'auth/user-disabled', 'auth/user-not-found'].includes(error.code)) await fbSignOut(auth);
+  } finally { checkingSession = false; }
+}
+setInterval(checkSession, 60000);
+window.addEventListener('focus', checkSession);

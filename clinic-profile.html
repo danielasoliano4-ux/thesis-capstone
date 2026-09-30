@@ -112,25 +112,63 @@
 
                 <!-- OPERATING HOURS -->
                 <div style="margin-top: 30px; margin-bottom: 30px;">
-                    <h3 style="margin-bottom: 15px;">Operating Hours</h3>
+                    <h3 style="margin-bottom: 15px;">Operating Hours</h3><p class="hours-help">Choose times using the clock buttons. Save changes to update resident booking times. All hours use Philippine time.</p>
                     <div class="profile-row">
-                        <div class="hours-box">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <i class="fa-solid fa-clock" style="color: #4a90e2;"></i>
+                        <div class="hours-box" data-hours-picker>
+                            <strong><i class="fa-solid fa-clock" aria-hidden="true"></i> Weekdays (Mon-Fri)</strong>
+                            <input id="profileWeekdayHours" type="hidden" value="8:00 AM - 5:00 PM">
+                            <label for="profileWeekdayHoursMode">Schedule</label>
+                            <select id="profileWeekdayHoursMode" class="hours-mode">
+                                <option value="custom">Opening and closing times</option>
+                                <option value="24">Open 24 hours</option>
+                                <option value="closed">Closed</option>
+                                <option value="saved" hidden>Keep existing schedule</option>
+                            </select>
+                            <div class="hours-times">
                                 <div>
-                                    <strong>Weekdays (Mon-Fri)</strong>
-                                    <input id="profileWeekdayHours" class="hours-input" value="8:00 AM - 5:00 PM" required/>
+                                    <label for="profileWeekdayHoursOpening">Opening time</label>
+                                    <div class="hours-time-control">
+                                        <input type="time" id="profileWeekdayHoursOpening" class="hours-opening" step="60">
+                                        <button type="button" class="hours-clock-button" data-time-input="profileWeekdayHoursOpening" aria-label="Choose weekday opening time"><i class="fa-regular fa-clock" aria-hidden="true"></i></button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="profileWeekdayHoursClosing">Closing time</label>
+                                    <div class="hours-time-control">
+                                        <input type="time" id="profileWeekdayHoursClosing" class="hours-closing" step="60">
+                                        <button type="button" class="hours-clock-button" data-time-input="profileWeekdayHoursClosing" aria-label="Choose weekday closing time"><i class="fa-regular fa-clock" aria-hidden="true"></i></button>
+                                    </div>
                                 </div>
                             </div>
+                            <small class="hours-note" aria-live="polite"></small>
                         </div>
-                        <div class="hours-box">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <i class="fa-solid fa-clock" style="color: #4a90e2;"></i>
+                        <div class="hours-box" data-hours-picker>
+                            <strong><i class="fa-solid fa-clock" aria-hidden="true"></i> Weekends (Sat-Sun)</strong>
+                            <input id="profileWeekendHours" type="hidden" value="Closed">
+                            <label for="profileWeekendHoursMode">Schedule</label>
+                            <select id="profileWeekendHoursMode" class="hours-mode">
+                                <option value="custom">Opening and closing times</option>
+                                <option value="24">Open 24 hours</option>
+                                <option value="closed">Closed</option>
+                                <option value="saved" hidden>Keep existing schedule</option>
+                            </select>
+                            <div class="hours-times">
                                 <div>
-                                    <strong>Weekends (Sat-Sun)</strong>
-                                    <input id="profileWeekendHours" class="hours-input" value="Closed" required/>
+                                    <label for="profileWeekendHoursOpening">Opening time</label>
+                                    <div class="hours-time-control">
+                                        <input type="time" id="profileWeekendHoursOpening" class="hours-opening" step="60">
+                                        <button type="button" class="hours-clock-button" data-time-input="profileWeekendHoursOpening" aria-label="Choose weekend opening time"><i class="fa-regular fa-clock" aria-hidden="true"></i></button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="profileWeekendHoursClosing">Closing time</label>
+                                    <div class="hours-time-control">
+                                        <input type="time" id="profileWeekendHoursClosing" class="hours-closing" step="60">
+                                        <button type="button" class="hours-clock-button" data-time-input="profileWeekendHoursClosing" aria-label="Choose weekend closing time"><i class="fa-regular fa-clock" aria-hidden="true"></i></button>
+                                    </div>
                                 </div>
                             </div>
+                            <small class="hours-note" aria-live="polite"></small>
                         </div>
                     </div>
                 </div>
