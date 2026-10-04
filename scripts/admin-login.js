@@ -6,6 +6,7 @@ function showMessage(message) {
   document.getElementById('loginMessage').hidden = false;
 }
 const controller = createLoginController(button, showMessage, () => 'admin');
+if (new URLSearchParams(location.search).get('session') === 'expired') showMessage('Your session ended. Please sign in again.');
 document.getElementById('passwordToggle').addEventListener('click', () => {
   const input = document.getElementById('passwordInput');
   input.type = input.type === 'password' ? 'text' : 'password';

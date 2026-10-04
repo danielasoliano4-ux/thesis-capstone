@@ -1,7 +1,9 @@
 import { auth, db, onAuthStateChanged, fetchUserProfile } from './firebase.js';
+import { protectPage } from './role-guard.js';
 import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 import { expiryReminders } from './expiry-reminders.mjs';
 import { shortVaccineName } from './stock-summary.mjs';
+protectPage('clinic_staff');
 const today = () => new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const list = document.getElementById('expiryReminders');
 const status = document.getElementById('expiryStatus');

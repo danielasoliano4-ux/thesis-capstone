@@ -1,4 +1,5 @@
 'use strict';
+const { resolveIntakeContext } = require('./intake-context');
 const WINDOW_MS = 90 * 60 * 1000;
 function scheduledTime(date, time) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return NaN;
@@ -19,8 +20,13 @@ function isNoShow(item, now) {
   return item?.status === 'confirmed' && !item.arrived_at && deadline(item) <= +now;
 }
 function validateIntake(data, today, HttpsError) {
-  const fields = ['bite_type', 'wound_washed', 'animal_type', 'bite_body_part', 'bite_date', 'patient_sex', 'patient_category'];
+  const fields = ['bite_type', 'wound_washed', 'animal_type', 'bite_body_part', 'bite_date', 'date_of_birth', 'patient_sex', 'patient_category'];
   const intake = {};
+  if (data.resident_name !== undefined) {
+    if (typeof data.resident_name !== 'string' || !data.resident_name.trim() || data.resident_name.length > 160)
+      throw new HttpsError('invalid-argument', 'Enter a patient name of up to 160 characters.');
+    intake.resident_name = data.resident_name.trim();
+  }
   for (const key of fields) {
     if (typeof data[key] !== 'string' || !data[key].trim() || data[key].length > 160)
       throw new HttpsError('invalid-argument', 'Complete all medical intake fields.');
@@ -28,9 +34,9 @@ function validateIntake(data, today, HttpsError) {
   }
   if (!['Yes', 'No', 'Unknown'].includes(intake.wound_washed) ||
       !['Male', 'Female', 'Other', 'Prefer not to say'].includes(intake.patient_sex) ||
-      !Number.isInteger(data.patient_age) || data.patient_age < 0 || data.patient_age > 130 ||
+      !Number.isFinite(scheduledTime(intake.date_of_birth, '00:00')) || intake.date_of_birth > today ||
       !Number.isFinite(scheduledTime(intake.bite_date, '00:00')) || intake.bite_date > today)
-    throw new HttpsError('invalid-argument', 'Check age, sex, wound washing and date of bite.');
+    throw new HttpsError('invalid-argument', 'Check date of birth, sex, wound washing and date of bite. Dates cannot be in the future.');
   if (!['Bite', 'Scratch', 'Both bite and scratch', 'Lick on broken skin'].includes(intake.bite_type))
     throw new HttpsError('invalid-argument', 'Select a valid exposure type.');
   if (!['Category I', 'Category II', 'Category III'].includes(intake.patient_category))
@@ -42,7 +48,9 @@ function validateIntake(data, today, HttpsError) {
     if (!other || other.length > 160) throw new HttpsError('invalid-argument', 'Specify the other animal.');
     intake.animal_type = other;
   }
-  return { ...intake, patient_age: data.patient_age };
+  const patientAge = Number(today.slice(0, 4)) - Number(intake.date_of_birth.slice(0, 4))
+    - (today.slice(5) < intake.date_of_birth.slice(5) ? 1 : 0);
+  return { ...intake, patient_age: patientAge };
 }
 function lifecycleHandler({ db, HttpsError, timestamp, now = () => new Date() }) {
   return async request => {
@@ -50,7 +58,7 @@ function lifecycleHandler({ db, HttpsError, timestamp, now = () => new Date() })
     if (!request.auth || claims.secure_login !== true || claims.email_verified !== true ||
         claims.firebase?.sign_in_provider !== 'custom') throw new HttpsError('unauthenticated', 'Please sign in again.');
     const { appointment_id: id, action } = request.data || {};
-    if (typeof id !== 'string' || !id || id.includes('/') || !['confirm', 'arrive', 'intake'].includes(action))
+    if (typeof id !== 'string' || !id || id.includes('/') || !['confirm', 'arrive', 'intake', 'intake_context'].includes(action))
       throw new HttpsError('invalid-argument', 'Choose a valid appointment and action.');
     const ref = db.collection('appointments').doc(id);
     return db.runTransaction(async tx => {
@@ -61,6 +69,14 @@ function lifecycleHandler({ db, HttpsError, timestamp, now = () => new Date() })
           (item && item.clinic_id !== (staff.clinic_id || request.auth.uid)))
         throw new HttpsError('permission-denied', 'Only active staff of this clinic can manage this appointment.');
       if (!item) throw new HttpsError('not-found', 'This appointment no longer exists.');
+      if(action === 'intake_context') {
+        if(item.status !== 'in_progress' || !item.arrived_at) throw new HttpsError('failed-precondition','Record arrival before reviewing patient information.');
+        if(typeof item.resident_uid !== 'string' || !item.resident_uid) throw new HttpsError('failed-precondition','This appointment has no linked patient.');
+        const snapshots=await Promise.all(['patient_records','appointments','vaccination_records'].map(name=>tx.get(db.collection(name).where('resident_uid','==',item.resident_uid))));
+        const profile=(await tx.get(db.collection('residents').doc(item.resident_uid))).data()||{};
+        const rows=snapshots.flatMap(snapshot=>snapshot.docs.map(doc=>({...doc.data(),id:doc.id})));
+        return resolveIntakeContext({...item,id},rows,profile);
+      }
       const current = now();
       const start = scheduledTime(item.preferred_date, item.preferred_time);
       const end = start + WINDOW_MS;
@@ -95,7 +111,7 @@ function lifecycleHandler({ db, HttpsError, timestamp, now = () => new Date() })
           { ...item, ...intake, id, vaccination_session_id: item.vaccination_session_id || 'legacy' }]);
         tx.set(db.collection('system_settings').doc('animal_exposure'), { animals, updated_at: timestamp() });
         tx.set(recordRef, { ...intake, appointment_id: id, resident_uid: item.resident_uid,
-          resident_name: item.resident_name || '', clinic_id: item.clinic_id, clinic_name: item.clinic_name || '',
+          resident_name: intake.resident_name || item.resident_name || '', clinic_id: item.clinic_id, clinic_name: item.clinic_name || '',
           vaccination_session_id: item.vaccination_session_id || 'legacy', preferred_date: item.preferred_date,
           preferred_time: item.preferred_time, arrived_at: item.arrived_at,
           recorded_by: request.auth.uid, recorded_at: timestamp() });

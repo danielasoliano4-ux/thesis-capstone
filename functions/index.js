@@ -94,49 +94,30 @@ exports.sendAppointmentConfirmation = onDocumentUpdated(
 	}
 );
 
-function getManilaDate(daysFromNow = 0) {
-	const date = new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000);
-	return new Intl.DateTimeFormat('en-CA', {
-		timeZone: 'Asia/Manila',
-		year: 'numeric',
-		month: '2-digit',
-		day: '2-digit'
-	}).format(date);
-}
-
+const { createReminderHandler } = require('./appointment-reminders');
 exports.sendAppointmentReminders = onSchedule(
 	{
-		schedule: '0 8 * * *',
+		schedule: '* * * * *',
 		timeZone: 'Asia/Manila',
+		maxInstances: 1,
+		concurrency: 1,
+		retryCount: 3,
 		secrets: [sendGridApiKey]
 	},
-	async () => {
-		configureEmail();
-		const tomorrow = getManilaDate(1);
-		const snapshot = await db.collection('appointments')
-			.where('status', '==', 'confirmed')
-			.where('preferred_date', '==', tomorrow)
-			.get();
-
-		for (const appointmentDoc of snapshot.docs) {
-			const appointment = appointmentDoc.data();
-			if (!appointment.resident_email || appointment.reminder_sent) continue;
-
+	createReminderHandler({
+		db,
+		timestamp: () => admin.firestore.FieldValue.serverTimestamp(),
+		sendEmail: async (appointment, reminder, message) => {
+			configureEmail();
 			await sgMail.send(buildAppointmentEmail(
 				appointment,
-				'Vaccination appointment reminder',
+				'Vaccination appointment reminder: ' + reminder.label,
 				'Appointment Reminder',
-				'Your anti-rabies vaccination appointment is scheduled for tomorrow.'
+				message
 			));
-
-			await appointmentDoc.ref.update({
-				reminder_sent: true,
-				reminder_sent_at: admin.firestore.FieldValue.serverTimestamp()
-			});
 		}
-	}
+	})
 );
-
 const { lifecycleHandler, cleanupAppointments, expirePendingAppointments } = require('./appointment-lifecycle');
 exports.manageAppointment = onCall(lifecycleHandler({
   db, HttpsError, timestamp: () => admin.firestore.FieldValue.serverTimestamp()
@@ -229,3 +210,13 @@ exports.reviewClinicRegistration = onCall({ timeoutSeconds: 60, maxInstances: 1,
 
 const { slotAvailabilityHandler } = require('./booking-capacity');
 exports.getSlotAvailability = onCall(slotAvailabilityHandler({ db, HttpsError }));
+
+const {treatmentHandler,refreshOverdue}=require('./treatment');
+exports.manageTreatment=onCall(treatmentHandler({db,HttpsError,timestamp:()=>admin.firestore.FieldValue.serverTimestamp(),verifyDocument:async path=>{try{const [metadata]=await admin.storage().bucket().file(path).getMetadata();return Number(metadata.size)>0&&Number(metadata.size)<=10*1024*1024&&['image/jpeg','image/png','application/pdf'].includes(metadata.contentType);}catch{return false;}}}));
+exports.refreshOverdueDoses=onSchedule({schedule:'every day 00:05',timeZone:'Asia/Manila'},()=>refreshOverdue(db));
+
+const { onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { refreshAnalytics } = require('./live-analytics');
+for (const [name, collection] of Object.entries({ refreshAppointmentAnalytics:'appointments', refreshVaccinationAnalytics:'vaccination_records', refreshPatientAnalytics:'patient_records', refreshResidentAnalytics:'residents' })) {
+exports[name] = onDocumentWritten(collection + '/{recordId}', () => refreshAnalytics(db, () => admin.firestore.FieldValue.serverTimestamp()));
+}

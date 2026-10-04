@@ -8,6 +8,8 @@ const source = fs.readFileSync(path.join(__dirname, '../scripts/login-security.j
   .replace(/^import .*;\r?\n/gm, '').replace(/^const secureLogin = .*;\r?\n/m, '').replace('export function', 'function');
 function fixture(handler, storage = new Map(), remember = false) {
   const persistence = [];
+  const sessions = [];
+  const events = {};
   let time = 1000000;
   let tick;
   let calls = 0;
@@ -17,10 +19,11 @@ function fixture(handler, storage = new Map(), remember = false) {
   const context = {
     Date: { now: () => time }, Math, Number, console: { error: () => {} },
     localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) },
-    window: { addEventListener: () => {} },
+    window: { addEventListener: (name, callback) => { events[name] = callback; } },
     document: { createElement: () => ({ addEventListener: () => {} }) },
     setInterval: callback => { tick = callback; },
     auth: {}, authPersistenceReady: Promise.resolve(),
+    activateSession: role => sessions.push(role),
     browserLocalPersistence: "local", browserSessionPersistence: "session",
     setPersistence: async (_, mode) => { persistence.push(mode); },
     secureLogin: async args => { calls++; return handler(args); },
@@ -29,7 +32,7 @@ function fixture(handler, storage = new Map(), remember = false) {
   vm.createContext(context);
   vm.runInContext(source, context);
   const controller = context.createLoginController(button, message => messages.push(message), () => 'resident', () => remember);
-  return { controller, button, messages, storage, persistence, resend: () => resend, calls: () => calls, advance: ms => { time += ms; tick(); } };
+  return { controller, button, messages, storage, persistence, sessions, context, events, resend: () => resend, calls: () => calls, advance: ms => { time += ms; tick(); } };
 }
 test('server cooldown disables login, persists on reload, counts down and expires', async () => {
   const f = fixture(async () => { throw { code: 'functions/resource-exhausted', message: 'Wait', details: { retryAfterMs: 60000 } }; });
@@ -72,5 +75,31 @@ test('remember me selects persistent authentication; unchecked uses session auth
     const f = fixture(async () => ({ data: { token: 'token' } }), new Map(), remember);
     assert.ok(await f.controller.attempt('a@example.com', 'correct'));
     assert.deepEqual(f.persistence, [remember ? 'local' : 'session']);
+    assert.deepEqual(f.sessions, ['resident']);
   }
+});
+
+test('fresh sign-in waits for guest-side sign-out before creating new credentials', async () => {
+  let finishSignOut;
+  const f = fixture(async () => ({ data: { token: 'token' } }));
+  f.context.window.residentSignOutReady = new Promise(resolve => { finishSignOut = resolve; });
+  const login = f.controller.attempt('a@example.com', 'correct');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.calls(), 0);
+  assert.deepEqual(f.sessions, []);
+  finishSignOut();
+  assert.ok((await login).user);
+  assert.deepEqual(f.sessions, ['resident']);
+});
+
+test('leaving the login page while the server is responding cancels sign-in', async () => {
+  let respond;
+  const f = fixture(() => new Promise(resolve => { respond = resolve; }));
+  const login = f.controller.attempt('a@example.com', 'correct');
+  await new Promise(resolve => setImmediate(resolve));
+  f.events.pagehide();
+  respond({ data: { token: 'token' } });
+  assert.equal(await login, null);
+  assert.deepEqual(f.sessions, []);
+  assert.deepEqual(f.persistence, []);
 });

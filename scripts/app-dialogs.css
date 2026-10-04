@@ -1,0 +1,22 @@
+.app-dialog { position: fixed; inset: 0; margin: auto; width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); padding: 0; border: 1px solid #e2e8f0; border-radius: 20px; background: #fff; color: #172033; box-shadow: 0 24px 80px #0f172a40; font: 15px/1.6 Arial, sans-serif; overflow: auto; }
+.app-dialog::backdrop { background: #0f172a99; backdrop-filter: blur(4px); }
+.app-dialog .app-dialog__card { display: block; margin: 0; padding: 30px; background: transparent; }
+.app-dialog .app-dialog__icon { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 18px; border-radius: 14px; background: #eff6ff; color: #2563eb; font-size: 26px; font-weight: 700; }
+.app-dialog--danger .app-dialog__icon { background: #fef2f2; color: #dc2626; }
+.app-dialog--success .app-dialog__icon { background: #ecfdf5; color: #15803d; }
+.app-dialog .app-dialog__title { margin: 0 0 10px; color: #172033; font-size: 22px; line-height: 1.3; font-weight: 700; }
+.app-dialog .app-dialog__message { margin: 0; color: #64748b; font-size: 15px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.app-dialog .app-dialog__field { margin-top: 20px; }
+.app-dialog .app-dialog__field label { display: block; margin-bottom: 7px; color: #334155; font-size: 13px; font-weight: 600; }
+.app-dialog .app-dialog__input { box-sizing: border-box; width: 100%; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; color: #172033; font: inherit; }
+.app-dialog .app-dialog__actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+.app-dialog .app-dialog__actions button { width: auto; margin: 0; padding: 11px 22px; border: 1px solid transparent; border-radius: 10px; font: 600 14px/1.4 Arial, sans-serif; cursor: pointer; transition: background .15s; }
+.app-dialog .app-dialog__cancel { background: #f1f5f9; color: #475569; border-color: #e2e8f0 !important; }
+.app-dialog .app-dialog__cancel:hover { background: #e2e8f0; }
+.app-dialog .app-dialog__accept { background: #2563eb; color: #fff; }
+.app-dialog .app-dialog__accept:hover { background: #1d4ed8; }
+.app-dialog--danger .app-dialog__accept { background: #dc2626; }
+.app-dialog--danger .app-dialog__accept:hover { background: #b91c1c; }
+.app-dialog :focus-visible { outline: 3px solid #93c5fd; outline-offset: 3px; }
+.app-dialog [hidden] { display: none !important; }
+@media (max-width: 480px) { .app-dialog .app-dialog__card { padding: 24px; } .app-dialog .app-dialog__actions button { flex: 1; } }

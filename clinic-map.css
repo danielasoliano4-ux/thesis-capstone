@@ -1,5 +1,9 @@
 .nearest-clinic-status { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 12px 16px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; color: #1e40af; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .nearest-clinic-status::before { content: ''; flex: 0 0 9px; width: 9px; height: 9px; border-radius: 50%; background: #2563eb; }
+.nearest-clinic-button { order: 1; margin-left: auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 9px 14px; border: 1px solid #e60000; border-radius: 8px; background: #e60000; color: #fff; font: 600 13px Arial, sans-serif; cursor: pointer; }
+.nearest-clinic-button:hover { background: #c90000; }
+.nearest-clinic-button:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+.nearest-clinic-button:disabled { opacity: .65; cursor: wait; }
 .map-box > .leaflet-container { flex: 1 1 100%; min-width: 0; width: 100%; }
 .clinic-popup .leaflet-popup-content-wrapper { border-radius: 16px; padding: 1px; box-shadow: 0 6px 24px rgba(15,23,42,.2); }
 .clinic-popup .leaflet-popup-content { margin: 18px; max-width: calc(100vw - 90px); font-family: Arial, sans-serif; line-height: 1.45; }

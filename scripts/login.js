@@ -1,5 +1,5 @@
-import { auth, db } from './firebase.js';
-import { signOut } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
+import { auth, db, signOutUser } from './firebase.js';
+import { sessionIsTerminated } from './session-state.js';
 import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 import { routes } from './routes.js';
 import { createLoginController } from './login-security.js';
@@ -11,6 +11,7 @@ function showLoginMessage(message) {
   document.getElementById('loginMessage').hidden = false;
 }
 const controller = createLoginController(document.getElementById('loginBtn'), showLoginMessage, () => loginRoles[window.currentRole || 'resident'], () => document.getElementById('rememberMe').checked);
+if (new URLSearchParams(location.search).get('session') === 'expired') showLoginMessage('Your session ended or could not be verified. Please sign in again.');
 if (new URLSearchParams(location.search).has('verify')) showLoginMessage('Your account is saved. Complete email verification during registration before signing in. Contact your administrator if you cannot return to registration.');
 document.getElementById('loginBtn').addEventListener('click', async () => {
   const email = document.getElementById('emailInput').value.trim();
@@ -22,9 +23,11 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
     const profile = (await getDoc(doc(db, 'users', credential.user.uid))).data();
     const role = profile?.role === 'administrator' ? 'admin' : profile?.role;
     if (!rolePages[role]) throw new Error('Missing role');
+    if (auth.currentUser?.uid !== credential.user.uid || sessionIsTerminated()) return;
+    document.getElementById('passwordInput').value = '';
     window.location.href = rolePages[role];
   } catch {
-    await signOut(auth);
+    await signOutUser();
     showLoginMessage('Could not load your account profile. Please contact the administrator.');
   }
 });

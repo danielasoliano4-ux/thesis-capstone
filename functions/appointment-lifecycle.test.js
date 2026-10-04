@@ -3,16 +3,16 @@ const assert = require('node:assert/strict');
 const { scheduledTime, deadline, isNoShow, lifecycleHandler, deleteNoShow, cleanupAppointments } = require('./appointment-lifecycle');
 class HttpsError extends Error { constructor(code, message) { super(message); this.code = code; } }
 const base = { clinic_id:'clinic', resident_uid:'resident', resident_name:'Resident', clinic_name:'Clinic', preferred_date:'2026-09-24', preferred_time:'9:00 AM', status:'pending' };
-const intake = { bite_type:'Scratch', wound_washed:'Yes', animal_type:'Dog', bite_body_part:'Left leg', bite_date:'2026-09-23', patient_age:24, patient_sex:'Female', patient_category:'Category II' };
+const intake = { bite_type:'Scratch', wound_washed:'Yes', animal_type:'Dog', bite_body_part:'Left leg', bite_date:'2026-09-23', date_of_birth:'2002-09-24', patient_sex:'Female', patient_category:'Category II' };
 function fixture(item = base) {
   let clock = new Date('2026-09-24T00:00:00Z'), sequence=0, queue=Promise.resolve();
   const rows=new Map([['users/staff',{role:'clinic_staff',is_active:true,clinic_id:'clinic'}],['appointments/a',{...item}]]);
-  const db={collection:name=>({path:name,doc:id=>({path:name+'/'+(id || ++sequence)})}),
+  const db={collection:name=>({path:name,where:(field,op,value)=>({path:name,filter:{field,value}}),doc:id=>({path:name+'/'+(id || ++sequence)})}),
     runTransaction:fn=>{
       const result=queue.then(async()=>{
         const writes=[];
         const tx={
-          get:async ref=>ref.path === 'patient_records' ? {docs:[...rows.entries()].filter(([key])=>key.startsWith('patient_records/')).map(([key,value])=>({id:key.split('/')[1],data:()=>value}))} : ({exists:rows.has(ref.path),data:()=>rows.get(ref.path)}),
+          get:async ref=>ref.filter ? {docs:[...rows.entries()].filter(([key,value])=>key.startsWith(ref.path+'/')&&value[ref.filter.field]===ref.filter.value).map(([key,value])=>({id:key.split('/')[1],data:()=>value}))} : ref.path === 'patient_records' ? {docs:[...rows.entries()].filter(([key])=>key.startsWith('patient_records/')).map(([key,value])=>({id:key.split('/')[1],data:()=>value}))} : ({exists:rows.has(ref.path),data:()=>rows.get(ref.path)}),
           update:(ref,data)=>writes.push(()=>rows.set(ref.path,{...rows.get(ref.path),...data})),
           set:(ref,data)=>writes.push(()=>rows.set(ref.path,data)),
           delete:ref=>writes.push(()=>rows.delete(ref.path))
@@ -81,13 +81,13 @@ test('intake requires arrival and creates a permanent record atomically; retries
  assert.equal(record.patient_category,'Category II');
  assert.equal(f.rows.get('appointments/a').patient_category,'Category II');
  assert.equal(f.rows.get('appointments/a').course_intake_data.patient_category,'Category II');
- assert.equal(record.patient_age,24);assert.equal(record.resident_uid,'resident');assert.equal(record.clinic_id,'clinic');
+ assert.equal(record.date_of_birth,'2002-09-24');assert.equal(record.patient_age,24);assert.equal(record.resident_uid,'resident');assert.equal(record.clinic_id,'clinic');
  assert.equal(f.rows.get('appointments/a').patient_record_id,'a');
- await f.call('intake',{intake:{...intake,patient_age:99}});assert.equal(f.rows.get('patient_records/a').patient_age,24);
+ await f.call('intake',{intake:{...intake,date_of_birth:'2000-01-01'}});assert.equal(f.rows.get('patient_records/a').patient_age,24);
  await f.clean();assert.ok(f.rows.has('patient_records/a'));
 });
 test('intake rejects missing/invalid medical fields without partial writes',async()=>{
- for(const changes of [{patient_category:undefined},{patient_category:''},{bite_type:''},{wound_washed:'Maybe'},{patient_age:-1},{patient_age:1.5},{patient_age:'24'},{patient_sex:''},{bite_date:'2026-09-25'},{bite_date:'2026-02-30'}]){
+ for(const changes of [{patient_category:undefined},{patient_category:''},{bite_type:''},{wound_washed:'Maybe'},{date_of_birth:undefined},{date_of_birth:''},{date_of_birth:'2026-09-25'},{date_of_birth:'2002-02-30'},{date_of_birth:'not-a-date'},{patient_sex:''},{bite_date:'2026-09-25'},{bite_date:'2026-02-30'}]){
   const f=fixture({...base,status:'in_progress',arrived_at:'server'});f.at('2026-09-24T01:00:00Z');
   await assert.rejects(f.call('intake',{intake:{...intake,...changes}}),{code:'invalid-argument'});
   assert.equal(f.rows.has('patient_records/a'),false);assert.equal(f.rows.get('appointments/a').intake_completed_at,undefined);
@@ -205,4 +205,46 @@ test('legacy expired records can be archived without an undefined resident or sc
  const f=fixture({clinic_id:'clinic',status:'expired'});await expirePendingAppointment(f.db,{path:'appointments/a'},f.now);
  const history=f.rows.get('history/appointment-expired-a');assert.ok(history);assert.ok(Object.values(history).every(value=>value!==undefined));
  assert.equal(f.rows.has('notifications/appointment-expired-a'),false);
+});
+
+test('date of birth accepts today and leap days; computes age at the birthday boundary', () => {
+ const { validateIntake } = require('./appointment-lifecycle');
+ for (const [dob, expectedAge] of [['2026-09-24',0],['2002-09-25',23],['2002-09-24',24],['2002-09-23',24],['2004-02-29',22]]) {
+  const result = validateIntake({...intake, date_of_birth:dob, patient_age:99}, '2026-09-24', HttpsError);
+  assert.equal(result.date_of_birth,dob);assert.equal(result.patient_age,expectedAge);
+ }
+});
+
+test('edited patient name is trimmed and saved to the appointment and permanent intake record', async () => {
+ const f=fixture({...base,status:'in_progress',arrived_at:'server'});
+ await f.call('intake',{intake:{...intake,resident_name:'  Updated Patient  '}});
+ assert.equal(f.rows.get('appointments/a').resident_name,'Updated Patient');
+ assert.equal(f.rows.get('appointments/a').course_intake_data.resident_name,'Updated Patient');
+ assert.equal(f.rows.get('patient_records/a').resident_name,'Updated Patient');
+ assert.equal(f.rows.get('patient_records/a').resident_uid,'resident');
+});
+test('blank, oversized and non-text patient names are rejected without writes', async () => {
+ for (const resident_name of ['', '   ', 'a'.repeat(161), null, 123]) {
+  const f=fixture({...base,status:'in_progress',arrived_at:'server'});
+  await assert.rejects(f.call('intake',{intake:{...intake,resident_name}}),{code:'invalid-argument'});
+  assert.equal(f.rows.has('patient_records/a'),false);
+  assert.equal(f.rows.get('appointments/a').resident_name,'Resident');
+ }
+});
+
+test('intake lookup is scoped to arrived patient and preserves prior records',async()=>{
+ const f=fixture({...base,status:'confirmed',vaccination_session_id:'course'});
+ f.rows.set('patient_records/old',{...intake,resident_uid:'resident',vaccination_session_id:'course'});
+ f.rows.set('patient_records/stranger',{...intake,resident_uid:'other',patient_sex:'Male',vaccination_session_id:'course'});
+ await assert.rejects(f.call('intake_context'),/arrival/);
+ await f.call('arrive');
+ const context=await f.call('intake_context');
+ assert.equal(context.mode,'review');
+ assert.equal(context.defaults.patient_sex,'Female');
+ assert.equal(context.defaults.bite_body_part,'Left leg');
+ assert.deepEqual(context.missingFields,[]);
+ await f.call('intake',{intake:{...context.defaults,bite_body_part:'Right leg'}});
+ assert.equal(f.rows.get('patient_records/old').bite_body_part,'Left leg');
+ assert.equal(f.rows.get('patient_records/a').bite_body_part,'Right leg');
+ await assert.rejects(f.call('intake_context',{}, {uid:'intruder',token:{secure_login:true,email_verified:true,firebase:{sign_in_provider:'custom'}}}),/active staff/);
 });

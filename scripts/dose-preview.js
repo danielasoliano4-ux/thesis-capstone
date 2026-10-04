@@ -9,7 +9,9 @@ export function doseSummaryFields(record, residentName, dateLabel) {
     ['Administration date', value(dateLabel)],
     ['Clinic facility', value(record.clinic_name)],
     ['Clinic location', value(record.clinic_location)],
-    ['Dose status', 'Completed'],
+    ['Dose status', value(record.status || 'Completed')],
+    ['Verification', value(record.verification_status)],
+    ['Verification basis', value(record.verification_basis)],
   ];
 }
 

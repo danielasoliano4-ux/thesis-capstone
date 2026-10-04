@@ -1,0 +1,25 @@
+
+/* Shared conditional vaccination workflow. */
+.dose-completion-modal-content { width:min(860px,100%);max-width:860px; }
+#treatmentReview { box-sizing:border-box;padding:0;border:0;display:grid;gap:14px;min-width:0; }
+#treatmentReview [hidden] { display:none!important; }
+#treatmentReview .treatment-card,#treatmentReview .treatment-selection,#doseCompletionForm>.dose-completion-grid,#doseCompletionForm>.record-edit-grid { padding:18px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;box-sizing:border-box; }
+#treatmentReview .treatment-selection { order:-1;background:#f0fdfa;border-color:#99f6e4; }
+#treatmentReview label { display:grid;gap:7px;color:#334155;font-size:13px;font-weight:600;min-width:0; }
+#treatmentReview input:not([type=checkbox]),#treatmentReview select,#treatmentReview textarea { box-sizing:border-box;width:100%;min-height:44px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;background:white;color:#172033;font:inherit;font-size:14px; }
+#treatmentReview :is(input,select,textarea,button,summary):focus-visible { outline:3px solid #14b8a6;outline-offset:3px; }
+#treatmentReview summary { cursor:pointer;font-size:14px;color:#172033;font-weight:700; }
+#treatmentReview .treatment-field-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;margin:16px 0; }
+#treatmentReview .treatment-progress { color:#0f766e;font-size:13px;font-weight:700;margin:12px 0 4px; }
+#treatmentReview p { font-size:13px;line-height:1.5; }
+#treatmentReview .treatment-helper { color:#64748b; }
+#treatmentReview .treatment-warning { padding:12px 14px;border-radius:10px;background:#fffbeb;color:#92400e;border:1px solid #fde68a;margin:0; }
+#treatmentReview .treatment-confirm { display:flex;align-items:flex-start;gap:10px;padding:14px;border-radius:10px;background:#f8fafc;line-height:1.5; }
+#treatmentReview input[type=checkbox] { width:18px;height:18px;min-height:0;flex:0 0 auto;margin:1px 0 0;accent-color:#0f766e; }
+#treatmentReview button,#doseCompletionForm>button[type=submit] { border:0;border-radius:9px;padding:12px 18px;min-height:44px;font:inherit;font-size:14px;font-weight:700;cursor:pointer; }
+#treatmentReview .treatment-primary,#doseCompletionForm>button[type=submit] { background:#0f766e;color:white; }
+#treatmentReview .treatment-primary:hover,#doseCompletionForm>button[type=submit]:hover { background:#115e59; }
+#treatmentReview .treatment-secondary { background:#f1f5f9;color:#334155;border:1px solid #cbd5e1;margin-top:12px; }
+#doseCompletionForm button:disabled { opacity:.5;cursor:not-allowed; }
+#doseCompletionForm>button[type=submit] { position:sticky;bottom:0;z-index:1;box-shadow:0 0 0 8px white; }
+@media(max-width:600px) { #treatmentReview .treatment-field-grid { grid-template-columns:1fr; } #treatmentReview .treatment-card { padding:14px; } }

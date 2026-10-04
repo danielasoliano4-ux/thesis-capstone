@@ -24,42 +24,6 @@
 </head>
 <body>
     <iframe id="appFrame" title="Anti-Rabies Locator"></iframe>
-    <script type="module">
-        import { auth, fetchUserProfile, onAuthStateChanged } from './scripts/firebase.js';
-        import { routes } from './scripts/routes.js';
-
-        const frame = document.getElementById('appFrame');
-        const rolePages = {
-            resident: 'residents.html',
-            clinic_staff: 'staff.html',
-            admin: routes.adminDashboard,
-            administrator: routes.adminDashboard
-        };
-        const savedPage = sessionStorage.getItem('appPage');
-
-        const loadPage = page => {
-            frame.src = page;
-        };
-
-        onAuthStateChanged(auth, async user => {
-            if (!user) {
-                loadPage(savedPage && savedPage !== 'residents.html' && savedPage !== 'staff.html' && savedPage !== 'admin.html' ? savedPage : 'index.html');
-                return;
-            }
-            const profile = await fetchUserProfile(user.uid);
-            loadPage(rolePages[profile?.role] || 'index.html');
-        });
-
-        frame.addEventListener('load', () => {
-            try {
-                const pageUrl = new URL(frame.contentWindow.location.href);
-                if (pageUrl.pathname !== '/' && !pageUrl.pathname.endsWith('/app.html')) {
-                    sessionStorage.setItem('appPage', pageUrl.pathname.slice(1) + pageUrl.search + pageUrl.hash);
-                }
-            } catch (error) {
-                sessionStorage.removeItem('appPage');
-            }
-        });
-    </script>
+    <script src="scripts/app-navigation.js"></script>
 </body>
 </html>

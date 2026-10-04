@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="/scripts/session-navigation.js"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Clinic Profile</title>
@@ -10,8 +11,6 @@
     <link rel="stylesheet" href="clinic-profile.css"/>
     <link rel="stylesheet" href="responsive.css">
 <link rel="stylesheet" href="clinic-layout.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body class="clinic-dashboard">
 
@@ -80,7 +79,6 @@
                     <input id="profileAddress" type="text" value="Brgy. Poblacion Uno, Cabuyao City, Laguna" required/>
                 </div>
 
-                <div class="profile-field full-width"><label>Clinic map location</label><p>Click the map or drag the pin to your clinic in Cabuyao. Save Changes to share your location with residents and administrators.</p><div id="clinicLocationMap" style="height:320px;width:100%;position:relative;z-index:0" aria-label="Pin your clinic location"></div><p id="clinicLocationStatus" role="status">No location pinned yet.</p></div>
 <!-- CONTACT AND EMAIL -->
                 <div class="profile-row">
                     <div class="profile-field">
@@ -160,16 +158,6 @@
                             <small class="hours-note" aria-live="polite"></small>
                         </div>
                     </div>
-                </div>
-
-                <div class="profile-field" style="margin-bottom: 30px;">
-                    <label for="profileReservationDays">Reservation Duration</label>
-                    <select id="profileReservationDays" required>
-                        <option value="1">1 day</option>
-                        <option value="2">2 days</option>
-                        <option value="3">3 days</option>
-                    </select>
-                    <small style="margin-top: 6px; color: #6b7280;">Choose how long a confirmed reservation remains valid.</small>
                 </div>
 
                 <!-- SERVICES OFFERED -->

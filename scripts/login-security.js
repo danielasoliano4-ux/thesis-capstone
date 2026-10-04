@@ -1,4 +1,5 @@
-import { app, auth, authPersistenceReady } from './firebase.js';
+import { app, auth, authPersistenceReady, signOutUser } from './firebase.js';
+import { activateSession } from './session-state.js';
 import { signInWithCustomToken, setPersistence, browserLocalPersistence, browserSessionPersistence } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-functions.js';
 const secureLogin = httpsCallable(getFunctions(app), 'secureLogin');
@@ -8,6 +9,8 @@ export function createLoginController(button, showMessage, getRole, getRememberM
   const cooldownKey = 'login-cooldown-until';
   let deadline = 0;
   let busy = false;
+  let navigationGeneration = 0;
+  window.addEventListener('pagehide', () => { navigationGeneration++; });
   let idleLabel = button.textContent;
   const readDeadline = () => {
     try { return Number(localStorage.getItem(cooldownKey)) || 0; } catch { return deadline; }
@@ -28,17 +31,29 @@ export function createLoginController(button, showMessage, getRole, getRememberM
     if (refresh()) { showMessage('Too many attempts. Please wait for the countdown to finish.'); return null; }
     idleLabel = button.textContent;
     busy = true;
+    const generation = navigationGeneration;
     refresh();
     try {
       await authPersistenceReady;
-      const { data } = await secureLogin({ email, password, role: getRole() });
+      await window.residentSignOutReady;
+      if (generation !== navigationGeneration) return null;
+      const role = getRole();
+      const { data } = await secureLogin({ email, password, role });
+      if (generation !== navigationGeneration) return null;
       // Handle a stale backend response without opening verification on sign-in.
       if (data.verificationRequired) {
         showMessage('Email verification is incomplete. Complete verification on the registration page or contact your administrator.');
         return null;
       }
       await setPersistence(auth, getRememberMe() ? browserLocalPersistence : browserSessionPersistence);
-      return await signInWithCustomToken(auth, data.token);
+      if (generation !== navigationGeneration) return null;
+      const credential = await signInWithCustomToken(auth, data.token);
+      if (generation !== navigationGeneration) {
+        await signOutUser();
+        return null;
+      }
+      activateSession(role);
+      return credential;
     } catch (error) {
       if (error.details?.retryAfterMs) {
         deadline = Date.now() + error.details.retryAfterMs;

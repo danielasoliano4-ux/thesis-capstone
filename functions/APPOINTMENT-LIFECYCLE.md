@@ -26,3 +26,7 @@ Exposure choices match Patient Tracking. Animal choices are Dog, Cat and Other; 
 
 
 Pending appointment expiry: unconfirmed requests expire at their scheduled Asia/Manila time. The expireAppointments job persists expired status every minute in a transaction, retaining the original document. Late confirmation is rejected before the job runs. Resident history includes expired records and Book Again creates a new request through the existing booking flow. Clinic expired entries have disabled actions. Deploy functions, Firestore rules and hosting together.
+
+## Smart Auto-Fill & Review
+
+After arrival, the intake dialog calls manageAppointment with action intake_context. The callable checks active staff membership in the appointment clinic and requires a recorded arrival before retrieving the linked resident history. It returns only intake defaults, mode and missing fields. Permanent records, prior appointments, vaccination records and the resident profile supply missing demographics; exposure fields come only from the current vaccination session (missing session IDs use legacy). A different session reuses demographics without copying a previous exposure. Age is recalculated from date of birth. Staff review and save a new permanent appointment intake; historical records remain unchanged. Failed lookup disables submission and offers Retry lookup. Deploy manageAppointment and Hosting together; this client requires the updated callable.

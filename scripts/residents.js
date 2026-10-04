@@ -1,5 +1,7 @@
+import { renderLiveCaptions } from './live-analytics-view.js';
+import { notifyDialog, confirmDialog } from './app-dialogs.js';
+import { sessionIsTerminated } from './session-state.js';
 import { availableSlots, bookingTimeError, clockMinutes, dateStart } from './clinic-hours.js';
-import { listenPatientRecords } from './appointment-intake.js';
 import { openDosePreview, openDoseReportPreview } from './dose-preview.js';
 import { app, auth, db, storage, fetchUserProfile, onAuthStateChanged, signOutUser } from './firebase.js';
 import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
@@ -26,6 +28,7 @@ let allResidentVaccinationDocuments = [];
 let bookingClinicContext = null;
 let currentVaccinationSessionId = '';
 let selectedDose = 1;
+let patientTreatments = [];
 let pendingClinicChangeId = '';
 let confirmedClinicChangeId = '';
 let vaccinationDocumentsUnsubscribe = null;
@@ -162,7 +165,6 @@ window.filterNotifs = filterNotifs;
 async function loadResidentDashboard(uid, userProfile = {}) {
   currentUid = uid;
   loadResidentNotifications(uid);
-  listenPatientRecords(document.getElementById('panel-booking-records'), 'resident_uid', uid);
   const residentDoc = await getDoc(doc(db, 'residents', uid));
   const residentData = residentDoc.exists() ? residentDoc.data() : {};
   residentProfile = residentData;
@@ -220,6 +222,11 @@ async function loadResidentDashboard(uid, userProfile = {}) {
   updateVaccinationProgress(vaccinationRecords);
   loadVaccinationDocuments(uid);
 
+  onSnapshot(query(collection(db, 'treatments'), where('resident_uid', '==', uid)), snapshot => {
+    patientTreatments = snapshot.docs.map(d => d.data());
+    updateVaccinationProgress(residentVaccinationRecords);
+    renderLiveDoseRecords(residentVaccinationRecords, residentAppointments);
+  });
   onSnapshot(query(collection(db, 'vaccination_records'), where('resident_uid', '==', uid)), snapshot => {
     const allRecords = snapshot.docs.map(item => item.data()).sort((first, second) => Number(second.dose_number || 0) - Number(first.dose_number || 0));
     allResidentVaccinationRecords = allRecords;
@@ -404,20 +411,20 @@ async function loadResidentBookings(uid) {
       }
       const nextDose = Math.min(5, completedDoseCount + 1);
       renderLiveDoseRecords(residentVaccinationRecords, bookings);
-      const nextDoseDate = firstDoseDate && nextDose > 1 ? formatInputDate(firstDoseDate, doseDayOffsets[nextDose - 1]) : '';
+      const nextDoseDate = patientTreatments.find(t => t.vaccination_session_id === (currentVaccinationSessionId || 'legacy'))?.doses?.find(d => d.dose_number === nextDose)?.recommended_date || (firstDoseDate && nextDose > 1 ? formatInputDate(firstDoseDate, doseDayOffsets[nextDose - 1]) : '');
       const latestCompletedAppointment = bookings.find(booking => booking.status === 'completed' && (Number(booking.completed_dose_number || 0) || Number(String(booking.dose_label || '').match(/\d+/)?.[0] || 0)) === completedDoseCount);
       const bookingMarkup = `<div class="booking-progress-panel"><h3><i class="fa-regular fa-calendar-check"></i> Booking Records</h3>${bookings.map(booking => {
         const status = appointmentStatus(booking);
         return `
         <div class="booking-progress-card"><div class="booking-progress-heading"><div><strong>${escapeHtml(booking.clinic_name || 'Clinic')}</strong><div>${escapeHtml(booking.preferred_date || '')} at ${escapeHtml(booking.preferred_time || '')} - ${escapeHtml(booking.dose_label || 'Dose 1')}</div></div><span class="booking-status status-${escapeHtml(status || 'pending')}">${status === 'in_progress' ? 'Arrived' : status === 'confirmed' ? 'Confirmed' : status === 'completed' ? 'Completed' : status === 'declined' ? 'Declined' : status === 'expired' ? 'Expired' : 'Pending clinic review'}</span></div>
-        <button type="button" class="view-record-button" data-record-id="${escapeHtml(booking.id)}">View Full Record</button><div class="full-record-details" id="full-record-${escapeHtml(booking.id)}" hidden><strong>Vaccination progress</strong><p>${completedDoseCount} of 5 doses completed.</p><p>${completedDoseCount < 5 ? `Next: Dose ${nextDose} (Day ${doseDayOffsets[nextDose - 1]})${nextDoseDate ? ` on ${formatScheduleDate(firstDoseDate, doseDayOffsets[nextDose - 1])}` : ''}.` : 'Vaccination schedule complete.'}</p>${completedDoseCount < 5 && latestCompletedAppointment?.id === booking.id ? `<button type="button" class="next-dose-button" data-clinic-id="${escapeHtml(latestRecord?.clinic_id || booking.clinic_id || '')}">Book Dose ${nextDose}${nextDoseDate ? ` for ${formatScheduleDate(firstDoseDate, doseDayOffsets[nextDose - 1])}` : ''}</button>` : ''}</div>
+        <button type="button" class="view-record-button" data-record-id="${escapeHtml(booking.id)}">View Full Record</button><div class="full-record-details" id="full-record-${escapeHtml(booking.id)}" hidden><strong>Vaccination progress</strong><p>${completedDoseCount} of 5 doses completed.</p><p>${completedDoseCount < 5 ? `Next: Dose ${nextDose} (Day ${doseDayOffsets[nextDose - 1]})${nextDoseDate ? ` on ${formatRecordDate(nextDoseDate)}` : ''}.` : 'Vaccination schedule complete.'}</p>${completedDoseCount < 5 && latestCompletedAppointment?.id === booking.id ? `<button type="button" class="next-dose-button" data-clinic-id="${escapeHtml(latestRecord?.clinic_id || booking.clinic_id || '')}">Book Dose ${nextDose}${nextDoseDate ? ` for ${formatRecordDate(nextDoseDate)}` : ''}</button>` : ''}</div>
         ${status === 'declined' ? '<p class="booking-status-message">This appointment was declined by the clinic. Please choose another clinic or date.</p>' : status === 'expired' ? '<p class="booking-status-message">This appointment has expired. Please book a new appointment.</p>' : `<div class="booking-steps"><div class="booking-step done"><span><i class="fa-solid fa-check"></i></span><small>Booked</small></div><div class="booking-step ${status === 'pending' ? 'current' : 'done'}"><span>${status === 'pending' ? '<i class="fa-solid fa-clock"></i>' : '<i class="fa-solid fa-check"></i>'}</span><small>${status === 'pending' ? 'Under review' : 'Confirmed'}</small></div><div class="booking-step ${status === 'completed' ? 'done' : ''}"><span>${status === 'completed' ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-solid fa-calendar-day"></i>'}</span><small>${status === 'completed' ? 'Dose recorded' : 'Appointment'}</small></div></div>`}</div>`; }).join('')}</div>`;
       container.innerHTML = bookingMarkup;
       container.querySelectorAll('.view-record-button').forEach(button => button.addEventListener('click', () => { const details = document.getElementById(`full-record-${button.dataset.recordId}`); if (details) details.hidden = !details.hidden; }));
       container.querySelectorAll('.next-dose-button').forEach(button => button.addEventListener('click', () => { const clinic = window.clinicDirectory?.find(item => item.id === button.dataset.clinicId); openBookingModal(clinic?.name || '', clinic?.id || ''); }));
     };
     onSnapshot(query(collection(db, 'vaccination_records'), where('resident_uid', '==', uid)), snapshot => {
-      residentVaccinationRecords = snapshot.docs.map(item => item.data()).sort((first, second) => String(second.date_given || '').localeCompare(String(first.date_given || '')));
+      residentVaccinationRecords = setCurrentVaccinationSession(snapshot.docs.map(item => item.data()).filter(r => r.date_given && (r.source !== 'external' || r.verification_status === 'Verified')).sort((first, second) => String(second.date_given || '').localeCompare(String(first.date_given || ''))));
       recordsLoaded = true;
       renderLiveDoseRecords(residentVaccinationRecords, bookings);
       renderBookings();
@@ -464,24 +471,28 @@ function renderLiveDoseRecords(records, bookings = []) {
   const selectedKeys = new Set([...list.querySelectorAll('.current-dose-checkbox:checked')].map(input => input.dataset.recordKey));
   const recordKey = record => JSON.stringify([record.vaccination_session_id || 'legacy', record.dose_number, record.date_given, record.clinic_id]);
   const completedByDose = new Map(records.map(record => [Number(record.dose_number), record]));
+  bookings = bookings.filter(b => (b.vaccination_session_id || 'legacy') === (currentVaccinationSessionId || 'legacy'));
   const bookingByDose = new Map(bookings.map(booking => [Number(String(booking.dose_label || '').match(/\d+/)?.[0] || 0), booking]));
   list.innerHTML = Array.from({ length: 5 }, (_, index) => {
     const doseNumber = index + 1;
     const completed = completedByDose.get(doseNumber);
     const booking = bookingByDose.get(doseNumber);
     const dayOffset = doseDayOffsets[index];
+    const first = records.find(r => Number(r.dose_number) === 1);
+    const recommended = patientTreatments.find(t => t.vaccination_session_id === (currentVaccinationSessionId || 'legacy'))?.doses?.find(d => d.dose_number === doseNumber)?.recommended_date || booking?.recommended_date || (first?.date_given ? formatInputDate(new Date(first.date_given), dayOffset) : '');
+    const overdue = !completed && recommended && recommended < manilaToday();
     if (completed) {
       const date = formatRecordDate(completed.date_given);
       const clinic = completed.clinic_name || 'Clinic not specified';
       const location = completed.clinic_location ? ` | ${completed.clinic_location}` : '';
       const vaccine = completed.vaccine_name || completed.vaccine_type || 'Vaccine not specified';
       const administrator = completed.administered_by_name ? ` | ${completed.administered_by_name}` : '';
-      return `<div class="dose-record"><input type="checkbox" class="dose-report-checkbox current-dose-checkbox" data-dose-number="${doseNumber}" data-record-key="${escapeHtml(recordKey(completed))}" aria-label="Select Dose ${doseNumber} for report" ${selectedKeys.has(recordKey(completed)) ? 'checked' : ''}><div class="dose-circle done-circle"><i class="fa-solid fa-check"></i></div><div class="dose-record-info"><h4>Dose ${doseNumber} - Day ${dayOffset}</h4><p>${escapeHtml(date)} | ${escapeHtml(clinic)}${escapeHtml(location)} | ${escapeHtml(vaccine)}${escapeHtml(administrator)}</p></div><div class="dose-record-status"><span class="r-done">Completed</span><button type="button" class="completed-dose-button" data-completed-dose="${doseNumber}" aria-haspopup="dialog">View dose <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button></div></div>`;
+      return `<div class="dose-record"><input type="checkbox" class="dose-report-checkbox current-dose-checkbox" data-dose-number="${doseNumber}" data-record-key="${escapeHtml(recordKey(completed))}" aria-label="Select Dose ${doseNumber} for report" ${selectedKeys.has(recordKey(completed)) ? 'checked' : ''}><div class="dose-circle done-circle"><i class="fa-solid fa-check"></i></div><div class="dose-record-info"><h4>Dose ${doseNumber} - Day ${dayOffset}</h4><p>${escapeHtml(date)} | ${escapeHtml(clinic)}${escapeHtml(location)} | ${escapeHtml(vaccine)}${escapeHtml(administrator)}</p></div><div class="dose-record-status"><span class="r-done">${completed.source === 'external' || /verified previous record|verified history|verified past dose/i.test(completed.status || '') ? 'Completed (Verified History)' : 'Completed'}</span><button type="button" class="completed-dose-button" data-completed-dose="${doseNumber}" aria-haspopup="dialog">View dose <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button></div></div>`;
     }
     if (booking && ['pending', 'confirmed'].includes(booking.status)) {
-      return `<div class="dose-record"><div class="dose-circle next-circle"><i class="fa-regular fa-calendar"></i></div><div class="dose-record-info"><h4>Dose ${doseNumber} - Day ${dayOffset}</h4><p>Scheduled: ${escapeHtml(booking.preferred_date || '')} at ${escapeHtml(booking.preferred_time || '')} | ${escapeHtml(booking.clinic_name || 'Clinic')}</p></div><div class="dose-record-status"><span class="r-next">${booking.status === 'confirmed' ? 'Confirmed' : 'Upcoming'}</span></div></div>`;
+      return `<div class="dose-record"><div class="dose-circle next-circle"><i class="fa-regular fa-calendar"></i></div><div class="dose-record-info"><h4>Dose ${doseNumber} - Day ${dayOffset}</h4><p>Scheduled: ${escapeHtml(booking.preferred_date || '')} at ${escapeHtml(booking.preferred_time || '')} | ${escapeHtml(booking.clinic_name || 'Clinic')}</p></div><div class="dose-record-status"><span class="r-next">${overdue ? 'Overdue' : 'Upcoming'}</span></div></div>`;
     }
-    return `<div class="dose-record"><div class="dose-circle pending-circle">${doseNumber}</div><div class="dose-record-info"><h4>Dose ${doseNumber} - Day ${dayOffset}</h4><p>Not yet scheduled</p></div><div class="dose-record-status"><span class="r-pending">Pending</span></div></div>`;
+    return `<div class="dose-record"><div class="dose-circle pending-circle">${doseNumber}</div><div class="dose-record-info"><h4>Dose ${doseNumber} - Day ${dayOffset}</h4><p>${recommended ? 'Recommended: ' + escapeHtml(recommended) : 'Not yet scheduled'}</p></div><div class="dose-record-status"><span class="r-pending">${overdue ? 'Overdue' : 'Pending'}</span></div></div>`;
   }).join('');
   if (list.querySelector('.current-dose-checkbox')) {
     list.insertAdjacentHTML('afterbegin', '<p class="dose-selection-help">Select completed doses to preview and print a report.</p>');
@@ -537,6 +548,10 @@ function updateVaccinationProgress(records) {
     .map(record => Number(record.dose_number || 0))
     .filter(doseNumber => doseNumber >= 1 && doseNumber <= 5));
   completedDoseCount = completedDoses.size;
+  const next = [1,2,3,4,5].find(n => !completedDoses.has(n));
+  const due = patientTreatments.find(t => t.vaccination_session_id === (currentVaccinationSessionId || 'legacy'))?.doses?.find(d => d.dose_number === next)?.recommended_date || (firstDoseDate && next ? formatInputDate(firstDoseDate, doseDayOffsets[next - 1]) : '');
+  const nextLabel = document.getElementById('nextDoseLabel');
+  if (nextLabel) nextLabel.textContent = next ? 'Next: Dose ' + next + (due ? ' on ' + formatRecordDate(due) : ' - awaiting clinical schedule confirmation') : 'Vaccination treatment complete';
   const total = 5;
   const pct = Math.round((completedDoseCount / total) * 100);
   const activeDoses = document.getElementById('activeDosesCount');
@@ -554,11 +569,12 @@ function updateVaccinationProgress(records) {
   for (let doseNumber = 1; doseNumber <= total; doseNumber++) {
     const pip = document.getElementById(`pip${doseNumber}`);
     if (!pip) continue;
-    pip.className = completedDoses.has(doseNumber) ? 'dose-pip done' : doseNumber === completedDoseCount + 1 ? 'dose-pip current' : 'dose-pip';
+    pip.className = completedDoses.has(doseNumber) ? 'dose-pip done' : doseNumber === [1,2,3,4,5].find(n => !completedDoses.has(n)) ? 'dose-pip current' : 'dose-pip';
   }
 }
 
 function setCurrentVaccinationSession(records) {
+  records = records.filter(r => r.date_given && (r.source !== 'external' || r.verification_status === 'Verified'));
   if (!records.length) {
     currentVaccinationSessionId = '';
     return records;
@@ -638,28 +654,14 @@ function loadVaccinationDocuments(uid) {
   const container = document.getElementById('vaccinationDocuments');
   if (!container) return;
   vaccinationDocumentsUnsubscribe?.();
-  const completedDoses = new Set(residentVaccinationRecords.map(record => Number(record.dose_number || 0))).size;
-  const courseComplete = completedDoses >= doseDayOffsets.length;
   const controls = document.getElementById('uploadDocumentControls');
   const help = document.getElementById('vaccinationDocumentHelp');
-  if (!courseComplete) {
-    residentVaccinationDocuments = [];
-    container.innerHTML = '<p class="documents-empty">Document upload unlocks when Dose 5 has been recorded.</p>';
-    if (controls) controls.hidden = true;
-    if (help) help.textContent = `Complete all 5 doses to unlock document upload (${completedDoses}/5 recorded).`;
-  }
-  if (help && courseComplete) help.textContent = 'Upload one completed vaccination card for clinic verification. You can delete it and choose a replacement if needed.';
+  if (controls) controls.hidden = false;
+  if (help) help.textContent = 'Upload a vaccination card for clinic verification of external doses. Uploads do not count as administered doses.';
   const documentsQuery = query(collection(db, 'vaccination_documents'), where('resident_uid', '==', uid));
   const renderDocumentList = documents => {
     residentVaccinationDocuments = documents;
     renderPreviousVaccinationRecords(allResidentVaccinationRecords);
-    // Keep the new course's document area locked, but do not stop the query:
-    // previous completed courses still need to show their own uploaded photo.
-    if (!courseComplete) {
-      container.innerHTML = '<p class="documents-empty">Document upload unlocks when Dose 5 has been recorded.</p>';
-      if (controls) controls.hidden = true;
-      return;
-    }
     documents = documents
       .sort((first, second) => (second.uploaded_at?.toMillis?.() || 0) - (first.uploaded_at?.toMillis?.() || 0));
     if (!documents.length) {
@@ -688,7 +690,7 @@ function loadVaccinationDocuments(uid) {
     // into the current course's record panel.
     allResidentVaccinationDocuments = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
     const documents = allResidentVaccinationDocuments
-      .filter(document => document.vaccination_session_id === currentVaccinationSessionId);
+      .filter(document => (document.vaccination_session_id || 'legacy') === (currentVaccinationSessionId || 'legacy'));
     renderPreviousVaccinationRecords(allResidentVaccinationRecords);
     if (documents.length) {
       renderDocumentList(documents);
@@ -710,7 +712,7 @@ function loadVaccinationDocuments(uid) {
 }
 
 async function deleteVaccinationDocument(documentId) {
-  if (!documentId || !currentUid || !confirm('Delete this uploaded vaccination document?')) return;
+  if (!documentId || !currentUid || !await confirmDialog('Delete this uploaded vaccination document?')) return;
   try {
     const documentSnap = await getDoc(doc(db, 'vaccination_documents', documentId));
     if (!documentSnap.exists() || documentSnap.data().resident_uid !== currentUid) throw new Error('This document is no longer available.');
@@ -727,7 +729,7 @@ async function deleteVaccinationDocument(documentId) {
     localStorage.removeItem(`vaccination-document-${currentUid}`);
   } catch (error) {
     console.error('Failed to delete vaccination document:', error);
-    alert('Could not delete the document: ' + error.message);
+    notifyDialog('Could not delete the document: ' + error.message);
   }
 }
 
@@ -941,6 +943,7 @@ function listenToAnimalExposure() {
 function listenToDashboardAnalytics() {
   onSnapshot(doc(db, 'system_settings', 'live_analytics'), snapshot => {
     const data = snapshot.exists() ? snapshot.data() : {};
+    renderLiveCaptions(data);
     const monthlyCases = Array.isArray(data.monthlyCases) ? data.monthlyCases : Array(12).fill(0);
     const monthlyVaccinations = Array.isArray(data.monthlyVaccinations) ? data.monthlyVaccinations : Array(12).fill(0);
     if (window.residentMonthlyChart) {
@@ -1110,6 +1113,8 @@ function doseLevelFromLabel(label, fallback = 1) {
 // but never blocked: a resident catching up must be able to book a later dose
 // even if an earlier one was never recorded by a clinic.
 function earliestBookingDate(doseLevel) {
+  const reviewed = patientTreatments.find(t => t.vaccination_session_id === (currentVaccinationSessionId || 'legacy'))?.doses?.find(d => d.dose_number === doseLevel)?.recommended_date;
+  if (reviewed) return [manilaToday(), reviewed].sort().pop();
   if (!firstDoseDate || doseLevel <= 1 || doseLevel > doseDayOffsets.length) {
     return manilaToday();
   }
@@ -1197,12 +1202,13 @@ function openBookingModal(clinic, clinicId = '') {
   const select = document.getElementById('modalClinic');
   const directory = window.clinicDirectory || [];
   selectedClinic = directory.find(item => item.id === clinicId) || directory.find(item => item.name === clinic) || directory.find(item => item.id === select.value);
-  if (!selectedClinic) { alert('Choose a clinic from the map or directory first.'); return; }
+  if (!selectedClinic) { notifyDialog('Choose a clinic from the map or directory first.'); return; }
   select.value = selectedClinic.id;
   document.getElementById('bookingClinicName').textContent = selectedClinic.name;
-  const nextDose = completedDoseCount >= doseDayOffsets.length ? 1 : Math.min(5, completedDoseCount + 1);
+  const nextDose = [1,2,3,4,5].find(n => !residentVaccinationRecords.some(r => Number(r.dose_number) === n && r.date_given));
+  if (!nextDose) { notifyDialog('This treatment is complete. Contact clinic staff for a new exposure assessment.'); return; }
   selectedDose = 'Dose ' + nextDose + ' (Day ' + doseDayOffsets[nextDose - 1] + ')';
-  if (completedDoseCount >= doseDayOffsets.length) currentVaccinationSessionId = crypto.randomUUID();
+
   const date = document.getElementById('modalDate');
   date.min = earliestBookingDate(nextDose);
   date.value = date.min;
@@ -1266,28 +1272,14 @@ function filterMap(btn) {
 async function handleUpload(input) {
   const file = input.files[0];
   if (!file || !currentUid) return;
-  if (new Set(residentVaccinationRecords.map(record => Number(record.dose_number || 0))).size < doseDayOffsets.length) {
-    alert('You can upload a vaccination document only after all 5 doses are recorded.');
-    input.value = '';
-    return;
-  }
-  if (clinic.status === 'out') {
-    msgEl.style.display = 'block';
-    msgEl.style.background = '#fff5f5';
-    msgEl.style.color = '#ef0000';
-    msgEl.style.border = '1px solid #fecaca';
-    msgEl.textContent = 'This clinic is out of stock. Please choose another clinic with vaccines available.';
-    resetBookingButton();
-    return;
-  }
   if (file.size > 10 * 1024 * 1024) {
-    alert('Please choose a file smaller than 10 MB.');
+    notifyDialog('Please choose a file smaller than 10 MB.');
     input.value = '';
     return;
   }
   const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
   if (!allowedTypes.includes(file.type)) {
-    alert('Please upload a PDF, JPG, or PNG file.');
+    notifyDialog('Please upload a PDF, JPG, or PNG file.');
     input.value = '';
     return;
   }
@@ -1301,7 +1293,7 @@ async function handleUpload(input) {
     const documentData = {
       id: replaceId || `local-${Date.now()}`,
       resident_uid: currentUid,
-      vaccination_session_id: currentVaccinationSessionId,
+      vaccination_session_id: currentVaccinationSessionId || 'legacy',
       file_name: file.name,
       file_type: file.type,
       file_size: file.size,
@@ -1319,10 +1311,10 @@ async function handleUpload(input) {
       uploaded_at: { localDate: new Date().toLocaleString() }
     }));
     loadVaccinationDocuments(currentUid);
-    alert(replaceId ? 'Vaccination document replaced successfully.' : 'Vaccination document uploaded successfully.');
+    notifyDialog(replaceId ? 'Vaccination document replaced successfully.' : 'Vaccination document uploaded successfully.');
   } catch (error) {
     console.error('Failed to upload vaccination document:', error);
-    alert('Could not upload the document: ' + error.message);
+    notifyDialog('Could not upload the document: ' + error.message);
   } finally {
     if (uploadBox) uploadBox.textContent = 'Click to upload or drag & drop';
     delete input.dataset.replaceId;
@@ -1470,17 +1462,14 @@ document.addEventListener('DOMContentLoaded', function() {
   notificationsCard?.addEventListener('click', () => showTab('notifications', document.getElementById('nav-notif')));
 
   onAuthStateChanged(auth, (user) => {
-    if (user) {
-      fetchUserProfile(user.uid).then((profile) => {
-        if (!profile || profile.role !== 'resident') {
-          alert('This account does not have resident access.');
-          signOutUser().then(() => window.location.href = 'login.html');
-          return;
-        }
+    // The independent session guard owns visibility and routing.
+    if (user && !sessionIsTerminated()) {
+      fetchUserProfile(user.uid).then(profile => {
+        if (profile?.role !== 'resident' || auth.currentUser?.uid !== user.uid || sessionIsTerminated()) return;
         loadResidentDashboard(user.uid, profile);
+      }).catch(error => {
+        console.error('Could not initialize resident dashboard:', error);
       });
-    } else {
-      window.location.href = 'login.html';
     }
   });
 
@@ -1502,3 +1491,5 @@ setInterval(() => {
     renderUpcomingAppointments(bookings);
   }
 }, 1000);
+
+setInterval(() => { if (currentUid) renderLiveDoseRecords(residentVaccinationRecords, residentAppointments); }, 60000);

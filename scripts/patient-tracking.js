@@ -1,4 +1,6 @@
-import { watchDoseStock, saveStockDose } from './dose-completion.js';
+import { notifyDialog, confirmDialog } from './app-dialogs.js';
+import { protectPage } from './role-guard.js';
+import { watchDoseStock, saveStockDose, reviewTreatment } from './dose-completion.js';
 import { manageAppointment } from './appointment-intake.js';
 import { courseKey, courseStatus } from './patient-course.js';
 import { auth, db, fetchUserProfile } from './firebase.js';
@@ -7,6 +9,8 @@ import {
   collection, query, where, orderBy, getDocs,
   doc, updateDoc, addDoc, serverTimestamp, getDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+protectPage('clinic_staff');
 
 function manilaToday() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -18,6 +22,8 @@ let activeAppointment = null;
 
 let patientAppointments = [], patientVaccinations = [], patientIntakes = [];
 let patientUnsubscribes = [], patientTimer;
+const crossClinicListeners = new Map();
+const crossClinicRecords = new Map();
 function startPatientListeners() {
  patientUnsubscribes.forEach(unsubscribe => unsubscribe());
  clearInterval(patientTimer);
@@ -25,7 +31,14 @@ function startPatientListeners() {
  patientUnsubscribes = ['appointments','vaccination_records','patient_records'].map(name =>
   onSnapshot(query(collection(db,name),where('clinic_id','==',currentClinicId)), snapshot => {
    const rows = snapshot.docs.map(item => ({...item.data(),id:item.id}));
-   if(name === 'appointments') patientAppointments = rows;
+   if(name === 'appointments') {
+     patientAppointments = rows;
+     for(const uid of new Set(rows.map(a=>a.resident_uid).filter(Boolean))) if(!crossClinicListeners.has(uid)) {
+       crossClinicListeners.set(uid,onSnapshot(query(collection(db,'vaccination_records'),where('resident_uid','==',uid)),snapshot=>{
+         crossClinicRecords.set(uid,snapshot.docs.map(d=>({...d.data(),id:d.id})));loadPatients();
+       }));
+     }
+   }
    if(name === 'vaccination_records') patientVaccinations = rows;
    if(name === 'patient_records') patientIntakes = rows;
    loadPatients();
@@ -41,7 +54,7 @@ function loadPatients() {
  }
  const patients = [...groups.values()].map(group => {
   const appointments = patientAppointments.filter(item => courseKey(item) === group.key);
-  const records = patientVaccinations.filter(item => courseKey(item) === group.key);
+  const records = (crossClinicRecords.get(group.source.resident_uid) || patientVaccinations).filter(item => courseKey(item) === group.key && item.date_given && (item.source !== 'external' || item.verification_status === 'Verified'));
   const intake = patientIntakes.find(item => courseKey(item) === group.key);
   if (!intake && !records.length && !appointments.some(item => item.status === 'in_progress')) return null;
   const source = intake || appointments.find(item=>item.intake_completed_at) || group.source;
@@ -58,7 +71,7 @@ function loadPatients() {
  document.getElementById('patientResultCount').textContent = visible.length + ' of ' + patients.length + ' patient courses';
  grid.innerHTML = visible.map((patient,index) => {
   const source=patient.source, pct=patient.doses*20;
-  const fields = {bite_type:'Exposure type',animal_type:'Animal',wound_washed:'Wound washed',bite_body_part:'Body part',bite_date:'Date of bite',patient_age:'Age',patient_sex:'Sex'};
+  const fields = {bite_type:'Exposure type',animal_type:'Animal',wound_washed:'Wound washed',bite_body_part:'Body part',bite_date:'Date of bite',date_of_birth:'Date of birth',patient_age:'Age',patient_sex:'Sex'};
   const details = Object.entries(fields).map(([key,label])=>'<div><dt>'+label+'</dt><dd>'+displayValue(source[key])+'</dd></div>').join('');
   return '<article class="patient-card"><div class="patient-header"><h3>'+escapeHtml(source.resident_name||'Resident')+'</h3><span class="course-status '+patient.status+'">'+patient.status.charAt(0).toUpperCase()+patient.status.slice(1)+'</span></div><div class="treatment-section"><label>Treatment progress</label><span class="doses-badge">'+patient.doses+'/5 doses</span><div class="progress-bar-container"><div class="progress-bar" style="width:'+pct+'%"></div></div></div><p class="course-note">'+escapeHtml(patient.note)+'</p><details class="patient-intake-details"><summary>Patient intake details</summary><dl>'+details+'</dl></details>'+(patient.appointment ? '<button class="view-record-btn" data-patient-index="'+index+'">View Full Record</button>':'')+'</article>';
  }).join('') || '<p class="patient-empty">No patients match these filters.</p>';
@@ -75,7 +88,7 @@ async function loadAppointments() {
     collection(db, 'appointments'),
     where('clinic_id', '==', clinicId)
   ));
-  const today = new Date().toISOString().split('T')[0];
+  const today = manilaToday();
   const scheduledAppointments = snap.docs.filter((appointment) => {
     const data = appointment.data();
     return ['confirmed', 'in_progress'].includes(data.status)
@@ -102,6 +115,7 @@ async function loadAppointments() {
     const card = buildScheduledApptCard(docSnap.id, d);
     list.appendChild(card);
     card.querySelector('.view-appt-details').addEventListener('click', () => openRecordModal(docSnap.id));
+    card.querySelector('.complete-dose-btn')?.addEventListener('click', () => openRecordModal(docSnap.id, true));
   });
 }
 
@@ -116,8 +130,9 @@ function buildScheduledApptCard(id, d) {
       <div class="appt-tags"><span class="tag tag-dose">${escapeHtml(d.dose_label || 'Dose 1')}</span><span class="tag tag-time"><i class="fa-regular fa-clock"></i> ${escapeHtml(d.preferred_time || '')}</span></div>
     </div>
     <div class="appt-status-col">
-      <span class="status-badge scheduled">${escapeHtml(d.status || 'confirmed')}</span>
+      <span class="status-badge scheduled">${d.status === 'in_progress' ? 'Ongoing' : 'Confirmed'}</span>
       <button class="mark-btn view-appt-details" type="button"><i class="fa-regular fa-id-card"></i> View Details</button>
+      ${d.status === 'in_progress' && d.intake_completed_at ? '<button class="mark-btn complete-dose-btn" type="button"><i class="fa-solid fa-syringe"></i> Complete Dose</button>' : ''}
     </div>`;
   return card;
 }
@@ -212,12 +227,12 @@ window.confirmAppt = async function(apptId) {
   } catch (err) {
     btn.disabled = false;
     btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Confirm';
-    alert('Error: ' + err.message);
+    notifyDialog('Error: ' + err.message);
   }
 };
 
 window.declineAppt = async function(apptId) {
-  if (!confirm('Decline this appointment?')) return;
+  if (!await confirmDialog('Decline this appointment?')) return;
 
   try {
     await updateDoc(doc(db, 'appointments', apptId), {
@@ -250,7 +265,7 @@ window.declineAppt = async function(apptId) {
 
     showToast('Appointment declined.');
   } catch (err) {
-    alert('Error: ' + err.message);
+    notifyDialog('Error: ' + err.message);
   }
 };
 
@@ -287,11 +302,11 @@ function displayValue(value) {
   return value === null || value === undefined || value === '' ? 'Not provided' : escapeHtml(String(value));
 }
 
-async function openRecordModal(id) {
+async function openRecordModal(id, focusCompletion = false) {
   try {
     const appointmentSnap = await getDoc(doc(db, 'appointments', id));
     if (!appointmentSnap.exists()) {
-      alert('This patient record is no longer available.');
+      notifyDialog('This patient record is no longer available.');
       return;
     }
     const appointment = appointmentSnap.data();
@@ -360,13 +375,15 @@ async function openRecordModal(id) {
     document.getElementById('completionDose').readOnly = true;
     document.getElementById('completionDose').value = Number(String(appointment.dose_label || '1').match(/\d+/)?.[0] || 1);
     watchDoseStock(currentClinicId);
+    reviewTreatment(document.getElementById('completionAppointmentId').value);
     document.getElementById('completionLocation').value = appointment.clinic_address || '';
     document.getElementById('editRecordBtn').hidden = Boolean(activeAppointment?.intake_completed_at);
     const modal = document.getElementById('recordModal');
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
+    if (focusCompletion && !completionForm.hidden) requestAnimationFrame(() => { completionForm.scrollIntoView({ block: 'start', behavior: 'smooth' }); document.getElementById('completionDate').focus({ preventScroll: true }); });
   } catch (error) {
-    alert('Failed to load patient record: ' + error.message);
+    notifyDialog('Failed to load patient record: ' + error.message);
   }
 }
 
@@ -389,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('doseCompletionForm').addEventListener('submit', async event => {
     event.preventDefault();
-    const doseNumber = Number(document.getElementById('completionDose').value);
+    const doseNumber = Number(document.getElementById('completionDose').dataset.doseNumber);
     try {
       if (!await saveStockDose(currentClinicId)) return;
       closeRecordModal();
@@ -397,7 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
       await loadAppointments();
       await loadPatients();
     } catch (error) {
-      alert('Failed to record dose: ' + error.message);
+      notifyDialog('Failed to record dose: ' + error.message);
     }
   });
   modal.addEventListener('click', event => {
@@ -407,12 +424,12 @@ document.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     const biteDate = document.getElementById('editBiteDate').value;
     if (biteDate && biteDate > manilaToday()) {
-      alert('Date of bite must be today or earlier.');
+      notifyDialog('Date of bite must be today or earlier.');
       return;
     }
     const appointmentId = document.getElementById('recordAppointmentId').value;
     if (!appointmentId || appointmentId === 'appointments') {
-      alert('This patient record is missing a valid appointment ID. Please close it and open the appointment again.');
+      notifyDialog('This patient record is missing a valid appointment ID. Please close it and open the appointment again.');
       return;
     }
     try {
@@ -443,7 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('editRecordBtn').hidden = Boolean(activeAppointment?.intake_completed_at);
       showToast('Patient record saved.');
     } catch (error) {
-      alert('Failed to save patient record: ' + error.message);
+      notifyDialog('Failed to save patient record: ' + error.message);
     }
   });
 });

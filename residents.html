@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="scripts/session-navigation.js"></script>
+  <script type="module" src="scripts/resident-session-guard.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Resident Dashboard - Anti-Rabies Locator</title>
@@ -11,7 +13,7 @@
  
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <style>
-      /* ── PUBLIC HEALTH HUB SECTION ──────────────────────────── */
+      /* ── PUBLIC HEALTH HUB SECTION ── */
       .public-hub {
         padding: 0 40px 50px;
         width: 1450px;
@@ -166,7 +168,7 @@
         align-items: center;
       }
 
-      /* ── MODULE 2.5: DATA VISUALIZATION ────────────────────── */
+      /* ── DATA VISUALIZATION ── */
       .viz-grid {
         display: grid;
         grid-template-columns: 3fr 2fr;
@@ -552,6 +554,7 @@
     </div>
     <div style="display:flex;gap:18px;margin-top:14px;padding:12px 16px;background:#f9fafb;border-radius:12px;border:1px solid #ddd;flex-wrap:wrap;">
       <span style="font-size:13px;font-weight:bold;color:#374151;align-self:center;">Legend:</span>
+      <button type="button" class="nearest-clinic-button" aria-controls="googleMapOverview"><i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i> Nearest Clinic</button>
       <span style="font-size:13px;color:#374151;display:flex;align-items:center;gap:6px;">
         <span style="width:14px;height:14px;background:#00b140;border-radius:50%;display:inline-block;"></span>Vaccines Available
       </span>
@@ -569,7 +572,7 @@
   </div>
 </div>
 
-    <!-- ---- STATE A: NEW RESIDENT (no vaccination history) ---- -->
+    <!-- STATE A NEW RESIDENT  -->
     <div id="view-new" style="display:none;" hidden>
 
       <!-- MAP + BOOK APPOINTMENT -->
@@ -881,36 +884,12 @@
       <div class="viz-bottom-row">
         <div class="viz-mini-card">
           <h4><i class="fa-solid fa-paw" style="color:#e60000;margin-right:6px;"></i>Exposure by Animal Source</h4>
-          <div class="donut-wrap" id="animalExposureChart">
-            <svg class="donut-svg" width="90" height="90" viewBox="0 0 36 36">
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e2e8f0" stroke-width="3.8"/>
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e60000" stroke-width="3.8" stroke-dasharray="42.7 57.3" stroke-dashoffset="25" />
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#d98a00" stroke-width="3.8" stroke-dasharray="12.6 87.4" stroke-dashoffset="-17.7" />
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#00b140" stroke-width="3.8" stroke-dasharray="5 95" stroke-dashoffset="-30.3" />
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#6b7280" stroke-width="3.8" stroke-dasharray="2.5 97.5" stroke-dashoffset="-35.3" />
-              <text x="18" y="19.5" text-anchor="middle" fill="#0f172a" font-size="5.5" font-weight="700">68%</text>
-              <text x="18" y="24" text-anchor="middle" fill="#94a3b8" font-size="3.5">Dog</text>
-            </svg>
-            <div class="donut-legend">
-              <div class="donut-legend-item"><span class="donut-dot" style="background:#e60000;"></span> Dog — 68%</div>
-              <div class="donut-legend-item"><span class="donut-dot" style="background:#d98a00;"></span> Cat — 20%</div>
-              <div class="donut-legend-item"><span class="donut-dot" style="background:#00b140;"></span> Bat — 8%</div>
-              <div class="donut-legend-item"><span class="donut-dot" style="background:#6b7280;"></span> Others — 4%</div>
-            </div>
-          </div>
+          <div class="donut-wrap" id="animalExposureChart"><p>Loading live data...</p></div>
         </div>
 
         <div class="viz-mini-card">
           <h4><i class="fa-solid fa-arrow-trend-up" style="color:#e60000;margin-right:6px;"></i>Case Trend (Jan–Dec 2026)</h4>
-          <div class="trend-bars" id="caseTrendChart">
-            <div class="trend-bar" style="height:38%;background:#00b140;" title="Jan: 12"></div>
-            <div class="trend-bar" style="height:57%;background:#d98a00;" title="Feb: 18"></div>
-            <div class="trend-bar" style="height:47%;background:#00b140;" title="Mar: 15"></div>
-            <div class="trend-bar" style="height:69%;background:#d98a00;" title="Apr: 22"></div>
-            <div class="trend-bar" style="height:60%;background:#d98a00;" title="May: 19"></div>
-            <div class="trend-bar" style="height:75%;background:#e60000;" title="Jun: 24"></div>
-            <div class="trend-bar" style="height:53%;background:#d98a00;" title="Jul: 17"></div>
-          </div>
+          <div class="trend-bars" id="caseTrendChart"><p>Loading live data...</p></div>
           <div class="trend-labels">
             <span class="trend-label">Jan</span><span class="trend-label">Feb</span>
             <span class="trend-label">Mar</span><span class="trend-label">Apr</span>
@@ -919,20 +898,14 @@
           </div>
           <p style="font-size:11px;color:#94a3b8;margin-top:8px;">
             <i class="fa-solid fa-triangle-exclamation" style="color:#e60000;"></i>
-            June peak: 24 cases — highest monthly count in 2026
+            Loading live case trend...
           </p>
         </div>
 
         <div class="viz-mini-card">
           <h4><i class="fa-solid fa-users" style="color:#e60000;margin-right:6px;"></i>Cases by Age Group (2026)</h4>
-          <div class="age-list" id="ageGroupChart">
-            <div class="age-row"><span class="age-label">0–9</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:30%;"></div></div><span class="age-count">18</span></div>
-            <div class="age-row"><span class="age-label">10–19</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:40%;"></div></div><span class="age-count">24</span></div>
-            <div class="age-row"><span class="age-label">20–39</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:55%;"></div></div><span class="age-count">33</span></div>
-            <div class="age-row"><span class="age-label">40–59</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:45%;"></div></div><span class="age-count">27</span></div>
-            <div class="age-row"><span class="age-label">60+</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:22%;"></div></div><span class="age-count">13</span></div>
-          </div>
-          <p style="font-size:11px;color:#94a3b8;margin-top:10px;">Adults 20–39 represent the highest exposure group (26%)</p>
+          <div class="age-list" id="ageGroupChart"><p>Loading live data...</p></div>
+          <p style="font-size:11px;color:#94a3b8;margin-top:10px;">Loading live age data...</p>
         </div>
       </div>
 
@@ -959,7 +932,7 @@
 
       <div class="steps-flow">
         <div class="flow-step"><div class="flow-num">1</div><h4>Find a Clinic</h4><p>Browse available clinics with real-time vaccine stock below</p></div>
-        <div class="flow-step"><div class="flow-num">2</div><h4>Book Appointment</h4><p>Select your preferred date, time, and dose schedule</p></div>
+        <div class="flow-step"><div class="flow-num">2</div><h4>Book Appointment</h4><p>Select your preferred date and time</p></div>
         <div class="flow-step"><div class="flow-num">3</div><h4>Visit the Clinic</h4><p>Arrive on time. Bring booking confirmation</p></div>
         <div class="flow-step"><div class="flow-num">4</div><h4>Get Vaccinated</h4><p>Staff records your dose — your dashboard progress tracker activates automatically</p></div>
       </div>

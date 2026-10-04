@@ -1,5 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js';
 import { firebaseConfig } from './firebase-config.js';
+import { terminateSession } from './session-state.js';
 import { getAuth, onAuthStateChanged, signOut as fbSignOut, setPersistence, browserSessionPersistence } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
 import { getStorage } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js';
 import {
@@ -64,6 +65,8 @@ export { app, auth, db, storage, authPersistenceReady, fetchUserProfile, fetchNo
 // Sign out helper
 async function signOutUser() {
   try {
+    terminateSession();
+    await authPersistenceReady;
     await fbSignOut(auth);
   } catch (err) {
     console.error('signOutUser error', err);

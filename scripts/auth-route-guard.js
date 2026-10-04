@@ -1,4 +1,4 @@
-import { auth, fetchUserProfile, onAuthStateChanged } from './firebase.js';
+import { auth, authPersistenceReady, signOutUser } from './firebase.js';
 import { routes } from './routes.js';
 
 const rolePages = {
@@ -9,14 +9,15 @@ const rolePages = {
 };
 
 export function redirectActiveUserFromPublicPage() {
-  onAuthStateChanged(auth, async user => {
-    if (!user) return;
-    const profile = await fetchUserProfile(user.uid);
-    const destination = rolePages[profile?.role];
-    if (destination && !window.location.pathname.endsWith(`/${destination}`)) {
-      window.location.replace(destination);
-    }
-  });
+  // Public pages stay public. The login form owns fresh sign-in navigation.
+  // Retain this entry point for pages that called the previous redirect guard.
+  if (!window.residentSignOutReady) {
+    window.residentSignOutReady = authPersistenceReady.then(async () => {
+      if (auth.currentUser) await signOutUser();
+    });
+    window.residentSignOutReady.catch(error => console.error('Could not end restored session:', error));
+  }
+  return window.residentSignOutReady;
 }
 
 export function dashboardForRole(role) {

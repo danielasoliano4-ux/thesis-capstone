@@ -1,5 +1,6 @@
+import { notifyDialog, confirmDialog } from './app-dialogs.js';
 import { summarizeStock, clinicStockStatus } from './stock-summary.mjs';
-import { watchDoseStock, saveStockDose } from './dose-completion.js';
+import { watchDoseStock, saveStockDose, reviewTreatment } from './dose-completion.js';
 import { appointmentDeadline, pendingAppointmentExpired } from './booking-status.js';
 import { manageAppointment, markArrivalAndOpenIntake, openIntake } from './appointment-intake.js';
 import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
@@ -204,7 +205,7 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
             const snapshot = await getDoc(doc(db, 'appointments', id));
             if (button.dataset.arriveId) await markArrivalAndOpenIntake(id, snapshot.data());
             else openIntake(id, snapshot.data());
-        } catch (error) { alert(error.message); }
+        } catch (error) { notifyDialog(error.message); }
         finally { button.disabled = false; }
     }, { signal: staffIntakeController.signal });
 
@@ -235,9 +236,9 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
 
 async function acceptStaffAppointment(appointmentId) {
     try { await manageAppointment({ appointment_id: appointmentId, action: 'confirm' });
-      alert('Appointment confirmed. You can now find it in Confirmed Appointments.');
+      notifyDialog('Appointment confirmed. You can now find it in Confirmed Appointments.');
     }
-    catch (error) { alert('Could not confirm appointment: ' + error.message); }
+    catch (error) { notifyDialog('Could not confirm appointment: ' + error.message); }
 }
 
 // Opening the decline dialog replaces the old one-click decline, so staff can
@@ -352,7 +353,7 @@ async function submitDeclineReferral(event) {
         closeDeclineReferral();
         await loadStaffAppointments(currentClinicId);
     } catch (error) {
-        alert('Could not decline appointment: ' + error.message);
+        notifyDialog('Could not decline appointment: ' + error.message);
     } finally {
         if (button) { button.disabled = false; button.innerHTML = '<i class="fa-solid fa-xmark"></i> Decline Appointment'; }
     }
@@ -365,6 +366,7 @@ function openDoseCompletion(appointmentId, appointment) {
     document.getElementById('completionDose').readOnly = true;
     document.getElementById('completionDose').value = Number(String(appointment?.dose_label || '1').match(/\d+/)?.[0] || 1);
     watchDoseStock(currentClinicId);
+    reviewTreatment(document.getElementById('completionAppointmentId').value);
     document.getElementById('completionLocation').value = appointment?.clinic_address || '';
     document.getElementById('doseCompletionModal').style.display = 'flex';
     document.getElementById('doseCompletionModal').setAttribute('aria-hidden', 'false');
@@ -378,7 +380,7 @@ async function completeStaffDose(event) {
         document.getElementById('doseCompletionForm').reset();
         await loadStaffAppointments(currentClinicId);
     } catch (error) {
-        alert('Could not complete dose: ' + error.message);
+        notifyDialog('Could not complete dose: ' + error.message);
     }
 }
 
@@ -391,7 +393,7 @@ function listenToInventory(clinicId) {
         renderInventory();
     }, error => {
         console.error('Failed to load inventory:', error);
-        alert('Failed to load vaccine inventory.');
+        notifyDialog('Failed to load vaccine inventory.');
     });
     return;
     onSnapshot(inventoryQuery, (snapshot) => {
@@ -433,7 +435,7 @@ function listenToInventory(clinicId) {
         }, { merge: true }).catch(error => console.error('Failed to publish clinic stock summary:', error));
     }, (error) => {
         console.error('Failed to load inventory:', error);
-        alert('Failed to load vaccine inventory.');
+        notifyDialog('Failed to load vaccine inventory.');
     });
 }
 
@@ -475,11 +477,14 @@ function renderInventory() {
         if (category.low) lowCount++;
         if (category.expired) expiryCount++;
         const statusLabel = category.expired ? 'expired' : category.archived ? (category.quantity <= 0 ? 'zeroed out' : 'archived') : category.low ? 'low' : 'adequate';
-        return `<tr><td><strong>${escapeHtml(item.type)}</strong></td><td>${escapeHtml(item.manufacturer)}</td><td>${escapeHtml(item.batch)}</td><td><strong>${category.quantity} doses</strong></td><td>${escapeHtml(item.expiry)}${expiryLabel ? `<div class="inventory-warning">${escapeHtml(expiryLabel)}</div>` : ''}</td><td><span class="status ${status}">${statusLabel}</span></td><td><div class="inventory-actions">${category.expired ? '' : `<button type="button" class="update-link" data-edit-id="${item.id}">Update</button><button type="button" class="inventory-action secondary" data-archive-id="${item.id}">${item.archived ? 'Restore' : 'Archive'}</button>`}<button type="button" class="inventory-action" data-delete-id="${item.id}">Delete</button></div></td></tr>`;
-    }).join('') || '<tr><td colspan="7">No inventory batches match this filter.</td></tr>';
+        const vaccine = vaccineBrands.find(brand => brand.value === canonicalVaccineName(item.type || item.brand_name));
+        const brandName = item.brand_name || vaccine?.brand || String(item.type || '').replace(/\s*\([^)]+\)\s*$/, '') || '—';
+        const genericName = item.generic_name || vaccine?.generic || String(item.type || '').match(/\(([^)]+)\)$/)?.[1] || '—';
+        return `<tr><td><strong>${escapeHtml(brandName)}</strong></td><td>${escapeHtml(genericName)}</td><td>${escapeHtml(item.manufacturer)}</td><td>${escapeHtml(item.batch)}</td><td><strong>${category.quantity} doses</strong></td><td>${escapeHtml(item.expiry)}${expiryLabel ? `<div class="inventory-warning">${escapeHtml(expiryLabel)}</div>` : ''}</td><td><span class="status ${status}">${statusLabel}</span></td><td><div class="inventory-actions">${category.expired ? '' : `<button type="button" class="update-link" data-edit-id="${item.id}">Update</button><button type="button" class="inventory-action secondary" data-archive-id="${item.id}">${item.archived ? 'Restore' : 'Archive'}</button>`}<button type="button" class="inventory-action" data-delete-id="${item.id}">Delete</button></div></td></tr>`;
+    }).join('') || '<tr><td colspan="8">No inventory batches match this filter.</td></tr>';
     tbody.querySelectorAll('[data-edit-id]').forEach(button => button.addEventListener('click', () => openModal(button.dataset.editId, inventoryItems.find(item => item.id === button.dataset.editId))));
     tbody.querySelectorAll('[data-archive-id]').forEach(button => button.addEventListener('click', () => updateDoc(doc(db, 'inventory', button.dataset.archiveId), { archived: !inventoryItems.find(item => item.id === button.dataset.archiveId)?.archived, updated_at: serverTimestamp() })));
-    tbody.querySelectorAll('[data-delete-id]').forEach(button => button.addEventListener('click', async () => { if (confirm('Delete this batch permanently?')) await deleteDoc(doc(db, 'inventory', button.dataset.deleteId)); }));
+    tbody.querySelectorAll('[data-delete-id]').forEach(button => button.addEventListener('click', async () => { if (!await confirmDialog('Delete this batch permanently?')) return; button.disabled = true; try { await deleteDoc(doc(db, 'inventory', button.dataset.deleteId)); } catch (error) { await notifyDialog('Could not delete the batch: ' + error.message); } finally { button.disabled = false; } }));
     const total = active.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
     document.getElementById('statTotalStock').textContent = total;
     document.getElementById('statLowStock').textContent = lowCount;
@@ -494,7 +499,7 @@ function escapeHtml(value = '') {
 }
 
 function openModal(docId = '', data = {}) {
-    if (docId && inventoryCategory(data).expired) { alert('Expired vaccine batches cannot be updated.'); return; }
+    if (docId && inventoryCategory(data).expired) { notifyDialog('Expired vaccine batches cannot be updated.'); return; }
     document.getElementById('modalTitle').textContent = docId ? 'Update Stock' : 'Add New Stock';
     document.getElementById('vaccineDocId').value = docId;
     setVaccineSelection(canonicalVaccineName(data.type || data.brand_name));
@@ -522,13 +527,13 @@ modal.addEventListener('click', (event) => {
 vaccineForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!currentClinicId) {
-        alert('Your staff account is not linked to a clinic. Add a clinic_id to your users profile first.');
+        notifyDialog('Your staff account is not linked to a clinic. Add a clinic_id to your users profile first.');
         return;
     }
     const docId = document.getElementById('vaccineDocId').value;
-    if (docId && inventoryCategory(inventoryItems.find(item => item.id === docId) || {}).expired) { alert('This batch has expired and cannot be updated.'); closeModal(); return; }
+    if (docId && inventoryCategory(inventoryItems.find(item => item.id === docId) || {}).expired) { notifyDialog('This batch has expired and cannot be updated.'); closeModal(); return; }
     const selectedVaccine = vaccineBrands.find(item => item.value === vaccineBrandSelect.value);
-    if (!selectedVaccine || selectedVaccine.generic !== vaccineGenericSelect.value) { alert('Select a matching vaccine brand and generic name/type.'); return; }
+    if (!selectedVaccine || selectedVaccine.generic !== vaccineGenericSelect.value) { notifyDialog('Select a matching vaccine brand and generic name/type.'); return; }
     const payload = {
         brand_name: selectedVaccine.brand,
         generic_name: selectedVaccine.generic,
@@ -543,11 +548,11 @@ vaccineForm.addEventListener('submit', async (event) => {
     };
 
     if (payload.expiry <= manilaToday()) {
-        if (!confirm('This batch is already expired. Save it as an archived record?')) return;
+        if (!await confirmDialog('This batch is already expired. Save it as an archived record?')) return;
         payload.archived = true;
     }
     const duplicate = inventoryItems.find(item => item.id !== docId && !item.archived && item.batch?.toLowerCase() === payload.batch.toLowerCase());
-    if (duplicate) { alert('This clinic already has an active record for that batch number. Update the existing batch instead.'); return; }
+    if (duplicate) { notifyDialog('This clinic already has an active record for that batch number. Update the existing batch instead.'); return; }
 
     try {
         if (docId) await updateDoc(doc(db, 'inventory', docId), payload);
@@ -556,7 +561,7 @@ vaccineForm.addEventListener('submit', async (event) => {
     } catch (error) {
         console.error('Error saving vaccine record:', error);
         const reason = error.code ? ` (${error.code})` : '';
-        alert(`Failed to save inventory record${reason}: ${error.message || 'Unknown Firebase error.'}`);
+        notifyDialog(`Failed to save inventory record${reason}: ${error.message || 'Unknown Firebase error.'}`);
     }
 });
 
@@ -567,7 +572,7 @@ document.querySelector('.signout-btn')?.addEventListener('click', async () => {
         await signOutUser();
     } catch (error) {
         console.error('Sign out failed:', error);
-        alert('Could not sign out: ' + (error.message || 'Unknown error.'));
+        notifyDialog('Could not sign out: ' + (error.message || 'Unknown error.'));
         return;
     }
     window.location.replace('login.html');

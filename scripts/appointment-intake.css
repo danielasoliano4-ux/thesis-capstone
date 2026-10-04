@@ -58,3 +58,10 @@
 @media (prefers-reduced-motion: reduce) {
   #appointmentIntakeDialog input, #appointmentIntakeDialog select, #appointmentIntakeDialog button { transition: none; }
 }
+
+#appointmentIntakeDialog .intake-patient-identity { flex: 1; min-width: 0; }
+#appointmentIntakeDialog .intake-name-edit { display: grid; place-items: center; width: 28px; height: 28px; margin: 5px 0 0; padding: 0; border: 1px solid #e2e8f0; border-radius: 7px; background: #fff; color: #64748b; }
+#appointmentIntakeDialog .intake-name-edit:hover { background: #fff1f2; color: #dc2626; border-color: #fecaca; }
+#appointmentIntakeDialog .intake-name-editor { margin-top: 6px; }
+
+#appointmentIntakeDialog #intakeAge { display:block; padding:13px 0; font-weight:600; color:#334155; }

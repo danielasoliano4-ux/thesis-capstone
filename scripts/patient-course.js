@@ -19,7 +19,7 @@ export function courseStatus(appointments, records, now = Date.now()) {
   return {status:'incomplete', doses:doses.size, note:'Follow-up arrival deadline missed'};
  // Use the same Day 0/3/7/14/28 schedule as the resident portal when no booking remains.
  const first = records.find(item => Number(item.dose_number) === 1);
- const date = typeof first?.date_given === 'string' ? first.date_given.slice(0,10) : first?.date_given?.toDate?.().toLocaleDateString('en-CA',{timeZone:'Asia/Manila'});
+ const date = first?.source === 'external' ? null : typeof first?.date_given === 'string' ? first.date_given.slice(0,10) : first?.date_given?.toDate?.().toLocaleDateString('en-CA',{timeZone:'Asia/Manila'});
  const due = date ? Date.parse(date + 'T00:00:00+08:00') + [0,3,7,14,28][next-1]*86400000 : NaN;
  if (doses.size && Number.isFinite(due) && now >= due + 86400000) return {status:'incomplete',doses:doses.size,note:'Follow-up dose is overdue; no arrival recorded'};
  return {status:'ongoing',doses:doses.size,note:doses.size ? 'Course in progress; awaiting next dose' : 'Patient intake and treatment in progress'};

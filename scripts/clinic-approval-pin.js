@@ -1,8 +1,9 @@
+import { notifyDialog } from './app-dialogs.js';
 export function viewClinicPin(clinic) {
   if (!clinic || !Number.isFinite(clinic.lat) || !Number.isFinite(clinic.lng)) {
-    alert('No clinic-selected location is available for this record.'); return;
+    notifyDialog('No clinic-selected location is available for this record.'); return;
   }
-  if (!window.L) { alert('The map could not load. Check your connection and try again.'); return; }
+  if (!window.L) { notifyDialog('The map could not load. Check your connection and try again.'); return; }
   const dialog = document.createElement('dialog');
   dialog.className = 'clinic-pin-dialog';
   dialog.setAttribute('aria-label', 'Clinic location');

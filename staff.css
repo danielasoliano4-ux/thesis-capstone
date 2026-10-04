@@ -550,7 +550,7 @@ tbody td {
 
 /* Keep batch selection and dose forms accessible within short viewports. */
 #doseCompletionForm label:has(#completionVaccine) { grid-column: 1 / -1; min-width: 0; }
-#doseCompletionForm #completionVaccine { height: 156px; min-height: 156px; max-width: 100%; padding: 6px; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; background: #fff; font-size: 14px; font-weight: 400; }
+#doseCompletionForm #completionVaccine { height: 50px; min-height: 50px; max-width: 100%; padding: 12px; background: #fff; font-size: 14px; font-weight: 400; }
 #completionVaccine option { padding: 10px 12px; min-height: 34px; border-radius: 5px; }
 #completionVaccineHint { font-size: 12px; font-weight: 400; line-height: 1.5; color: #64748b; }
 .record-modal-content, .dose-completion-modal-content { box-sizing: border-box; max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; -webkit-overflow-scrolling: touch; }
@@ -559,3 +559,10 @@ tbody td {
 .vaccine-identity-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .vaccine-identity-grid select { width: 100%; min-width: 0; }
 @media (max-width: 540px) { .vaccine-identity-grid { grid-template-columns: 1fr; } }
+
+#treatmentReview { grid-column: 1 / -1; width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; }
+#treatmentReview p { margin: 8px 0; line-height: 1.5; }
+#treatmentReview details { margin: 12px 0; }
+#treatmentReview summary { cursor: pointer; font-weight: 600; }
+#treatmentReview input[type="checkbox"] { width: auto; }
+#treatmentReview textarea { width: 100%; min-height: 64px; }

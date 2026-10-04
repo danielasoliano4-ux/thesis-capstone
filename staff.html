@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="/scripts/session-navigation.js"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
@@ -13,6 +14,7 @@
     <link rel="stylesheet" href="staff.css"/>
     <link rel="stylesheet" href="responsive.css">
 <link rel="stylesheet" href="clinic-layout.css">
+    <link rel="stylesheet" href="dose-completion.css">
 </head>
 <body class="clinic-dashboard">
 
@@ -46,31 +48,25 @@
                     <span>Total Stock</span>
                     <h2 id="statTotalStock">0</h2>
                 </div>
-
                 <i class="fa-solid fa-cube blue"></i>
-
             </div>
 
             <!-- CARD -->
             <div class="stat-card">
-
                 <div>
                     <span>Active Patients</span>
                     <h2 id="statActivePatients" aria-live="polite">Loading...</h2>
                 </div>
 
                 <i class="fa-solid fa-user-group green"></i>
-
             </div>
 
             <!-- CARD -->
             <div class="stat-card">
-
                 <div>
                     <span>Low Stock Items</span>
                     <h2 id="statLowStock" class="red-text">0</h2>
                 </div>
-
                 <i class="fa-solid fa-triangle-exclamation red"></i>
 
             </div>
@@ -141,30 +137,23 @@
 
                     <!-- ALERT -->
                     <div class="alert-box">
-
                     <div class="alert-title">
-
                         <i class="fa-solid fa-triangle-exclamation"></i>
-
                         <h3>Stock Alert</h3>
-
                     </div>
 
                     <p>
                         1 critical and 1 low stock items require immediate attention.
                     </p>
-
                     </div>
 
                     <!-- TABLE -->
                     <div class="table-container">
-
                     <table>
-
                         <thead>
-
                             <tr>
-                                <th>VACCINE TYPE</th>
+                                <th>VACCINE BRAND NAME</th>
+                                <th>GENERIC NAME/TYPE</th>
                                 <th>MANUFACTURER</th>
                                 <th>BATCH NUMBER</th>
                                 <th>QUANTITY</th>
@@ -248,8 +237,8 @@
                 <div class="dose-completion-grid">
                     <label>Administration Date<input id="completionDate" type="date" required></label>
                     <label>Dose Number<input id="completionDose" type="number" min="1" max="5" required></label>
-                    <label class="full-field">Vaccine / Batch<select id="completionVaccine" size="4" aria-describedby="completionVaccineHint" required><option value="">Select vaccine / batch...</option></select><small id="completionVaccineHint">Scroll the list to see more batches, then select one.</small></label>
-                    <label class="full-field">Clinic Location<input id="completionLocation" required></label>
+                    <label class="full-field">Vaccine / Batch<select id="completionVaccine" aria-describedby="completionVaccineHint" required><option value="">Select vaccine / batch...</option></select><small id="completionVaccineHint">Select an available vaccine and batch.</small></label>
+Suspended in the air. I hate myself breathing hanging by your throat, my hardest barely beat it. I haven't fallen death, but I feel it coming tell me what it be too much to ask if you break it to me gently it wake in the next day with our shine and who I hold on to today. Tomorrow will charge be a memory and then I will apart all of this and wonder why I are stated here just to watch you disappear and let it go how do I work before it's too late I'll take a step away I know one wordful may me go rushing back to you so I'll rush in my eyes forget that you were mine how do you go from making on your home and let me take it in before it takes in far me on my rest of the future you promise now that I never even had I have every reason to miss and I don't know where I can find the strings go when the only life I've come to know bags and lift me alone forget that you were mine                    <label class="full-field">Clinic Location<input id="completionLocation" required></label>
                 </div>
                 <button type="submit" class="add-btn dose-completion-submit"><i class="fa-solid fa-syringe"></i> Complete Dose</button>
             </form>

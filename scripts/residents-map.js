@@ -1,3 +1,4 @@
+import { notifyDialog } from './app-dialogs.js';
 import { simplifyStockText, clinicStockStatus } from './stock-summary.mjs';
 import { auth, db, onAuthStateChanged, fetchUserProfile } from './firebase.js';
 import { clinicBooking } from './booking-status.js';
@@ -415,7 +416,7 @@ let locationWatchId = null;
 // the viewport unless the resident explicitly pressed the location control.
 let centerOnNextLocationUpdate = false;
 function locateUser(centerMap = true) {
-  if (!navigator.geolocation) return alert('Location is not supported by this browser.');
+  if (!navigator.geolocation) return notifyDialog('Location is not supported by this browser.');
   centerOnNextLocationUpdate = centerMap;
   if (centerMap && userLocation) {
     mapsData.forEach(entry => entry.map.setView(userLocation, 17));
@@ -433,7 +434,7 @@ function locateUser(centerMap = true) {
   };
   if (locationWatchId !== null) return;
   locationWatchId = navigator.geolocation.watchPosition(updateLocation, () => {
-    alert('Please allow location access to show your current position.');
+    notifyDialog('Please allow location access to show your current position.');
     locationWatchId = null;
   }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 });
 }
@@ -457,6 +458,8 @@ async function focusNearestClinic() {
   }
   const message = text => { if (status) status.textContent = text; };
   findingNearestClinic = true;
+  const buttons = document.querySelectorAll('.nearest-clinic-button');
+  buttons.forEach(button => { button.disabled = true; button.setAttribute('aria-busy', 'true'); button.textContent = 'Finding nearest clinic...'; });
   card?.setAttribute('aria-busy', 'true');
   message('Finding your location. Please allow location access when prompted.');
   try {
@@ -489,6 +492,7 @@ async function focusNearestClinic() {
     message(error.code === 1 ? 'Location access was denied. Allow location access in your browser, then click Nearest Clinic again.' : error.code === 2 ? 'Your location is unavailable. Turn on location services and try again.' : error.code === 3 ? 'Finding your location timed out. Please try again.' : error.message);
   } finally {
     findingNearestClinic = false;
+    buttons.forEach(button => { button.disabled = false; button.removeAttribute('aria-busy'); button.innerHTML = '<i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i> Nearest Clinic'; });
     card?.removeAttribute('aria-busy');
   }
 }
@@ -535,5 +539,6 @@ window.refreshMaps = refreshMaps;
 window.initMap = initMap;
 window.filterMarkers = filterMarkers;
 window.focusNearestClinic = focusNearestClinic;
+document.querySelectorAll('.nearest-clinic-button').forEach(button => button.addEventListener('click', () => focusNearestClinic()));
 populateMapDirectoryFilters();
 loadClinics();

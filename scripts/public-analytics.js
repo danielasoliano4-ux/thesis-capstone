@@ -1,3 +1,4 @@
+import { renderLiveCaptions } from './live-analytics-view.js';
 import { db } from './firebase.js';
 import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
@@ -30,6 +31,7 @@ onSnapshot(doc(db, 'system_settings', 'animal_exposure'), snapshot => {
 
 onSnapshot(doc(db, 'system_settings', 'live_analytics'), snapshot => {
   const data = snapshot.exists() ? snapshot.data() : {};
+    renderLiveCaptions(data);
 
   const defaults = { monthlyCases: Array(12).fill(0), monthlyVaccinations: Array(12).fill(0), caseTrend: Array(12).fill(0), ageGroups: [0, 0, 0, 0, 0], barangays: [] };
   const values = { ...defaults, ...data };
@@ -44,13 +46,16 @@ onSnapshot(doc(db, 'system_settings', 'live_analytics'), snapshot => {
     window.monthlyChart.update();
   }
   renderList('barangayIncidentRate', values.barangays, item => `<div class="bgy-row"><div class="bgy-row-top"><span class="bgy-name">${escapeHtml(item.name)}</span><span class="bgy-count">${escapeHtml(item.cases)} cases</span></div><div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-high" style="width:${Math.min(100, Number(item.cases) * 3)}%;"></div></div></div>`);
-  renderList('caseTrendChart', values.caseTrend, (value, index) => `<div class="trend-bar" style="height:${Math.min(100, Number(value))}%;background:${index === 5 ? '#e60000' : '#d98a00'};" title="${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][index]}: ${escapeHtml(value)}"></div>`);
-  renderList('ageGroupChart', values.ageGroups, (value, index) => `<div class="age-row"><span class="age-label">${['0–9','10–19','20–39','40–59','60+'][index]}</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:${Math.min(100, Number(value) * 2)}%;"></div></div><span class="age-count">${escapeHtml(value)}</span></div>`);
+  const maxTrend = Math.max(1, ...values.monthlyCases);
+  const maxAge = Math.max(1, ...values.ageGroups);
+  renderList('caseTrendChart', values.monthlyCases, (value, index) => `<div class="trend-bar" style="height:${Math.round(Number(value) / maxTrend * 100)}%;background:${Number(value) === maxTrend ? '#e60000' : '#d98a00'};" title="${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][index]}: ${escapeHtml(value)}"></div>`);
+  renderList('ageGroupChart', values.ageGroups, (value, index) => `<div class="age-row"><span class="age-label">${['0–9','10–19','20–39','40–59','60+'][index]}</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:${Math.round(Number(value) / maxAge * 100)}%;"></div></div><span class="age-count">${escapeHtml(value)}</span></div>`);
 }, error => console.error('Failed to load dashboard analytics:', error));
 
 function renderList(id, values, renderItem) {
   const element = document.getElementById(id);
-  if (!element || !Array.isArray(values) || !values.length) return;
+  if (!element) return;
+  if (!Array.isArray(values) || !values.length) { element.innerHTML = '<p>No live records available.</p>'; return; }
   element.innerHTML = values.map(renderItem).join('');
 }
 

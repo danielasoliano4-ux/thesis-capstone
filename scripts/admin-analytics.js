@@ -1,6 +1,7 @@
+import { notifyDialog, confirmDialog, promptDialog } from './app-dialogs.js';
 import { viewClinicPin } from './clinic-approval-pin.js';
-import { auth, db, fetchUserProfile } from './firebase.js';
-import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
+import { auth, db, fetchUserProfile, signOutUser } from './firebase.js';
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
 import { routes } from './routes.js';
 import {
   collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc
@@ -28,7 +29,7 @@ function canonicalVaccineBrand(value) {
 }
 
 document.getElementById('adminSignOutBtn')?.addEventListener('click', async () => {
-  await signOut(auth);
+  await signOutUser();
   window.location.replace(routes.adminLogin);
 });
 
@@ -187,13 +188,14 @@ function buildPublicCaseRecords() {
     const records = vaccinations.filter(record => sessionKey(record) === session.key);
     const latestRecord = [...records].sort((a, b) => timestampValue(b.recorded_at || b.date_given) - timestampValue(a.recorded_at || a.date_given))[0];
     const source = session.first;
-    const category = source.who_category || source.bite_category || source.category || 'Not recorded';
+    const categorySource = [source, ...appointments.filter(record => sessionKey(record) === session.key), ...records].find(record => record.patient_category || record.course_intake_data?.patient_category || record.who_category || record.bite_category || record.category) || source;
+    const category = categorySource.patient_category || categorySource.course_intake_data?.patient_category || categorySource.who_category || categorySource.bite_category || categorySource.category || 'Not recorded';
     const doses = session.doses.size;
     const outcome = session.death ? 'death' : session.completed ? 'recovered' : 'ongoing';
     return {
       caseId: `CAB-${session.date.getFullYear()}-${String(index + 1).padStart(3, '0')}`,
       year: session.date.getFullYear(), barangay: barangayFor(source), animal: normalizeAnimalSource(source.animal_type),
-      category, severity: /iii|3/i.test(category) ? 'High' : /ii|2/i.test(category) ? 'Medium' : 'Low', outcome,
+      category, severity: /iii|3/i.test(category) ? 'High' : /ii|2/i.test(category) ? 'Medium' : /^(Category )?(I|1)$/i.test(category) ? 'Low' : 'Unknown', outcome,
       doseCount: doses, vaccine: latestRecord?.vaccine_name || source.vaccine_name || 'Not recorded',
       clinic: latestRecord?.clinic_name || source.clinic_name || 'Not recorded',
       date: session.date.toISOString().slice(0, 10)
@@ -246,6 +248,7 @@ function renderAnalytics() {
   const deaths = cases.filter(item => item.death).length;
   const ongoing = cases.filter(item => !item.death && !item.completed).length;
   const summary = {
+    year: selectedAnalyticsYear,
     monthlyCases,
     monthlyVaccinations,
     barangays,
@@ -265,7 +268,7 @@ function renderAnalytics() {
     publicRecords: buildPublicCaseRecords()
   };
   updateDashboard(summary, maxCases);
-  setDoc(doc(db, 'system_settings', 'live_analytics'), { ...summary, updated_at: serverTimestamp() }, { merge: true }).catch(reportError);
+  // Database triggers publish public analytics independently of this dashboard.
 }
 
 function normalizeAnimalSource(value) {
@@ -292,7 +295,6 @@ function updateDashboard(data, maxCases) {
     window.adminMonthlyChart.update();
   }
   updateStockChart();
-  updateSystemMetrics(data);
   const body = document.getElementById('heatmapBody');
   if (!body) return;
   body.innerHTML = data.barangays.map(item => {
@@ -366,7 +368,7 @@ function renderManagement() {
       const totalStock = stock.reduce((total, item) => total + Number(item.quantity || 0), 0);
       const status = totalStock === 0 ? ['critical', 'Out of Stock'] : totalStock <= 15 ? ['low', 'Low Stock'] : ['adequate', 'Available'];
       const updated = [...stock, clinic].map(item => item.updated_at || item.created_at).sort((first, second) => timestampValue(second) - timestampValue(first))[0];
-      return `<tr><td><strong>${escapeHtml(clinic.name || 'Unnamed Clinic')}</strong></td><td>${escapeHtml(clinic.type || 'ABTC')}</td><td>${escapeHtml(clinic.barangay || clinic.address || '-')}</td><td>${totalStock} doses</td><td><span class="status ${status[0]}">${status[1]}</span></td><td>${formatDate(updated)}</td><td><div class="table-action-group"><button type="button" class="table-action" data-view-clinic="${clinic.id}">View Location</button><button type="button" class="table-action table-action-edit" data-edit-clinic="${clinic.id}" aria-label="Edit ${escapeHtml(clinic.name || 'clinic')}"><i class="fa-regular fa-pen-to-square"></i><span>Edit</span></button><button type="button" class="table-action table-action-delete" data-delete-clinic="${clinic.id}" aria-label="Delete ${escapeHtml(clinic.name || 'clinic')}"><i class="fa-regular fa-trash-can"></i><span>Delete</span></button></div></td></tr>`;
+      return `<tr><td><strong>${escapeHtml(clinic.name || 'Unnamed Clinic')}</strong></td><td>${escapeHtml(clinic.type || 'ABTC')}</td><td>${escapeHtml(clinic.barangay || clinic.address || '-')}</td><td>${totalStock} doses</td><td><span class="status ${status[0]}">${status[1]}</span></td><td>${formatDate(updated)}</td><td><div class="table-action-group"><button type="button" class="table-action table-action-edit" data-edit-clinic="${clinic.id}" aria-label="Edit ${escapeHtml(clinic.name || 'clinic')}"><i class="fa-regular fa-pen-to-square"></i><span>Edit</span></button><button type="button" class="table-action table-action-delete" data-delete-clinic="${clinic.id}" aria-label="Delete ${escapeHtml(clinic.name || 'clinic')}"><i class="fa-regular fa-trash-can"></i><span>Delete</span></button></div></td></tr>`;
     }).join('') : '<tr><td colspan="7">No clinics found.</td></tr>';
     clinicBody.querySelectorAll('[data-view-clinic]').forEach(button => button.addEventListener('click', () => viewClinicPin(clinics.find(item => item.id === button.dataset.viewClinic))));
     clinicBody.querySelectorAll('[data-edit-clinic]').forEach(button => button.addEventListener('click', () => editClinic(clinics.find(item => item.id === button.dataset.editClinic))));
@@ -379,7 +381,7 @@ async function changeStaffStatus(userId, approved) {
     await httpsCallable(getFunctions(), 'reviewClinicRegistration')({ uid: userId, approved });
   } catch (error) {
     console.error('Could not update staff approval:', error);
-    alert(`Could not update staff approval: ${error.message}`);
+    notifyDialog(`Could not update staff approval: ${error.message}`);
   }
 }
 
@@ -425,57 +427,39 @@ function updateStockChart() {
   window.adminStockChart.update();
 }
 
-function updateSystemMetrics(data) {
-  const message = `${data.pendingStaff} pending staff approval${data.pendingStaff === 1 ? '' : 's'}, ${data.clinicsOutOfStock} clinic${data.clinicsOutOfStock === 1 ? '' : 's'} out of usable stock, and ${data.expiringBatches} batch${data.expiringBatches === 1 ? '' : 'es'} expired or expiring within 30 days.`;
-  setText('systemAlertText', message);
-  const body = document.getElementById('systemMetricsBody');
-  if (!body) return;
-  const metrics = [
-    ['Staff Account Approvals', `${data.pendingStaff} pending`, data.pendingStaff ? 'low' : 'adequate', 'User Management'],
-    ['Clinics Out of Usable Stock', `${data.clinicsOutOfStock} clinic${data.clinicsOutOfStock === 1 ? '' : 's'}`, data.clinicsOutOfStock ? 'critical' : 'adequate', 'Clinic Management'],
-    ['Expired / Expiring Batches', `${data.expiringBatches} batch${data.expiringBatches === 1 ? '' : 'es'}`, data.expiringBatches ? 'critical' : 'adequate', 'Clinic Management'],
-    ['Live Appointment Records', `${appointments.length} total`, 'adequate', 'Analytics']
-  ];
-  body.innerHTML = metrics.map(([name, value, status, destination]) => `<tr><td><strong>${name}</strong></td><td>${value}</td><td><span class="status ${status}">${status === 'adequate' ? 'Normal' : status === 'low' ? 'Attention' : 'Critical'}</span></td><td><button type="button" class="update-link live-metric-link" data-metric-destination="${destination}">View</button></td></tr>`).join('');
-  body.querySelectorAll('[data-metric-destination]').forEach(button => button.addEventListener('click', () => {
-    const index = { Analytics: 0, 'User Management': 1, 'Clinic Management': 2 }[button.dataset.metricDestination] || 0;
-    showTab(['analytics', 'users', 'clinics'][index], document.querySelectorAll('.admin-tab')[index]);
-  }));
-}
-
 async function createUserAccount() {
-  const email = prompt('Email address for the new account:'); if (!email) return;
-  const password = prompt('Temporary password (at least 6 characters):'); if (!password) return;
-  const full_name = prompt('Full name / username:') || '';
-  const role = prompt('Role: resident, clinic_staff, or admin', 'resident') || 'resident';
+  const email = await promptDialog('Email address for the new account:'); if (!email) return;
+  const password = await promptDialog('Temporary password (at least 6 characters):'); if (!password) return;
+  const full_name = await promptDialog('Full name / username:') || '';
+  const role = await promptDialog('Role: resident, clinic_staff, or admin', 'resident') || 'resident';
   try { await httpsCallable(getFunctions(), 'manageUserAccount')({ action: 'create', email, password, profile: { full_name, username: full_name, role } }); }
-  catch (error) { alert(`Could not create account: ${error.message}. Deploy Cloud Functions first.`); }
+  catch (error) { notifyDialog(`Could not create account: ${error.message}. Deploy Cloud Functions first.`); }
 }
 
 async function editUser(user) {
   if (!user) return;
-  const full_name = prompt('Full name / username:', user.full_name || user.username || ''); if (full_name === null) return;
-  const role = prompt('Role:', user.role || 'resident'); if (role === null) return;
+  const full_name = await promptDialog('Full name / username:', user.full_name || user.username || ''); if (full_name === null) return;
+  const role = await promptDialog('Role:', user.role || 'resident'); if (role === null) return;
   try { await httpsCallable(getFunctions(), 'manageUserAccount')({ action: 'update', uid: user.id, profile: { full_name, username: full_name, role } }); }
-  catch (error) { alert(`Could not update account: ${error.message}`); }
+  catch (error) { notifyDialog(`Could not update account: ${error.message}`); }
 }
 
 async function deleteUserAccount(uid) {
-  if (!confirm('Delete this user account permanently?')) return;
+  if (!await confirmDialog('Delete this user account permanently?')) return;
   try { await httpsCallable(getFunctions(), 'manageUserAccount')({ action: 'delete', uid }); }
-  catch (error) { alert(`Could not delete account: ${error.message}`); }
+  catch (error) { notifyDialog(`Could not delete account: ${error.message}`); }
 }
 
 async function editClinic(clinic = null) {
-  const name = prompt('Clinic name:', clinic?.name || ''); if (!name) return;
-  const type = prompt('Clinic type:', clinic?.type || 'ABTC'); if (type === null) return;
-  const barangay = prompt('Barangay:', clinic?.barangay || ''); if (barangay === null) return;
+  const name = await promptDialog('Clinic name:', clinic?.name || ''); if (!name) return;
+  const type = await promptDialog('Clinic type:', clinic?.type || 'ABTC'); if (type === null) return;
+  const barangay = await promptDialog('Barangay:', clinic?.barangay || ''); if (barangay === null) return;
   const ref = clinic ? doc(db, 'clinics', clinic.id) : doc(collection(db, 'clinics'));
   try { await setDoc(ref, { name, type, barangay, updated_at: serverTimestamp(), ...(clinic ? {} : { created_at: serverTimestamp() }) }, { merge: true }); }
-  catch (error) { alert(`Could not save clinic: ${error.message}`); }
+  catch (error) { notifyDialog(`Could not save clinic: ${error.message}`); }
 }
 
-async function deleteClinic(id) { if (confirm('Delete this clinic permanently?')) { try { const { deleteDoc } = await import('https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js'); await deleteDoc(doc(db, 'clinics', id)); } catch (error) { alert(`Could not delete clinic: ${error.message}`); } } }
+async function deleteClinic(id) { if (await confirmDialog('Delete this clinic permanently?')) { try { const { deleteDoc } = await import('https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js'); await deleteDoc(doc(db, 'clinics', id)); } catch (error) { notifyDialog(`Could not delete clinic: ${error.message}`); } } }
 
 function reportRange() {
   const start = document.getElementById('reportStartDate')?.value || '';
@@ -515,7 +499,7 @@ function legacyDownloadReport(kind) {
     });
     pdf.save(`${kind}-report-${new Date().toISOString().slice(0, 10)}.pdf`);
   } catch (error) {
-    alert(`Could not generate report: ${error.message}`);
+    notifyDialog(`Could not generate report: ${error.message}`);
   }
 }
 
@@ -571,7 +555,7 @@ function openReportPreview(kind) {
     modal.hidden = false;
     modal.setAttribute('aria-hidden', 'false');
   } catch (error) {
-    alert(`Could not prepare report preview: ${error.message}`);
+    notifyDialog(`Could not prepare report preview: ${error.message}`);
   }
 }
 
@@ -592,7 +576,7 @@ function openBploPreview(user) {
   if (!user?.bplo_certificate_url) return;
   let url;
   try { url = new URL(user.bplo_certificate_url); if (url.protocol !== 'https:') throw new Error(); }
-  catch { alert('The certificate link is invalid.'); return; }
+  catch { notifyDialog('The certificate link is invalid.'); return; }
   const dialog = document.getElementById('bploPreview');
   const image = document.getElementById('bploPreviewImage');
   setText('bploPreviewOwner', (user.full_name || 'Clinic staff') + ' - ' + (user.clinic_name || 'Clinic'));

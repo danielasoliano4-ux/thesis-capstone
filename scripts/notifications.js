@@ -1,4 +1,5 @@
 import { auth, db, onAuthStateChanged, fetchUserProfile, signOutUser } from './firebase.js';
+import { sessionIsTerminated } from './session-state.js';
 import { collection, onSnapshot, query, where, doc, updateDoc } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
 function markAllRead() {
@@ -146,11 +147,31 @@ function escapeHtml(value = '') {
 
 // Listen for auth state and load user-specific notifications
 
+let unsubscribeNotifications;
+function showGuestNotifications() {
+    unsubscribeNotifications?.();
+    unsubscribeNotifications = null;
+    renderNotifications([]);
+    const headerName = document.getElementById('headerName');
+    const signOutBtn = document.getElementById('signOutBtn');
+    const unreadCount = document.getElementById('unreadCount');
+    if (headerName) headerName.textContent = 'Guest';
+    if (signOutBtn) signOutBtn.style.display = 'none';
+    if (unreadCount) unreadCount.textContent = '0';
+}
+showGuestNotifications();
+window.addEventListener('pageshow', event => {
+    if (event.persisted) showGuestNotifications();
+});
+
 onAuthStateChanged(auth, async (user) => {
 
-    if (user) {
+    await window.residentSignOutReady;
+    unsubscribeNotifications?.();
+    if (user && auth.currentUser?.uid === user.uid && !sessionIsTerminated()) {
 
-        onSnapshot(query(collection(db, 'notifications'), where('recipient_uid', '==', user.uid)), snapshot => {
+        unsubscribeNotifications = onSnapshot(query(collection(db, 'notifications'), where('recipient_uid', '==', user.uid)), snapshot => {
+            if (sessionIsTerminated() || auth.currentUser?.uid !== user.uid) return;
             const list = snapshot.docs.map(item => ({ id: item.id, ...item.data() }))
                 .sort((first, second) => {
                     const firstTime = first.created_at?.toMillis?.() || 0;
@@ -174,6 +195,7 @@ onAuthStateChanged(auth, async (user) => {
                 try {
 
                     const profile = await fetchUserProfile(user.uid);
+                    if (sessionIsTerminated() || auth.currentUser?.uid !== user.uid) return;
 
                     const name = (profile && (profile.full_name || profile.fullName || profile.name)) || user.displayName || user.email || 'Resident';
 
@@ -191,7 +213,7 @@ onAuthStateChanged(auth, async (user) => {
 
         // Public view: show empty state or placeholder
 
-        renderNotifications([]);
+        showGuestNotifications();
 
     }
 

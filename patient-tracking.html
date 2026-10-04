@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="/scripts/session-navigation.js"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Patient Tracking — Clinic Staff</title>
@@ -8,6 +9,7 @@
     <link rel="stylesheet" href="patient-tracking.css"/>
     <link rel="stylesheet" href="responsive.css">
 <link rel="stylesheet" href="clinic-layout.css">
+    <link rel="stylesheet" href="dose-completion.css">
 </head>
 <body class="clinic-dashboard">
 
@@ -89,8 +91,8 @@
                 <h3>Complete Vaccination Dose</h3>
                 <div class="record-edit-grid">
                     <label>Administration Date<input id="completionDate" type="date" required></label>
-                    <label>Dose Number<input id="completionDose" type="number" min="1" max="5" required></label>
-                    <label>Vaccine / Batch<select id="completionVaccine" size="4" aria-describedby="completionVaccineHint" required><option value="">Select vaccine / batch...</option></select><small id="completionVaccineHint">Scroll the list to see more batches, then select one.</small></label>
+                    <label>Dose Being Administered<input id="completionDose" type="text" readonly required></label>
+                    <label>Vaccine / Batch<select id="completionVaccine" aria-describedby="completionVaccineHint" required><option value="">Select vaccine / batch...</option></select><small id="completionVaccineHint">Select a vaccine and batch from the dropdown.</small></label>
                     <label>Clinic Location<input id="completionLocation" type="text" required></label>
                 </div>
                 <div class="record-edit-actions">

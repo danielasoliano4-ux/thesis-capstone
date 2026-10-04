@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script src="/scripts/session-navigation.js"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Administrator Dashboard</title>
@@ -153,27 +154,6 @@
                 </tr>
             </tbody>
         </table>
-        </div>
-    </div>
-    <div class="content-box">
-        <div class="content-box-header">
-            <h3>System Metrics &amp; Alerts</h3>
-            <button type="button" class="btn-primary" onclick="showTab('reports',document.querySelectorAll('.admin-tab')[3])"><i class="fa-solid fa-file-chart-column"></i> View Full Reports</button>
-        </div>
-        <div class="alert-box">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-            <div>
-                <h4>Attention Required</h4>
-                <p id="systemAlertText">Loading live system checks…</p>
-            </div>
-        </div>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr><th>Metric</th><th>Value</th><th>Status</th><th>Action</th></tr>
-                </thead>
-                <tbody id="systemMetricsBody"><tr><td colspan="4">Loading live system metrics…</td></tr></tbody>
-            </table>
         </div>
     </div>
 </div>

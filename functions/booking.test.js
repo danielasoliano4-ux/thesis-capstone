@@ -20,11 +20,11 @@ function fixture(initial = [], clinic = { name: 'Clinic', hours: '24 hours' }) {
  const auth = { uid: 'resident', token: { secure_login: true, email_verified: true, firebase: { sign_in_provider: 'custom' } } };
  return { appointments, book: (data = {}, identity = auth) => handler({ auth: identity, data: { clinic_id: 'clinic-a', preferred_date: '2026-09-22', preferred_time: '09:00', ...data } }) };
 }
-test('pending and accepted statuses block only the same resident and clinic', async () => {
+test('active appointments block duplicate doses across clinics', async () => {
  for (const status of ['pending', 'confirmed', 'accepted', 'approved', 'in_progress']) {
   const f = fixture([{ resident_uid: 'resident', clinic_id: 'clinic-a', status }]);
   await assert.rejects(f.book(), { code: 'already-exists' });
-  await f.book({ clinic_id: 'clinic-b' });
+  await assert.rejects(f.book({ clinic_id: 'clinic-b' }), { code: 'already-exists' });
  }
 });
 test('completed, cancelled, declined and expired bookings allow another appointment', async () => {

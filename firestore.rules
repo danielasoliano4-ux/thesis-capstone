@@ -119,7 +119,7 @@ service cloud.firestore {
           && (resource.data.status != 'pending' || (resource.data.get('scheduled_at_ms', null) != null && request.time.toMillis() < resource.data.scheduled_at_ms))
           && request.resource.data.clinic_id == resource.data.clinic_id
           && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-            'resident_uid', 'preferred_date', 'preferred_time', 'confirmed_at', 'arrived_at', 'arrived_by', 'arrival_deadline_ms', 'scheduled_at_ms',
+            'vaccination_session_id', 'treatment_id', 'dose_number', 'dose_label', 'recommended_date', 'course_vaccination_history', 'resident_uid', 'preferred_date', 'preferred_time', 'confirmed_at', 'arrived_at', 'arrived_by', 'arrival_deadline_ms', 'scheduled_at_ms',
             'intake_completed_at', 'patient_record_id', 'course_intake_data'
           ])
           && (resource.data.get('intake_completed_at', null) == null
@@ -128,8 +128,7 @@ service cloud.firestore {
             ]))
           && (request.resource.data.status == resource.data.status
             || (resource.data.status == 'pending' && request.resource.data.status == 'declined')
-            || (resource.data.status == 'in_progress' && resource.data.get('intake_completed_at', null) != null
-              && request.resource.data.status == 'completed')))
+            ))
         || (isResident()
           && resource.data.resident_uid == request.auth.uid
           && resource.data.status in ['pending', 'confirmed']
@@ -174,21 +173,14 @@ service cloud.firestore {
       allow read: if isAdmin() 
         || (isResident() && resource.data.resident_uid == request.auth.uid)
         || isClinicStaff();
-      allow create: if isAdmin() || (isClinicStaff()
-        && request.resource.data.resident_uid is string
-        && request.resource.data.dose_number is number
-        && request.resource.data.vaccine_name is string
-        && request.resource.data.clinic_id is string
-        && request.resource.data.clinic_name is string
-        && request.resource.data.clinic_location is string
-        && request.resource.data.date_given is string
-        && belongsToClinic(request.resource.data.clinic_id)
-        && get(/databases/$(database)/documents/appointments/$(request.resource.data.appointment_id)).data.status == 'in_progress'
-        && get(/databases/$(database)/documents/appointments/$(request.resource.data.appointment_id)).data.get('intake_completed_at', null) != null
-        && request.resource.data.administered_by == request.auth.uid);
+      allow create: if false; // Server validates sequence, verification and stock.
       allow update, delete: if false;
     }
 
+    match /treatments/{treatmentId} {
+      allow read: if isAdmin() || (isResident() && resource.data.resident_uid == request.auth.uid);
+      allow write: if false;
+    }
     match /vaccination_documents/{documentId} {
       // Supporting vaccination-history records can be reviewed by administrators;
       // clinic staff receive only the document reference attached to their clinic's appointment.

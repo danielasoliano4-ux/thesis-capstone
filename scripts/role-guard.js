@@ -1,5 +1,5 @@
-import { auth, fetchUserProfile, onAuthStateChanged } from './firebase.js';
-import { signOut } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js';
+import { auth, fetchUserProfile, onAuthStateChanged, signOutUser } from './firebase.js';
+import { activateSession, sessionIsTerminated } from './session-state.js';
 import { routes } from './routes.js';
 
 const rolePages = {
@@ -10,31 +10,44 @@ const rolePages = {
 };
 
 export function protectPage(expectedRole, loginPage = 'login.html') {
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-      window.location.href = loginPage;
+  let generation = 0;
+  const returnToLogin = () => window.location.replace(loginPage + '?session=expired');
+  const check = async user => {
+    const run = ++generation;
+    if (!user || sessionIsTerminated()) {
+      if (user) signOutUser().catch(console.error);
+      returnToLogin();
       return;
     }
-
-    const profile = await fetchUserProfile(user.uid);
-    const hasExpectedRole = profile && (profile.role === expectedRole
-      || (expectedRole === 'admin' && profile.role === 'administrator'));
-    // Only newly registered clinic staff carry a 'pending' approval_status.
-    // Existing staff accounts may have no approval_status field, so they must
-    // not be signed out and bounced back to the login page.
-    if (expectedRole === 'clinic_staff' && profile
-      && (profile.approval_status === 'pending' || profile.approval_status === 'denied')) {
-      await signOut(auth);
-      alert(profile.approval_status === 'denied'
-        ? 'Your clinic staff registration was not approved.'
-        : 'Your clinic staff account is pending administrator approval.');
-      window.location.replace(loginPage);
-      return;
+    try {
+      const profile = await fetchUserProfile(user.uid);
+      if (run !== generation) return;
+      if (auth.currentUser?.uid !== user.uid || sessionIsTerminated()) {
+        returnToLogin();
+        return;
+      }
+      const hasExpectedRole = profile && (profile.role === expectedRole
+        || (expectedRole === 'admin' && profile.role === 'administrator'));
+      // Staff created before the approval workflow may omit approval_status.
+      if (expectedRole === 'clinic_staff' && profile
+        && (profile.approval_status === 'pending' || profile.approval_status === 'denied')) {
+        signOutUser().catch(console.error);
+        returnToLogin();
+        return;
+      }
+      if (!hasExpectedRole) {
+        const destination = rolePages[profile?.role] || loginPage;
+        if (!profile) signOutUser().catch(console.error);
+        window.location.replace(destination);
+        return;
+      }
+      activateSession(profile.role);
+      window.finishSessionCheck?.();
+    } catch (error) {
+      console.error('Could not verify page access:', error);
+      returnToLogin();
     }
-    if (!hasExpectedRole) {
-      const destination = rolePages[profile?.role] || loginPage;
-      alert(`This account is not authorized for this page. Returning to your dashboard.`);
-      window.location.replace(destination);
-    }
-  });
+  };
+  window.revalidateSession = () => check(auth.currentUser);
+  return onAuthStateChanged(auth, check, returnToLogin);
 }

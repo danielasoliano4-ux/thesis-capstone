@@ -1,7 +1,10 @@
+import { notifyDialog } from './app-dialogs.js';
+import { protectPage } from './role-guard.js';
 import {auth,db,fetchUserProfile,onAuthStateChanged} from './firebase.js';
 import {collection,query,where,onSnapshot} from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 import {appointmentDeadline} from './booking-status.js';
 import {markArrivalAndOpenIntake,openIntake} from './appointment-intake.js';
+protectPage('clinic_staff');
 const $=id=>document.getElementById(id);
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 let rows=[],loaded=false,unsubscribe,generation=0;
@@ -25,7 +28,7 @@ function render(){
    const allowed=item.status!=='confirmed'||(item.preferred_date<=today()&&Number.isFinite(deadline)&&Date.now()<deadline);
    button.disabled=busy.has(item.id)||!allowed;
    if(!allowed){const note=document.createElement('p');note.textContent=item.preferred_date>today()?'Arrival opens on the appointment date.':'The 90-minute arrival window has ended.';card.append(note);}
-   button.onclick=async()=>{if(busy.has(item.id))return;busy.add(item.id);button.disabled=true;try{if(item.status==='confirmed')await markArrivalAndOpenIntake(item.id,item);else openIntake(item.id,item);}catch(error){alert(error.message||'Could not update appointment.');}finally{busy.delete(item.id);render();}};
+   button.onclick=async()=>{if(busy.has(item.id))return;busy.add(item.id);button.disabled=true;try{if(item.status==='confirmed')await markArrivalAndOpenIntake(item.id,item);else openIntake(item.id,item);}catch(error){notifyDialog(error.message||'Could not update appointment.');}finally{busy.delete(item.id);render();}};
    actions.prepend(button);
   }
   card.prepend(badge,heading,details);card.append(actions);$('confirmedList').append(card);
