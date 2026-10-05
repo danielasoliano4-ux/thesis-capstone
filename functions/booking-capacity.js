@@ -11,6 +11,20 @@ async function checkSlotCapacity(tx,db,clinicId,date,time,excludeId,HttpsError){
  if(count>=CAPACITY)throw new HttpsError('resource-exhausted','This time slot is fully booked (5 appointments). Please choose the next available time.');
  return lock;
 }
+async function checkBatchSlotCapacity(tx,db,clinicId,slots,movingAppointmentIds,HttpsError){
+ const locks=slots.map(slot=>db.collection('_slot_locks').doc(createHash('sha256').update(clinicId+':'+slot.scheduled).digest('hex')));
+ for(const lock of locks) await tx.get(lock);
+ const rows=await tx.get(db.collection('appointments').where('clinic_id','==',clinicId));
+ const moving=new Set(movingAppointmentIds);
+ for(const slot of slots){
+  const count=rows.docs.filter(doc=>{
+   const item=doc.data();
+   return !moving.has(doc.id)&&occupiesSlot(item)&&scheduledTime(item.preferred_date,item.preferred_time)===slot.scheduled;
+  }).length;
+  if(count>=CAPACITY)throw new HttpsError('resource-exhausted','This time slot is fully booked (5 appointments). Please choose another time.');
+ }
+ return locks;
+}
 function slotAvailabilityHandler({db,HttpsError}){return async request=>{
  if(!request.auth || request.auth.token?.secure_login!==true)throw new HttpsError('unauthenticated','Please sign in again.');
  const {clinic_id,date}=request.data||{};
@@ -20,4 +34,4 @@ function slotAvailabilityHandler({db,HttpsError}){return async request=>{
  for(const doc of rows.docs){const item=doc.data();if(item.preferred_date!==date||!occupiesSlot(item))continue;const key=scheduledTime(date,item.preferred_time);if(Number.isFinite(key))counts[key]=(counts[key]||0)+1;}
  return {capacity:CAPACITY,counts};
 };}
-module.exports={checkSlotCapacity,slotAvailabilityHandler,occupiesSlot};
+module.exports={checkSlotCapacity,checkBatchSlotCapacity,slotAvailabilityHandler,occupiesSlot};

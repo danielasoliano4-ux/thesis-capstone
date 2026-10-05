@@ -6,10 +6,12 @@ The server derives treatment identity from existing patient appointments/history
 
 The existing five-dose Day 0/3/7/14/28 application schedule remains the default. This is not a new clinical protocol. Staff can change incomplete recommended dates after documenting clinical review; appointment dates and actual administration dates are separate. No missed-date or clinic-change operation creates a new treatment. Completed courses require a separate clinical assessment; this flow does not automatically start another course.
 
+Saving reviewed dates also writes a resident vaccine notification in the same transaction. The notification lists the recommended dates and prompts the resident to review and book the pending course. A Firestore create trigger sends a web push to registered resident devices. Residents opt in to push alerts from the dashboard; in-app notifications remain available when push is unsupported or declined.
+
 manageTreatment checks active approved receiving-clinic staff, rereads patient history in a transaction, and serializes updates through the treatment document. Completion writes stock, permanent record, appointment, treatment, and notification together. External verification accepts optional vaccine information and documentation. Supplied cards are checked against the treatment and Storage object; without a card, staff must document a clinical verification basis. Verified external Dose 1 anchors recommended dates to Day 0, 3, 7, 14, and 28; dates explicitly reviewed by staff take precedence. Verifier, source and evidence remain in the continuous treatment history without consuming clinic stock. Only administered verified records count toward progress.
 
 refreshOverdueDoses runs daily at 00:05 Asia/Manila. Review/booking recalculate overdue status immediately; the patient display refreshes each minute. It never moves recommended dates automatically.
 
-Run: node --test functions/treatment.test.js functions/booking.test.js functions/reschedule-booking.test.js functions/appointment-lifecycle.test.js functions/dose-stock.test.js functions/booking-ui.test.js
+Run: node --test functions/treatment.test.js functions/batch-booking.test.js functions/schedule-push.test.js functions/booking.test.js functions/reschedule-booking.test.js functions/appointment-lifecycle.test.js functions/dose-stock.test.js functions/booking-ui.test.js
 
 Before production rollout, verify callable authentication, Firestore rules, uploaded-card access, and both staff screens against a Firebase emulator or staging project. Local unit tests do not replace that integration check.

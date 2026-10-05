@@ -1,10 +1,17 @@
-export function usableStock(item, clinicId, today) {
+import { availableQuantity, physicalQuantity } from './stock-summary.mjs';
+
+export function usableStock(item, clinicId, today, reservation = null) {
+  const reserved = reservation?.status === 'reserved' && reservation.inventory_id === item?.id;
   return item?.clinic_id === clinicId && !item.archived && typeof item.type === 'string' && item.type.trim()
     && /^\d{4}-\d{2}-\d{2}$/.test(item.expiry || '') && item.expiry > today
-    && Number.isInteger(Number(item.quantity)) && Number(item.quantity) > 0;
+    && Number.isFinite(Date.parse(item.expiry)) && new Date(item.expiry).toISOString().slice(0, 10) === item.expiry
+    && Number.isInteger(Number(item.quantity)) && Number(item.quantity) >= 0
+    && (reserved ? Number.isInteger(Number(item.reserved_count)) && Number(item.reserved_count) > 0
+      && physicalQuantity(item) >= Number(item.reserved_count) : availableQuantity(item) > 0);
 }
-export function availableStock(items, clinicId, today) {
-  return items.filter(item => usableStock(item, clinicId, today)).sort((a,b) => a.expiry.localeCompare(b.expiry) || a.type.localeCompare(b.type));
+export function availableStock(items, clinicId, today, reservation = null) {
+  return items.filter(item => (reservation?.status !== 'reserved' || item.id === reservation.inventory_id)
+    && usableStock(item, clinicId, today, reservation)).sort((a,b) => a.expiry.localeCompare(b.expiry) || a.type.localeCompare(b.type));
 }
 export async function commitDose(tx, refs, values) {
   const appointmentSnap = await tx.get(refs.appointment);
@@ -15,12 +22,20 @@ export async function commitDose(tx, refs, values) {
   if (recordSnap.exists() || appointment?.status === 'completed') throw new Error('This appointment already has a completed dose.');
   if (!appointment || appointment.clinic_id !== values.clinicId) throw new Error('Appointment does not belong to this clinic.');
   if (appointment.status !== 'in_progress' || !appointment.intake_completed_at) throw new Error('Record arrival and complete medical intake first.');
-  if (!usableStock(stock, values.clinicId, values.today)) throw new Error('This vaccine batch is no longer available. Select another batch.');
+  const reservation = appointment.stock_reservation?.status === 'reserved' ? appointment.stock_reservation : null;
+  if (reservation && reservation.inventory_id !== refs.stock.id) throw new Error('Use the vaccine batch reserved at confirmation.');
+  if (!usableStock({...stock, id: refs.stock.id}, values.clinicId, values.today, reservation)) throw new Error('This vaccine batch is no longer available. Select another batch.');
   const scheduledDose = Number(String(appointment.dose_label || '1').match(/\d+/)?.[0] || 1);
   if (!Number.isInteger(values.doseNumber) || values.doseNumber < 1 || values.doseNumber > 5 || values.doseNumber !== scheduledDose) throw new Error('Dose number must match this appointment.');
   const date = new Date(values.date + 'T00:00:00Z');
   if (!Number.isFinite(+date) || date.toISOString().slice(0,10) !== values.date || values.date > values.today || !values.location.trim()) throw new Error('Enter a valid administration date and clinic location.');
-  tx.update(refs.stock, { quantity: Number(stock.quantity) - 1, updated_at: values.timestamp });
+  // Legacy reservations already deducted availability; on-hand batches deduct
+  // their physical dose only now. Both consume the reservation atomically.
+  tx.update(refs.stock, {
+    quantity: Number(stock.quantity) - (!reservation || stock.quantity_mode === 'on_hand' ? 1 : 0),
+    ...(reservation ? { reserved_count: Number(stock.reserved_count) - 1 } : {}),
+    updated_at: values.timestamp
+  });
   tx.set(refs.record, {
     resident_uid: appointment.resident_uid, resident_name: appointment.resident_name || '', appointment_id: refs.appointment.id,
     vaccination_session_id: appointment.vaccination_session_id || 'legacy', dose_number: values.doseNumber,
@@ -29,7 +44,10 @@ export async function commitDose(tx, refs, values) {
     clinic_id: values.clinicId, clinic_name: appointment.clinic_name || '', clinic_location: values.location.trim(),
     date_given: values.date, administered_by: values.uid, recorded_at: values.timestamp
   });
-  tx.update(refs.appointment, { status: 'completed', completed_at: values.timestamp, completed_dose_number: values.doseNumber, completed_vaccine_name: stock.type });
+  tx.update(refs.appointment, {
+    ...(reservation ? { stock_reservation: {...reservation, status: 'consumed', consumed_at: values.timestamp} } : {}),
+    status: 'completed', completed_at: values.timestamp, completed_dose_number: values.doseNumber, completed_vaccine_name: stock.type
+  });
   tx.set(refs.notification, {
     recipient_uid: appointment.resident_uid, user_id: appointment.resident_uid, appointment_id: refs.appointment.id,
     type: 'vaccine', title: 'Dose ' + values.doseNumber + ' Completed',

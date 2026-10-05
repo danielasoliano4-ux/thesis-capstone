@@ -124,6 +124,7 @@ function renderNotifications(list) {
             <div class="notif-body">
                 <h4>${escapeHtml(n.title || 'Notification')}</h4>
                 <p>${escapeHtml(n.message || n.body || '')}</p>
+                ${n.action === 'review_schedule' ? '<a class="action-btn" href="residents.html">Review and book dates in your dashboard</a>' : ''}
                 <div class="notif-meta"><span class="notif-time"><i class="fa-regular fa-clock"></i> ${escapeHtml(createdAt)}</span><span class="notif-tag tag-${escapeHtml(n.type || 'system')}">${escapeHtml(n.type || 'system')}</span></div>
             </div>
 

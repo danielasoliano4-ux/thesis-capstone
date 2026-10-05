@@ -22,6 +22,55 @@ test('stock choices exclude other clinics, expired, empty, archived and malforme
  const rows=[stock,early,...[{clinic_id:'other'},{expiry:'2026-09-25'},{expiry:''},{quantity:0},{quantity:-1},{quantity:'invalid'},{quantity:0.5},{archived:true}].map(change=>({...stock,...change}))];
  assert.deepEqual(availableStock(rows,'clinic',values.today).map(item=>item.batch),['early','B1']);
 });
+
+test('fully reserved batches disappear from available stock but remain usable by their appointment',async()=>{
+ const {availableStock}=await core;
+ const reservation={status:'reserved',inventory_id:'held'};
+ for(const batch of [
+  {...stock,id:'held',quantity:1,reserved_count:1,quantity_mode:'on_hand'},
+  {...stock,id:'held',quantity:0,reserved_count:1}
+ ]) {
+  const other={...stock,id:'other'};
+  assert.deepEqual(availableStock([batch,other],'clinic',values.today).map(item=>item.id),['other']);
+  assert.deepEqual(availableStock([batch,other],'clinic',values.today,reservation).map(item=>item.id),['held']);
+  for(const change of [{archived:true},{expiry:values.today},{expiry:'2099-02-30'},{reserved_count:0}])
+   assert.deepEqual(availableStock([{...batch,...change},other],'clinic',values.today,reservation),[]);
+ }
+});
+
+test('unreserved dose completion cannot consume another appointment reservation',async()=>{
+ const f=fixture({stock:{...stock,quantity:2,reserved_count:2,quantity_mode:'on_hand'}});
+ await assert.rejects(f.run(),/no longer available/);
+ assert.equal(f.rows.get('stock').quantity,2);
+ assert.equal(f.rows.has('record'),false);
+});
+
+test('completing a reserved dose reduces physical inventory without reducing availability again',async()=>{
+ const reservation={status:'reserved',inventory_id:'stock',quantity:1};
+ for(const batch of [
+  {...stock,quantity:50,reserved_count:1,quantity_mode:'on_hand'},
+  {...stock,quantity:1,reserved_count:1,quantity_mode:'on_hand'},
+  {...stock,quantity:0,reserved_count:1}
+ ]) {
+  const {availableQuantity,physicalQuantity}=await import('../scripts/stock-summary.mjs');
+  const beforeAvailable=availableQuantity(batch),beforePhysical=physicalQuantity(batch);
+  const f=fixture({stock:batch,appointment:{...appointment,stock_reservation:reservation}});
+  await f.run();
+  assert.equal(physicalQuantity(f.rows.get('stock')),beforePhysical-1);
+  assert.equal(availableQuantity(f.rows.get('stock')),beforeAvailable);
+  assert.equal(f.rows.get('stock').reserved_count,0);
+  assert.equal(f.rows.get('appointment').stock_reservation.status,'consumed');
+  await assert.rejects(f.run(),/already/);
+  assert.equal(physicalQuantity(f.rows.get('stock')),beforePhysical-1);
+ }
+});
+
+test('a reserved appointment cannot complete using a different vaccine batch',async()=>{
+ const f=fixture({appointment:{...appointment,stock_reservation:{status:'reserved',inventory_id:'other',quantity:1}}});
+ await assert.rejects(f.run(),/reserved/);
+ assert.equal(f.rows.get('stock').quantity,2);
+ assert.equal(f.rows.has('record'),false);
+});
 test('completion deducts one dose and saves matching batch, record, appointment and notification',async()=>{
  const f=fixture();await f.run();
  assert.equal(f.rows.get('stock').quantity,1);

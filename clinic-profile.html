@@ -9,8 +9,9 @@
     <link rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
     <link rel="stylesheet" href="clinic-profile.css"/>
-    <link rel="stylesheet" href="responsive.css">
+
 <link rel="stylesheet" href="clinic-layout.css">
+    <link rel="stylesheet" href="/responsive.css">
 </head>
 <body class="clinic-dashboard">
 
@@ -77,6 +78,14 @@
                 <div class="profile-field full-width">
                     <label>Address</label>
                     <input id="profileAddress" type="text" value="Brgy. Poblacion Uno, Cabuyao City, Laguna" required/>
+                </div>
+
+                <div class="profile-field full-width">
+                    <label for="profileBarangay">Barangay</label>
+                    <select id="profileBarangay" required aria-describedby="profileBarangayHelp">
+                        <option value="">Select barangay</option>
+                    </select>
+                    <small id="profileBarangayHelp" style="display:block;margin-top:6px;color:#6b7280;">Residents can find your clinic using this barangay on the map.</small>
                 </div>
 
 <!-- CONTACT AND EMAIL -->

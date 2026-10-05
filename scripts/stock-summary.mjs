@@ -1,3 +1,11 @@
+export function availableQuantity(item) {
+  const quantity = Number(item.quantity ?? 0), reserved = Number(item.reserved_count ?? 0);
+  if (!Number.isInteger(quantity) || quantity < 0 || !Number.isInteger(reserved) || reserved < 0) return 0;
+  return Math.max(0, quantity - (item.quantity_mode === 'on_hand' ? reserved : 0));
+}
+export function physicalQuantity(item) {
+  return Number(item.quantity || 0) + (item.quantity_mode === 'on_hand' ? 0 : Number(item.reserved_count || 0));
+}
 export function shortVaccineName(value) {
   const name = String(value || 'Vaccine').replace(/\([^)]*\)/g, '').trim();
   const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -7,7 +15,7 @@ export function shortVaccineName(value) {
 export function summarizeStock(items) {
   const totals = new Map();
   for (const item of items) {
-    const quantity = Number(item.quantity);
+    const quantity = availableQuantity(item);
     if (!Number.isFinite(quantity) || quantity <= 0) continue;
     const name = shortVaccineName(item.type);
     totals.set(name, (totals.get(name) || 0) + quantity);

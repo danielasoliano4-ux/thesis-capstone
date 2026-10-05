@@ -1,5 +1,7 @@
+import { CABUYAO_BARANGAYS, extractBarangay } from './clinic-barangays.js';
 import { notifyDialog } from './app-dialogs.js';
-import { simplifyStockText, clinicStockStatus } from './stock-summary.mjs';
+import { simplifyStockText, clinicStockStatus, summarizeStock, availableQuantity } from './stock-summary.mjs';
+import { availableStock } from './dose-stock.mjs';
 import { auth, db, onAuthStateChanged, fetchUserProfile } from './firebase.js';
 import { clinicBooking } from './booking-status.js';
 import { collection, onSnapshot, query, where } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
@@ -8,18 +10,30 @@ let bookingRows = [];
 let bookingState = 'loading';
 let bookingUnsubscribe;
 const bookingWidgets = new Set();
+let bookingWidgetDisplayKey = '';
+function bookingWidgetKey() {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  return bookingState + ':' + bookingRows.map(booking => booking.id + ':' + Boolean(clinicBooking([booking], booking.clinic_id, today))).join('|');
+}
 function refreshBookingWidgets() {
+  bookingWidgetDisplayKey = bookingWidgetKey();
   for (const widget of bookingWidgets) {
     if (!widget.host.isConnected) bookingWidgets.delete(widget);
     else widget.render();
   }
 }
+// Deadlines can pass without a Firestore update. Remove expired actions promptly.
+setInterval(() => {
+  if (bookingWidgetKey() !== bookingWidgetDisplayKey) refreshBookingWidgets();
+}, 1000);
 onAuthStateChanged(auth, async user => {
   bookingUnsubscribe?.();
   bookingRows = [];
   bookingState = user ? 'loading' : 'ready';
   refreshBookingWidgets();
-  if (!user) return;
+  inventoryUnsubscribe?.();
+  inventoryReady = false;
+  if (!user) { rebuildClinicDirectory(); return; }
   const profile = await fetchUserProfile(user.uid);
   if (auth.currentUser?.uid !== user.uid) return;
   if (profile?.role !== 'resident') {
@@ -27,6 +41,7 @@ onAuthStateChanged(auth, async user => {
     refreshBookingWidgets();
     return;
   }
+  listenToResidentInventory();
   // One live resident query serves all clinic markers; each widget filters by clinic_id.
   bookingUnsubscribe = onSnapshot(query(collection(db, 'appointments'), where('resident_uid', '==', user.uid)), { includeMetadataChanges: true }, snapshot => {
     bookingRows = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
@@ -39,6 +54,7 @@ onAuthStateChanged(auth, async user => {
   });
 });
 function mountBookingWidget(host, clinic, mapId) {
+  host.classList.add('clinic-booking-widget');
   for (const widget of bookingWidgets) {
     if (!widget.host.isConnected || widget.host === host) bookingWidgets.delete(widget);
   }
@@ -46,21 +62,39 @@ function mountBookingWidget(host, clinic, mapId) {
     host.replaceChildren();
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
     const booking = clinicBooking(bookingRows, clinic.id, today);
-    if (bookingState === 'ready' && booking && booking.status !== 'pending') {
+    if (bookingState === 'ready' && booking) {
       const status = document.createElement('div');
-      status.style.cssText = 'margin-top:12px;padding:12px;border-radius:8px;background:#ecfdf5;color:#166534;';
-      status.textContent = 'Scheduled: ' + (booking.preferred_date || 'Contact clinic') + ' at ' + (booking.preferred_time || 'Contact clinic');
+      status.className = 'clinic-scheduled-status';
+      status.textContent = (booking.status === 'pending' ? 'Awaiting clinic confirmation: ' : 'Scheduled: ') + (booking.preferred_date || 'Contact clinic') + ' at ' + (booking.preferred_time || 'Contact clinic');
       host.append(status);
+      if (['pending', 'confirmed'].includes(booking.status) && !booking.arrived_at) {
+        const actions = document.createElement('div');
+        actions.className = 'clinic-booking-actions';
+        for (const [label, handler] of [['Reschedule', 'openRescheduleModal'], ['Cancel', 'openCancelModal']]) {
+          const action = document.createElement('button');
+          action.type = 'button';
+          action.className = 'action-btn' + (label === 'Cancel' ? ' danger' : '');
+          action.textContent = label;
+          action.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof window[handler] === 'function') window[handler](booking);
+            else window.location.href = 'residents.html#panel-appointments';
+          });
+          actions.append(action);
+        }
+        host.append(actions);
+      }
       return;
     }
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'map-book-button';
-    button.disabled = bookingState !== 'ready' || Boolean(booking) || clinic.status === 'out';
-    button.textContent = bookingState === 'loading' ? 'Checking booking...' : bookingState === 'error' ? 'Unable to check booking' : booking ? 'Pending' : clinic.status === 'out' ? 'Out of Stock' : 'Book Appointment';
+    button.disabled = bookingState !== 'ready' || Boolean(booking) || clinic.status !== 'available';
+    button.textContent = bookingState === 'loading' ? 'Checking booking...' : bookingState === 'error' ? 'Unable to check booking' : booking ? 'Pending' : clinic.status !== 'available' ? STATUS_LABEL[clinic.status] : 'Book Appointment';
     if (button.disabled) button.style.cssText = 'background:#e5e7eb;color:#4b5563;cursor:not-allowed;';
     button.addEventListener('click', () => {
-      if (mapId === 'googleMap') window.checkAuthAndBook?.(clinic.name, clinic.id);
+      if (mapId === 'googleMap' || mapId === 'googleMapNew') window.checkAuthAndBook?.(clinic.name, clinic.id);
       else window.openBookingModal?.(clinic.name, clinic.id);
     });
     host.append(button);
@@ -73,17 +107,20 @@ let CLINICS = [];
 let clinicProfileData = [];
 let inventoryByClinic = new Map();
 let inventoryUnsubscribe = null;
+let inventoryReady = false;
 
 const STATUS_COLOR = { available: '#00b140', low: '#d98a00', out: '#e60000' };
 const STATUS_LABEL = { available: 'Available', low: 'Low Stock', out: 'Out of Stock' };
 
 const mapsData = [];
 let selectedDestination = null;
+let directionsMapId = null;
 let activeStockFilter = 'all';
 
 function initMap() {
   const containers = [
     { mapId: 'googleMapOverview', sidebarId: 'clinicSidebarOverview' },
+    { mapId: 'googleMapNew',      sidebarId: 'clinicSidebarNew'      },
     { mapId: 'googleMap',         sidebarId: 'clinicSidebar'         }
   ];
   if (!CLINICS.length) return;
@@ -118,24 +155,35 @@ function loadClinics() {
     rebuildClinicDirectory();
   }, (error) => console.error('Failed to load clinics:', error));
 
+}
+
+function listenToResidentInventory() {
   inventoryUnsubscribe?.();
   inventoryUnsubscribe = onSnapshot(collection(db, 'inventory'), snapshot => {
     inventoryByClinic = new Map();
     snapshot.docs.forEach(item => {
       const data = item.data();
       const list = inventoryByClinic.get(data.clinic_id) || [];
-      if (Number(data.quantity || 0) > 0) list.push(data.type || '');
+      list.push({...data, id:item.id});
       inventoryByClinic.set(data.clinic_id, list);
     });
+    inventoryReady = true;
     rebuildClinicDirectory();
-  }, error => console.error('Failed to load clinic vaccine inventory:', error));
+  }, error => {
+    inventoryReady = false;
+    rebuildClinicDirectory();
+    console.error('Failed to load clinic vaccine inventory:', error);
+  });
 }
 
 function rebuildClinicDirectory() {
-    CLINICS = clinicProfileData.map(clinic => ({
-      ...clinic,
-      vaccineTypes: [...new Set([...(clinic.vaccineTypes || []), ...(inventoryByClinic.get(clinic.id) || [])])]
-    }));
+    const today = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+    CLINICS = clinicProfileData.map(clinic => {
+      if (!inventoryReady) return {...clinic};
+      const active = availableStock(inventoryByClinic.get(clinic.id) || [], clinic.id, today);
+      const total = active.reduce((sum,item) => sum + availableQuantity(item), 0);
+      return {...clinic, stock_total:total, status:clinicStockStatus(total), stock:summarizeStock(active), vaccineTypes:[...new Set(active.map(item=>item.type))]};
+    });
 
     window.clinicDirectory = CLINICS;
     if (window.updateNearestClinicSummary) window.updateNearestClinicSummary(CLINICS);
@@ -147,34 +195,6 @@ function rebuildClinicDirectory() {
     });
     if (window.L) initMap();
     populateMapDirectoryFilters();
-}
-
-// Complete Cabuyao list, including barangays without registered clinics.
-// Source: https://psa.gov.ph/classification/psgc/barangays/0403404000
-const CABUYAO_BARANGAYS = [
-  'Baclaran', 'Banaybanay', 'Banlic', 'Barangay Dos', 'Barangay Tres',
-  'Barangay Uno', 'Bigaa', 'Butong', 'Casile', 'Diezmo', 'Gulod',
-  'Mamatid', 'Marinig', 'Niugan', 'Pittland', 'Pulo', 'Sala', 'San Isidro'
-];
-
-function normalizeBarangay(value) {
-  const name = String(value).toLowerCase()
-    .replace(/\b(?:brgy|barangay|poblacion|pob)\b\.?/g, '')
-    .replace(/\b(?:city of cabuyao|cabuyao(?: city)?|laguna)\b/g, '')
-    .replace(/[^a-z0-9]/g, '');
-  return CABUYAO_BARANGAYS.find(barangay =>
-    barangay.toLowerCase().replace(/^barangay /, '').replace(/[^a-z0-9]/g, '') === name
-  ) || '';
-}
-
-function extractBarangay(value, explicitValue = '') {
-  const match = String(value).match(/(?:brgy\.?|barangay)\s+([^,]+)/i);
-  const candidates = [explicitValue, match?.[1], ...String(value).split(',')];
-  for (const candidate of candidates) {
-    const barangay = normalizeBarangay(candidate || '');
-    if (barangay) return barangay;
-  }
-  return String(explicitValue || match?.[1] || '').trim();
 }
 
 function normalizeVaccineTypes(value) {
@@ -192,10 +212,12 @@ function createMap(mapId, sidebarId) {
 
   const entry = { mapId, sidebarId, map, markers: [] };
   entry.center = CABUYAO_CENTER;
+  entry.defaultView = { center: map.getCenter(), zoom: map.getZoom() };
   CLINICS.filter(clinic => Number.isFinite(clinic.lat) && Number.isFinite(clinic.lng)).forEach(clinic => {
     entry.markers.push(createMarkerForMap(map, clinic, mapId));
   });
   addLocationControl(entry);
+  addDirectionsControl(entry);
   mapsData.push(entry);
   buildSidebarFor(entry);
   if (!entry.markers.length) {
@@ -251,16 +273,17 @@ function createMarkerForMap(map, clinic, mapId) {
   const marker = L.marker([clinic.lat, clinic.lng], { icon, title: clinic.name }).addTo(map);
   const bookingButton = '<div class="clinic-booking-status"></div>';
   const directionsButton = '<button type="button" class="map-directions-button">Get Directions</button>';
-  marker.bindPopup(`<section class="clinic-popup-card"><header><span class="clinic-popup-type">${escapeHtml(clinic.type)}</span><h3>${escapeHtml(clinic.name)}</h3><span class="clinic-popup-status" style="color:${color}">${STATUS_LABEL[clinic.status]}</span></header><dl><div><dt>Address</dt><dd>${escapeHtml(clinic.address)}</dd></div><div><dt>Hours</dt><dd>${escapeHtml(clinic.hours)}</dd></div><div><dt>Phone</dt><dd>${escapeHtml(clinic.phone)}</dd></div><div><dt>Price</dt><dd>${escapeHtml(clinic.priceRange)}</dd></div><div><dt>Stock</dt><dd>${escapeHtml(clinic.stock)}</dd></div></dl><div class="clinic-popup-actions">${bookingButton}${directionsButton}</div><div class="route-summary" aria-live="polite"></div></section>`, { className: 'clinic-popup', maxWidth: 310, minWidth: 210, maxHeight: 330, autoPanPadding: [16, 16] });
+  marker.bindPopup(`<section class="clinic-popup-card"><header><span class="clinic-popup-type">${escapeHtml(clinic.type)}</span><h3>${escapeHtml(clinic.name)}</h3><span class="clinic-popup-status" style="color:${color}">${STATUS_LABEL[clinic.status]}</span></header><dl><div><dt>Address</dt><dd>${escapeHtml(clinic.address)}</dd></div><div><dt>Hours</dt><dd>${escapeHtml(clinic.hours)}</dd></div><div><dt>Phone</dt><dd>${escapeHtml(clinic.phone)}</dd></div><div><dt>Price</dt><dd>${escapeHtml(clinic.priceRange)}</dd></div><div><dt>Stock</dt><dd>${escapeHtml(clinic.stock)}</dd></div></dl><div class="clinic-popup-actions">${bookingButton}${directionsButton}<button type="button" class="map-popup-exit-directions" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i> Exit directions</button></div><div class="route-summary" aria-live="polite"></div></section>`, { className: 'clinic-popup', maxWidth: 310, minWidth: 210, maxHeight: 330, autoPanPadding: [16, 16] });
   marker.on('popupopen', event => {
     const host = event.popup.getElement()?.querySelector('.clinic-booking-status');
     if (host) mountBookingWidget(host, clinic, mapId);
     const routeButton = event.popup.getElement()?.querySelector('.map-directions-button');
-    if (routeButton) routeButton.addEventListener('click', () => {
-      selectedDestination = clinic;
-      locateUser(false);
-      if (userLocation) updateRoutes();
-    });
+    if (routeButton) routeButton.addEventListener('click', () => startDirections(clinic, mapId));
+    const exitButton = event.popup.getElement()?.querySelector('.map-popup-exit-directions');
+    if (exitButton) {
+      exitButton.hidden = !directionsActive;
+      exitButton.addEventListener('click', exitDirections);
+    }
   });
   return { marker, clinic };
 }
@@ -293,7 +316,8 @@ function buildSidebarFor(entry) {
         ? `<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;color:${color};font-weight:bold;text-align:right;">${STATUS_LABEL[mobj.clinic.status]}<br><span style="color:#6b7280;font-weight:normal;">${doseLabel}</span></span><button class="book-btn" onclick="checkAuthAndBook('${mobj.clinic.name.replace(/'/g, "\\'")}', '${mobj.clinic.id}')">Book</button></div>`
         : `<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;color:${color};font-weight:bold;text-align:right;">${STATUS_LABEL[mobj.clinic.status]}<br><span style="color:#6b7280;font-weight:normal;">${doseLabel}</span></span><button class="book-btn" onclick="openBookingModal('${mobj.clinic.name.replace(/'/g, "\\'")}', '${mobj.clinic.id}')">Book</button></div>`;
 
-    row.innerHTML = `<div style="display:flex;align-items:center;gap:12px;flex:1;">${leftHtml}</div><div style="display:flex;align-items:center;gap:12px;">${rightHtml}</div>`;
+    row.classList.add('map-clinic-row');
+    row.innerHTML = `<div class="map-clinic-details" style="display:flex;align-items:center;gap:12px;flex:1;">${leftHtml}</div><div class="map-clinic-actions" style="display:flex;align-items:center;gap:12px;">${rightHtml}</div>`;
 
     row.addEventListener('click', (e) => {
       if (e.target && (e.target.tagName === 'BUTTON' || e.target.closest('button'))) return;
@@ -392,7 +416,10 @@ document.querySelectorAll('.map-directory-clear').forEach(button => button.addEv
 function refreshMaps() {
   if (!window.L) return;
   mapsData.forEach(entry => {
-    setTimeout(() => entry.map.invalidateSize(), 0);
+    setTimeout(() => {
+      entry.map.invalidateSize({ pan: false });
+      if (entry.routeLayer) fitRoute(entry);
+    }, 0);
   });
 }
 
@@ -410,19 +437,45 @@ function addLocationControl(entry) {
   control.addTo(entry.map);
 }
 
+function addDirectionsControl(entry) {
+  const control = L.control({ position: 'bottomleft' });
+  control.onAdd = () => {
+    const button = L.DomUtil.create('button', 'map-exit-directions');
+    button.type = 'button';
+    button.hidden = true;
+    button.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i> Exit directions';
+    button.setAttribute('aria-label', 'Exit directions and return to the clinic map');
+    L.DomEvent.disableClickPropagation(button);
+    L.DomEvent.on(button, 'click', exitDirections);
+    entry.exitDirectionsButton = button;
+    return button;
+  };
+  control.addTo(entry.map);
+}
+
 let userLocation = null;
 let locationWatchId = null;
 // Location updates keep the blue marker accurate, but should never take over
 // the viewport unless the resident explicitly pressed the location control.
 let centerOnNextLocationUpdate = false;
-function locateUser(centerMap = true) {
+let directionsActive = false;
+let routeRequestId = 0;
+let locationRequestId = 0;
+function locateUser(centerMap = true, restartWatch = false) {
   if (!navigator.geolocation) return notifyDialog('Location is not supported by this browser.');
   centerOnNextLocationUpdate = centerMap;
   if (centerMap && userLocation) {
     mapsData.forEach(entry => entry.map.setView(userLocation, 17));
     centerOnNextLocationUpdate = false;
   }
+  if (restartWatch && locationWatchId !== null) {
+    navigator.geolocation.clearWatch(locationWatchId);
+    locationWatchId = null;
+  }
+  if (locationWatchId !== null) return;
+  const requestId = ++locationRequestId;
   const updateLocation = position => {
+    if (requestId !== locationRequestId) return;
     userLocation = [position.coords.latitude, position.coords.longitude];
     mapsData.forEach(entry => {
       if (!entry.userMarker) entry.userMarker = L.circleMarker(userLocation, { radius: 8, color: '#fff', weight: 3, fillColor: '#2878e8', fillOpacity: 1 }).addTo(entry.map);
@@ -432,11 +485,72 @@ function locateUser(centerMap = true) {
     centerOnNextLocationUpdate = false;
     if (selectedDestination) updateRoutes();
   };
-  if (locationWatchId !== null) return;
-  locationWatchId = navigator.geolocation.watchPosition(updateLocation, () => {
-    notifyDialog('Please allow location access to show your current position.');
-    locationWatchId = null;
-  }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 });
+  locationWatchId = navigator.geolocation.watchPosition(updateLocation, error => {
+    if (requestId !== locationRequestId) return;
+    if (selectedDestination) {
+      const reason = error.code === 1 ? 'Allow location access to draw your route.'
+        : error.code === 2 ? 'Your location is unavailable.'
+          : 'Finding your location timed out. Waiting for your location...';
+      setDirectionsSummary(reason, googleMapsDirectionsUrl(null, selectedDestination));
+    } else {
+      notifyDialog('Please allow location access to show your current position.');
+    }
+    if (error.code === 1) {
+      navigator.geolocation.clearWatch(locationWatchId);
+      locationWatchId = null;
+      locationRequestId++;
+    }
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+}
+
+function startDirections(clinic, mapId) {
+  if (!directionsActive) {
+    directionsActive = true;
+    mapsData.forEach(entry => {
+      entry.normalView = { center: entry.map.getCenter(), zoom: entry.map.getZoom() };
+      if (entry.exitDirectionsButton) entry.exitDirectionsButton.hidden = false;
+      entry.map.getContainer().querySelectorAll('.map-popup-exit-directions').forEach(button => {
+        button.hidden = false;
+      });
+    });
+  }
+  // Cancel routes for the previous clinic while fresh geolocation is pending.
+  routeRequestId++;
+  centerOnNextLocationUpdate = false;
+  selectedDestination = clinic;
+  directionsMapId = mapId;
+  mapsData.forEach(entry => {
+    if (entry.routeLayer) {
+      entry.routeLayer.remove();
+      entry.routeLayer = null;
+    }
+  });
+  setDirectionsSummary('Getting your location...');
+  if (!navigator.geolocation) {
+    setDirectionsSummary('Location is not supported. Use Google Maps for directions.',
+      googleMapsDirectionsUrl(null, clinic));
+    return;
+  }
+  // Start the same live lookup as the location control. The first location
+  // result draws the route without requiring another button click.
+  locateUser(false, true);
+}
+
+function setDirectionsSummary(message, routeLink = '') {
+  mapsData.forEach(entry => {
+    const summary = entry.map.getPopup()?.getElement()?.querySelector('.route-summary');
+    if (!summary) return;
+    summary.replaceChildren(document.createTextNode(message));
+    if (routeLink) {
+      summary.append(' ');
+      const link = document.createElement('a');
+      link.href = routeLink;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.textContent = 'Open turn-by-turn directions';
+      summary.append(link);
+    }
+  });
 }
 
 let findingNearestClinic = false;
@@ -478,8 +592,7 @@ async function focusNearestClinic() {
     activeStockFilter = 'all';
     document.querySelectorAll('.map-filter').forEach(group => group.querySelectorAll('button').forEach((button, index) => { button.classList.toggle('active-btn', index === 0); }));
     applyMapDirectoryFilters();
-    selectedDestination = nearest.clinic;
-    if (entry.routeLayer) { entry.routeLayer.remove(); entry.routeLayer = null; }
+    clearDirections(false);
     if (!entry.userMarker) entry.userMarker = L.circleMarker(userLocation, { radius: 8, color: '#fff', weight: 3, fillColor: '#2878e8', fillOpacity: 1 }).addTo(entry.map).bindPopup('Your location');
     else entry.userMarker.setLatLng(userLocation);
     entry.map.invalidateSize();
@@ -505,8 +618,19 @@ function mapDistanceInKm(latitude, longitude, clinicLatitude, clinicLongitude) {
   return earthRadius * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
 }
 
+function fitRoute(entry) {
+  const container = entry.map.getContainer();
+  if (!container.clientWidth || !container.clientHeight) return;
+  entry.map.stop();
+  entry.map.invalidateSize({ pan: false });
+  entry.map.fitBounds(entry.routeLayer.getBounds(), {
+    padding: [44, 44], maxZoom: 16, animate: false
+  });
+}
+
 async function updateRoutes() {
   if (!userLocation || !selectedDestination) return;
+  const requestId = ++routeRequestId;
   const destination = [selectedDestination.lng, selectedDestination.lat];
   const origin = [userLocation[1], userLocation[0]];
   const url = `https://router.project-osrm.org/route/v1/driving/${origin.join(',')};${destination.join(',')}?overview=full&geometries=geojson`;
@@ -516,17 +640,80 @@ async function updateRoutes() {
     const data = await response.json();
     const route = data.routes?.[0];
     if (!route) throw new Error('No route found');
-    mapsData.forEach(entry => {
-      if (entry.routeLayer) entry.routeLayer.remove();
-      entry.routeLayer = L.geoJSON(route.geometry, { style: { color: '#2878e8', weight: 5, opacity: .85 } }).addTo(entry.map);
-      entry.map.fitBounds(entry.routeLayer.getBounds(), { padding: [30, 30] });
-      const popup = entry.map.getPopup();
-      const summary = popup?.getElement()?.querySelector('.route-summary');
-      if (summary) summary.textContent = `Route: ${(route.distance / 1000).toFixed(1)} km, about ${Math.ceil(route.duration / 60)} min`;
+    if (requestId !== routeRequestId || !selectedDestination) return;
+    const destinationName = selectedDestination.name;
+    const mapsUrl = googleMapsDirectionsUrl(userLocation, selectedDestination);
+    const entry = mapsData.find(item => item.mapId === directionsMapId);
+    if (!entry) throw new Error('The selected map is no longer available');
+    // Refresh dimensions before creating the SVG renderer, including maps
+    // initialized inside a hidden tab. Stop any clinic-popup zoom animation.
+    entry.map.stop();
+    entry.map.invalidateSize({ pan: false });
+    if (entry.routeLayer) entry.routeLayer.remove();
+    const routeLine = L.geoJSON(route.geometry, {
+      style: { color: '#1458b0', weight: 9, opacity: 1, lineCap: 'round', lineJoin: 'round' }
     });
+    const routeHighlight = L.geoJSON(route.geometry, {
+      style: { color: '#56a5ff', weight: 5, opacity: 1, lineCap: 'round', lineJoin: 'round' }
+    });
+    // Project the route at its final zoom before attaching the renderer.
+    entry.routeLayer = L.featureGroup([routeLine, routeHighlight]);
+    fitRoute(entry);
+    entry.routeLayer.addTo(entry.map);
+    const summary = entry.map.getPopup()?.getElement()?.querySelector('.route-summary');
+    if (summary) {
+      summary.replaceChildren(document.createTextNode(`Route to ${destinationName}: ${(route.distance / 1000).toFixed(1)} km, about ${Math.ceil(route.duration / 60)} min.`));
+      const link = document.createElement('a');
+      link.href = mapsUrl;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.textContent = ' Open turn-by-turn directions';
+      summary.append(link);
+    }
   } catch (error) {
+    if (requestId !== routeRequestId) return;
     console.error('Failed to load route:', error);
+    setDirectionsSummary('The route line could not be loaded. Open turn-by-turn directions instead.',
+      googleMapsDirectionsUrl(userLocation, selectedDestination));
   }
+}
+
+function googleMapsDirectionsUrl(origin, destination) {
+  const params = new URLSearchParams({
+    api: '1',
+    destination: `${destination.lat},${destination.lng}`,
+    travelmode: 'driving'
+  });
+  if (origin) params.set('origin', `${origin[0]},${origin[1]}`);
+  return `https://www.google.com/maps/dir/?${params}`;
+}
+
+function clearDirections(restoreView) {
+  routeRequestId++;
+  selectedDestination = null;
+  directionsMapId = null;
+  directionsActive = false;
+  mapsData.forEach(entry => {
+    if (entry.routeLayer) {
+      entry.routeLayer.remove();
+      entry.routeLayer = null;
+    }
+    if (entry.exitDirectionsButton) entry.exitDirectionsButton.hidden = true;
+    entry.map.getContainer().querySelectorAll('.map-popup-exit-directions').forEach(button => {
+      button.hidden = true;
+    });
+    entry.map.closePopup();
+    const normalView = entry.normalView || entry.defaultView;
+    if (restoreView) entry.map.setView(normalView.center, normalView.zoom);
+    entry.normalView = null;
+    entry.map.getContainer().querySelectorAll('.route-summary').forEach(summary => {
+      summary.textContent = '';
+    });
+  });
+}
+
+function exitDirections() {
+  clearDirections(true);
 }
 
 function escapeHtml(value = '') {

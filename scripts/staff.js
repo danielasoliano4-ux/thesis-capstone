@@ -1,9 +1,9 @@
 import { notifyDialog, confirmDialog } from './app-dialogs.js';
-import { summarizeStock, clinicStockStatus } from './stock-summary.mjs';
+import { physicalQuantity } from './stock-summary.mjs';
 import { watchDoseStock, saveStockDose, reviewTreatment } from './dose-completion.js';
 import { appointmentDeadline, pendingAppointmentExpired } from './booking-status.js';
 import { manageAppointment, markArrivalAndOpenIntake, openIntake } from './appointment-intake.js';
-import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp, setDoc, runTransaction } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
 // signOutUser comes from the app's own firebase.js, so sign-out acts on the same
 // auth instance that set the session persistence.
 import { auth, db, fetchUserProfile, signOutUser } from './firebase.js';
@@ -23,6 +23,12 @@ let inventoryUnsubscribe = null;
 let inventoryItems = [];
 const modal = document.getElementById('vaccineModal');
 const vaccineForm = document.getElementById('vaccineForm');
+let inventoryEditMetadata = '';
+
+function inventoryFormMetadata() {
+    return JSON.stringify(['vacType', 'vacGeneric', 'vacManufacturer', 'vacBatch', 'vacExpiry']
+        .map(id => document.getElementById(id).value));
+}
 
 const VACCINE_NAME_ALIASES = {
     'verorab': 'Verorab (PVRV)', 'verorab pvrv': 'Verorab (PVRV)', 'verovab': 'Verorab (PVRV)',
@@ -175,6 +181,7 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
                             <div class="appointment-avatar"><i class="fa-solid fa-user"></i></div>
                             <div class="resident-appointment-info">
                                 <h3>${escapeHtml(appointment.resident_name || 'Resident')}</h3>
+                                ${appointment.reschedule_requested ? `<p class="appointment-reschedule-note"><strong>Reschedule request — confirmation required</strong>${appointment.previous_preferred_date ? `<br>Previous: ${escapeHtml(appointment.previous_preferred_date)} at ${escapeHtml(appointment.previous_preferred_time || '')}` : ''}</p>` : ''}
                                 <p>${escapeHtml(appointment.preferred_date || '')} &nbsp;·&nbsp; ${escapeHtml(appointment.preferred_time || '')}</p>
                                 <div class="appointment-tags"><span>${escapeHtml(appointment.dose_label || 'Dose 1')}</span><span><i class="fa-regular fa-clock"></i> ${escapeHtml(appointment.preferred_time || '')}</span><span>${escapeHtml(appointment.clinic_name || '')}</span></div>
                             </div>
@@ -236,7 +243,7 @@ async function loadStaffAppointments(clinicId, staffUid = auth.currentUser?.uid)
 
 async function acceptStaffAppointment(appointmentId) {
     try { await manageAppointment({ appointment_id: appointmentId, action: 'confirm' });
-      notifyDialog('Appointment confirmed. You can now find it in Confirmed Appointments.');
+      notifyDialog('Appointment confirmed. One dose is reserved, so Clinic Status Overview shows one fewer available dose. Inventory will decrease when you complete the dose.');
     }
     catch (error) { notifyDialog('Could not confirm appointment: ' + error.message); }
 }
@@ -395,48 +402,6 @@ function listenToInventory(clinicId) {
         console.error('Failed to load inventory:', error);
         notifyDialog('Failed to load vaccine inventory.');
     });
-    return;
-    onSnapshot(inventoryQuery, (snapshot) => {
-        const tbody = document.getElementById('inventoryTableBody');
-        tbody.innerHTML = '';
-        let totalStock = 0;
-        let lowStockCount = 0;
-
-        snapshot.forEach((inventoryDoc) => {
-            const data = inventoryDoc.data();
-            const quantity = Number(data.quantity || 0);
-            totalStock += quantity;
-            const status = quantity <= 5 ? 'critical' : quantity <= 15 ? 'low' : 'adequate';
-            if (status !== 'adequate') lowStockCount++;
-
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td><strong>${escapeHtml(data.type)}</strong></td>
-                <td>${escapeHtml(data.manufacturer)}</td>
-                <td>${escapeHtml(data.batch)}</td>
-                <td><strong>${quantity} doses</strong></td>
-                <td>${escapeHtml(data.expiry)}</td>
-                <td><span class="status ${status}">${status}</span></td>
-                <td><button type="button" class="update-link edit-item-btn" data-id="${inventoryDoc.id}">
-                    <i class="fa-regular fa-pen-to-square"></i> Update
-                </button></td>`;
-            tbody.appendChild(row);
-
-            row.querySelector('.edit-item-btn').addEventListener('click', () => openModal(inventoryDoc.id, data));
-        });
-
-        document.getElementById('statTotalStock').textContent = totalStock;
-        document.getElementById('statLowStock').textContent = lowStockCount;
-        document.querySelector('.alert-box p').textContent = `${lowStockCount} stock item${lowStockCount === 1 ? '' : 's'} require immediate attention.`;
-        setDoc(doc(db, 'clinics', clinicId), {
-            stock_total: totalStock,
-            stock_status: clinicStockStatus(totalStock),
-            stock_summary: snapshot.docs.map(item => `${item.data().type || 'Vaccine'}: ${Number(item.data().quantity || 0)}`).join(' · ')
-        }, { merge: true }).catch(error => console.error('Failed to publish clinic stock summary:', error));
-    }, (error) => {
-        console.error('Failed to load inventory:', error);
-        notifyDialog('Failed to load vaccine inventory.');
-    });
 }
 
 
@@ -447,12 +412,62 @@ function expiryState(expiry) {
 }
 
 function inventoryCategory(item) {
-    const quantity = Number(item.quantity || 0);
+    const quantity = physicalQuantity(item);
     const [expiry] = expiryState(item.expiry);
     const expired = expiry === 'expired';
     const archived = Boolean(item.archived) || quantity <= 0;
     const usable = !archived && !expired && quantity > 0;
     return { quantity, expired, archived, usable, low: usable && quantity < LOW_STOCK_THRESHOLD, adequate: usable && quantity >= LOW_STOCK_THRESHOLD };
+}
+
+const pendingInventoryActions = new Set();
+
+async function manageInventoryBatch(button, action) {
+    const id = action === 'delete' ? button.dataset.deleteId : button.dataset.archiveId;
+    if (!id || pendingInventoryActions.has(id)) return;
+    pendingInventoryActions.add(id);
+    const originalText = button.textContent;
+    button.disabled = true;
+    try {
+        const reference = doc(db, 'inventory', id);
+        const latest = await getDoc(reference);
+        if (!latest.exists()) {
+            await notifyDialog('This batch no longer exists. Refresh the inventory to see the latest stock.');
+            return;
+        }
+        const item = latest.data();
+        const reserved = Number(item.reserved_count || 0);
+        if (reserved > 0) {
+            await notifyDialog(`This batch has ${reserved} dose${reserved === 1 ? '' : 's'} reserved for confirmed appointments. Archive and delete become available after those appointments are completed or cancelled. You can still update its quantity.`, { title: 'Batch has reserved doses' });
+            return;
+        }
+        const restoring = action === 'archive' && Boolean(item.archived);
+        if (restoring && !inventoryCategory({ ...item, archived: false }).usable) {
+            await notifyDialog('This batch cannot return to active stock because it is expired or has no doses on hand.');
+            return;
+        }
+        const confirmation = action === 'delete'
+            ? `Delete batch ${item.batch || id} permanently? This cannot be undone.`
+            : restoring ? `Restore batch ${item.batch || id} to active stock?`
+                : `Archive batch ${item.batch || id}? It will leave active stock and remain available under Archived.`;
+        if (!await confirmDialog(confirmation, { confirmText: action === 'delete' ? 'Delete batch' : restoring ? 'Restore batch' : 'Archive batch' })) return;
+        button.textContent = action === 'delete' ? 'Deleting...' : restoring ? 'Restoring...' : 'Archiving...';
+        // Firestore also checks reservations if another booking arrives during confirmation.
+        if (action === 'delete') await deleteDoc(reference);
+        else await updateDoc(reference, { archived: !restoring, updated_at: serverTimestamp() });
+        await notifyDialog(`Batch ${item.batch || id} ${action === 'delete' ? 'deleted' : restoring ? 'restored' : 'archived'} successfully.${action === 'archive' && !restoring ? ' View it using the Archived filter.' : ''}`);
+    } catch (error) {
+        console.error(`Could not ${action} inventory batch:`, error);
+        const reason = error.code === 'permission-denied'
+            ? 'Your access may have changed, or this batch now has reserved doses. Refresh the inventory and try again.'
+            : error.message || 'Check your connection and try again.';
+        await notifyDialog(`Could not ${action === 'archive' && originalText === 'Restore' ? 'restore' : action} the batch. ${reason}`);
+    } finally {
+        pendingInventoryActions.delete(id);
+        button.disabled = false;
+        button.textContent = originalText;
+        renderInventory();
+    }
 }
 
 function renderInventory() {
@@ -480,16 +495,15 @@ function renderInventory() {
         const vaccine = vaccineBrands.find(brand => brand.value === canonicalVaccineName(item.type || item.brand_name));
         const brandName = item.brand_name || vaccine?.brand || String(item.type || '').replace(/\s*\([^)]+\)\s*$/, '') || '—';
         const genericName = item.generic_name || vaccine?.generic || String(item.type || '').match(/\(([^)]+)\)$/)?.[1] || '—';
-        return `<tr><td><strong>${escapeHtml(brandName)}</strong></td><td>${escapeHtml(genericName)}</td><td>${escapeHtml(item.manufacturer)}</td><td>${escapeHtml(item.batch)}</td><td><strong>${category.quantity} doses</strong></td><td>${escapeHtml(item.expiry)}${expiryLabel ? `<div class="inventory-warning">${escapeHtml(expiryLabel)}</div>` : ''}</td><td><span class="status ${status}">${statusLabel}</span></td><td><div class="inventory-actions">${category.expired ? '' : `<button type="button" class="update-link" data-edit-id="${item.id}">Update</button><button type="button" class="inventory-action secondary" data-archive-id="${item.id}">${item.archived ? 'Restore' : 'Archive'}</button>`}<button type="button" class="inventory-action" data-delete-id="${item.id}">Delete</button></div></td></tr>`;
+        return `<tr><td><strong>${escapeHtml(brandName)}</strong></td><td>${escapeHtml(genericName)}</td><td>${escapeHtml(item.manufacturer)}</td><td>${escapeHtml(item.batch)}</td><td><strong>${category.quantity} doses on hand</strong><div class="inventory-available">${Math.max(0, category.quantity - Number(item.reserved_count || 0))} available to book</div>${Number(item.reserved_count || 0) > 0 ? `<div class="inventory-warning">${Number(item.reserved_count)} reserved for confirmed appointments</div>` : ''}</td><td>${escapeHtml(item.expiry)}${expiryLabel ? `<div class="inventory-warning">${escapeHtml(expiryLabel)}</div>` : ''}</td><td><span class="status ${status}">${statusLabel}</span></td><td><div class="inventory-actions">${category.expired ? '' : `<button type="button" class="update-link" data-edit-id="${item.id}">Update</button><button type="button" class="inventory-action secondary${Number(item.reserved_count || 0) > 0 ? ' inventory-reserved-action' : ''}" data-archive-id="${escapeHtml(item.id)}" title="${Number(item.reserved_count || 0) > 0 ? 'View reservation details' : item.archived ? 'Restore this batch to active stock' : 'Move this batch to Archived'}">${item.archived ? 'Restore' : 'Archive'}</button>`}<button type="button" class="inventory-action${Number(item.reserved_count || 0) > 0 ? ' inventory-reserved-action' : ''}" data-delete-id="${escapeHtml(item.id)}" title="${Number(item.reserved_count || 0) > 0 ? 'View reservation details' : 'Permanently delete this batch'}">Delete</button></div>${Number(item.reserved_count || 0) > 0 ? '<p class="inventory-action-note"><i class="fa-solid fa-lock" aria-hidden="true"></i> Archive &amp; delete locked by reservations</p>' : ''}</td></tr>`;
     }).join('') || '<tr><td colspan="8">No inventory batches match this filter.</td></tr>';
     tbody.querySelectorAll('[data-edit-id]').forEach(button => button.addEventListener('click', () => openModal(button.dataset.editId, inventoryItems.find(item => item.id === button.dataset.editId))));
-    tbody.querySelectorAll('[data-archive-id]').forEach(button => button.addEventListener('click', () => updateDoc(doc(db, 'inventory', button.dataset.archiveId), { archived: !inventoryItems.find(item => item.id === button.dataset.archiveId)?.archived, updated_at: serverTimestamp() })));
-    tbody.querySelectorAll('[data-delete-id]').forEach(button => button.addEventListener('click', async () => { if (!await confirmDialog('Delete this batch permanently?')) return; button.disabled = true; try { await deleteDoc(doc(db, 'inventory', button.dataset.deleteId)); } catch (error) { await notifyDialog('Could not delete the batch: ' + error.message); } finally { button.disabled = false; } }));
-    const total = active.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+    tbody.querySelectorAll('[data-archive-id]').forEach(button => button.addEventListener('click', () => manageInventoryBatch(button, 'archive')));
+    tbody.querySelectorAll('[data-delete-id]').forEach(button => button.addEventListener('click', () => manageInventoryBatch(button, 'delete')));
+    const total = active.reduce((sum, item) => sum + physicalQuantity(item), 0);
     document.getElementById('statTotalStock').textContent = total;
     document.getElementById('statLowStock').textContent = lowCount;
     document.querySelector('.alert-box p').textContent = `${lowCount} usable batch${lowCount === 1 ? ' is' : 'es are'} below ${LOW_STOCK_THRESHOLD} doses.${expiryCount ? ` ${expiryCount} batch${expiryCount === 1 ? ' is' : 'es are'} expired.` : ''}`;
-    setDoc(doc(db, 'clinics', currentClinicId), { stock_total: total, stock_status: clinicStockStatus(total), stock_summary: summarizeStock(active), updated_at: serverTimestamp() }, { merge: true }).catch(console.error);
 }
 
 function escapeHtml(value = '') {
@@ -505,8 +519,20 @@ function openModal(docId = '', data = {}) {
     setVaccineSelection(canonicalVaccineName(data.type || data.brand_name));
     document.getElementById('vacManufacturer').value = data.manufacturer || '';
     document.getElementById('vacBatch').value = data.batch || '';
-    document.getElementById('vacQuantity').value = data.quantity ?? '';
+    document.getElementById('vacQuantity').value = physicalQuantity(data) ?? '';
     document.getElementById('vacExpiry').value = data.expiry || '';
+    const reserved = Number(data.reserved_count || 0);
+    for (const id of ['vacType', 'vacGeneric', 'vacManufacturer', 'vacBatch', 'vacExpiry']) {
+        document.getElementById(id).disabled = Boolean(docId && reserved > 0);
+    }
+    document.getElementById('vacQuantity').min = reserved;
+    document.getElementById('vacQuantity').step = '1';
+    inventoryEditMetadata = inventoryFormMetadata();
+    const note = document.getElementById('stockReservationNote');
+    if (note) {
+        note.hidden = !docId || reserved <= 0;
+        note.textContent = `${reserved} dose${reserved === 1 ? '' : 's'} reserved for appointments. You can update doses on hand; batch details stay locked until reservations are released.`;
+    }
     modal.style.display = 'flex';
     modal.setAttribute('aria-hidden', 'false');
 }
@@ -526,11 +552,15 @@ modal.addEventListener('click', (event) => {
 
 vaccineForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const saveButton = vaccineForm.querySelector('[type="submit"]');
+    if (saveButton.disabled) return;
     if (!currentClinicId) {
         notifyDialog('Your staff account is not linked to a clinic. Add a clinic_id to your users profile first.');
         return;
     }
     const docId = document.getElementById('vaccineDocId').value;
+    const quantity = Number(document.getElementById('vacQuantity').value);
+    if (!Number.isInteger(quantity) || quantity < 0) { notifyDialog('Enter a whole number of doses, zero or greater.'); return; }
     if (docId && inventoryCategory(inventoryItems.find(item => item.id === docId) || {}).expired) { notifyDialog('This batch has expired and cannot be updated.'); closeModal(); return; }
     const selectedVaccine = vaccineBrands.find(item => item.value === vaccineBrandSelect.value);
     if (!selectedVaccine || selectedVaccine.generic !== vaccineGenericSelect.value) { notifyDialog('Select a matching vaccine brand and generic name/type.'); return; }
@@ -541,7 +571,8 @@ vaccineForm.addEventListener('submit', async (event) => {
         type: document.getElementById('vacType').value.trim(),
         manufacturer: document.getElementById('vacManufacturer').value.trim(),
         batch: document.getElementById('vacBatch').value.trim(),
-        quantity: Number(document.getElementById('vacQuantity').value),
+        quantity,
+        quantity_mode: 'on_hand',
         expiry: document.getElementById('vacExpiry').value,
         archived: docId ? Boolean(inventoryItems.find(item => item.id === docId)?.archived) : false,
         updated_at: serverTimestamp()
@@ -551,17 +582,41 @@ vaccineForm.addEventListener('submit', async (event) => {
         if (!await confirmDialog('This batch is already expired. Save it as an archived record?')) return;
         payload.archived = true;
     }
+    if (payload.quantity < Number(inventoryItems.find(item => item.id === docId)?.reserved_count || 0)) { notifyDialog('Physical stock cannot be less than the doses reserved for appointments.'); return; }
     const duplicate = inventoryItems.find(item => item.id !== docId && !item.archived && item.batch?.toLowerCase() === payload.batch.toLowerCase());
     if (duplicate) { notifyDialog('This clinic already has an active record for that batch number. Update the existing batch instead.'); return; }
 
+    const originalText = saveButton.textContent;
+    saveButton.disabled = true;
+    saveButton.textContent = 'Saving...';
     try {
-        if (docId) await updateDoc(doc(db, 'inventory', docId), payload);
+        if (docId) await runTransaction(db, async transaction => {
+            const reference = doc(db, 'inventory', docId);
+            const snapshot = await transaction.get(reference);
+            if (!snapshot.exists()) throw new Error('This batch no longer exists. Refresh the inventory.');
+            const current = snapshot.data();
+            if (current.clinic_id !== currentClinicId) throw new Error('This batch belongs to another clinic.');
+            if (inventoryCategory(current).expired) throw new Error('This batch has expired and cannot be updated.');
+            const reserved = Number(current.reserved_count || 0);
+            if (quantity < reserved) throw new Error(`Stock cannot be less than the ${reserved} doses currently reserved for appointments.`);
+            if (reserved > 0 && inventoryFormMetadata() !== inventoryEditMetadata) {
+                throw new Error('This batch now has reserved doses. Reopen the form to update its quantity; batch details cannot change while doses are reserved.');
+            }
+            transaction.update(reference, reserved > 0 ? {
+                quantity, quantity_mode: 'on_hand', updated_at: serverTimestamp()
+            } : payload);
+        });
         else await addDoc(collection(db, 'inventory'), payload);
         closeModal();
     } catch (error) {
         console.error('Error saving vaccine record:', error);
-        const reason = error.code ? ` (${error.code})` : '';
-        notifyDialog(`Failed to save inventory record${reason}: ${error.message || 'Unknown Firebase error.'}`);
+        const reason = error.code === 'permission-denied'
+            ? 'Your clinic access or deployed inventory rules do not allow this update. Refresh and sign in again; if it continues, deploy the latest Firestore rules.'
+            : error.message || 'Check your connection and try again.';
+        notifyDialog(`Could not save stock. ${reason}`);
+    } finally {
+        saveButton.disabled = false;
+        saveButton.textContent = originalText;
     }
 });
 
@@ -590,7 +645,7 @@ async function openAppointmentDetails(appointmentId) {
         if (!snapshot.exists()) throw new Error('This appointment is no longer available.');
         const appointment = snapshot.data();
         const intake = appointment.course_intake_data || appointment;
-        const priorDoses = Array.isArray(appointment.course_vaccination_history) ? appointment.course_vaccination_history : [];
+        const priorDoses = Array.isArray(appointment.course_vaccination_history) ? appointment.course_vaccination_history.filter(record => record.clinic_id === currentClinicId) : [];
         const historyMarkup = priorDoses.length
             ? `<ol class="appointment-course-history">${priorDoses.map(record => `<li><strong>Dose ${displayStaffValue(record.dose_number)}</strong> — ${displayStaffValue(record.date_given)} | ${displayStaffValue(record.vaccine_name)} | ${displayStaffValue(record.clinic_name)}</li>`).join('')}</ol>`
             : '<span>No previous administered doses recorded yet.</span>';
@@ -622,7 +677,7 @@ async function openAppointmentDetails(appointmentId) {
             <div><strong>Previous Vaccination Declared</strong><span>${appointment.prior_vaccination_history_declared ? 'Yes' : 'No / not declared'}</span></div>
             <div><strong>Previous Vaccination Record</strong><span>${priorVaccinationDocumentMarkup}</span></div>
             ${appointment.prior_vaccination_history_notes ? `<div class="full-field"><strong>Previous Vaccination Notes</strong><span>${displayStaffValue(appointment.prior_vaccination_history_notes)}</span></div>` : ''}
-            <div class="full-field"><strong>Previous Vaccination History</strong><span>${historyMarkup}</span></div>
+            <div class="full-field"><strong>Doses recorded at this clinic</strong><span>${historyMarkup}</span></div>
         </div>`;
     } catch (error) {
         body.innerHTML = `<p class="appointment-details-error">Could not load details: ${escapeHtml(error.message)}</p>`;

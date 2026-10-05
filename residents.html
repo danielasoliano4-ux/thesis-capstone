@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <script src="scripts/session-navigation.js"></script>
+  <script src="scripts/resident-navigation.js"></script>
   <script type="module" src="scripts/resident-session-guard.js"></script>
+  <script type="module" src="scripts/resident-account.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Resident Dashboard - Anti-Rabies Locator</title>
@@ -10,7 +12,7 @@
   <link rel="stylesheet" href="resident.css">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
- 
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <style>
       /* ── PUBLIC HEALTH HUB SECTION ── */
@@ -105,12 +107,27 @@
         border: 1px solid #ddd;
         overflow: hidden;
       }
+      .records-table-scroll {
+        max-height: min(60vh, 560px);
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: #d1d5db transparent;
+      }
+      .records-table-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+      .records-table-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 6px; }
       .records-table {
         width: 100%;
         border-collapse: collapse;
         font-size: 14px;
       }
       .records-table thead { background: #fff1f1; }
+      .records-table-scroll thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: #fff1f1;
+      }
       .records-table th {
         padding: 14px 18px;
         text-align: left;
@@ -167,6 +184,34 @@
         justify-content: space-between;
         align-items: center;
       }
+      .batch-booking-dose-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        max-height: 48vh;
+        overflow-y: auto;
+        margin: 16px 0;
+      }
+      .batch-booking-dose {
+        display: grid;
+        gap: 7px;
+        padding: 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: #fff;
+      }
+      .batch-booking-dose label { font-size: 13px; font-weight: 600; color: #374151; }
+      .batch-booking-dose input, .batch-booking-dose select, .batch-booking-clinic {
+        width: 100%;
+        min-height: 42px;
+        padding: 8px 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 7px;
+        background: #fff;
+      }
+      @media (max-width: 600px) {
+        .batch-booking-dose-grid { grid-template-columns: 1fr; max-height: 42vh; }
+      }
 
       /* ── DATA VISUALIZATION ── */
       .viz-grid {
@@ -174,6 +219,7 @@
         grid-template-columns: 3fr 2fr;
         gap: 22px;
         margin-bottom: 22px;
+        --viz-content-height: clamp(260px, 28vw, 400px);
       }
       .viz-card {
         background: white;
@@ -201,8 +247,23 @@
         white-space: nowrap;
       }
       .viz-card-body { padding: 18px 22px; }
+      .monthly-chart-card { align-self: start; }
+      .monthly-chart-container { position: relative; height: var(--viz-content-height); }
+      #monthlyChartStatus { padding: 24px 0; color: #6b7280; font-size: 14px; }
 
-      .bgy-list { display: flex; flex-direction: column; gap: 13px; }
+      .bgy-list {
+        display: flex;
+        flex-direction: column;
+        gap: 13px;
+        height: var(--viz-content-height);
+        overflow-y: auto;
+        padding-right: 8px;
+        scrollbar-width: thin;
+        scrollbar-color: #d1d5db transparent;
+      }
+      .bgy-list > .bgy-row { flex: 0 0 auto; }
+      .bgy-list::-webkit-scrollbar { width: 6px; }
+      .bgy-list::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 6px; }
       .bgy-row-top {
         display: flex; justify-content: space-between;
         align-items: center; margin-bottom: 6px; font-size: 14px;
@@ -406,12 +467,14 @@
       }
     </style>
 
-    <link rel="stylesheet" href="responsive.css">
+
     <link rel="stylesheet" href="clinic-map.css">
+    <link rel="stylesheet" href="/responsive.css">
 </head>
 
 
 <body>
+
   <header class="top-header">
     <div class="logo-section">
       <img class="system-logo" src="assets/system-logo.png" alt="System logo">
@@ -426,7 +489,7 @@
       <button type="button" class="profile-btn" id="profileBtn" aria-label="Open profile" title="Profile">
         <i class="fa-solid fa-user-circle"></i>
       </button>
-      <button class="signout-btn" id="signOutBtn">
+      <button type="button" class="signout-btn" id="signOutBtn">
         <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
       </button>
     </div>
@@ -434,26 +497,28 @@
 
   <!-- NAV TABS -->
   <nav class="nav-tabs-bar" id="navTabs">
-    <a class="nav-tab active" onclick="showTab('overview', this)">
+    <a href="#panel-overview" class="nav-tab active" onclick="showTab('overview', this); return false;">
       <i class="fa-solid fa-house"></i> Overview
     </a>
-    <a class="nav-tab" onclick="showTab('appointments', this)">
+    <a href="#panel-appointments" class="nav-tab" onclick="showTab('appointments', this); return false;">
       <i class="fa-regular fa-calendar"></i> Appointments
     </a>
-    <a class="nav-tab" id="nav-records" onclick="showTab('records', this)" style="display:none;">
+    <a href="#panel-records" class="nav-tab" id="nav-records" onclick="showTab('records', this); return false;" style="display:none;">
       <i class="fa-solid fa-syringe"></i> My Vaccination Records
     </a>
-    <a class="nav-tab" onclick="showTab('firstaid', this)">
+    <a href="#panel-firstaid" class="nav-tab" onclick="showTab('firstaid', this); return false;">
       <i class="fa-solid fa-kit-medical"></i> First Aid Guide
     </a>
-    <a class="nav-tab" onclick="showTab('notifications', this)" id="nav-notif">
+    <a href="#panel-notifications" class="nav-tab" onclick="showTab('notifications', this); return false;" id="nav-notif">
       <i class="fa-regular fa-bell"></i> Notifications
       <span id="notifBadge" style="background:#ef0000;color:white;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;display:none;">4</span>
     </a>
-    <a class="nav-tab" onclick="showTab('booking-records', this)" id="nav-booking-records">
+    <a href="#panel-booking-records" class="nav-tab" onclick="showTab('booking-records', this); return false;" id="nav-booking-records">
       <i class="fa-regular fa-folder-open"></i> Booking Records
     </a>
   </nav>
+
+  <p id="residentDataStatus" role="status" hidden style="margin:16px 30px;color:#b91c1c;"></p>
 
   <div class="profile-modal" id="profileModal" aria-hidden="true">
     <div class="profile-dialog" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
@@ -567,7 +632,7 @@
     </div>
     <div style="margin-top:12px;">
       <h4 style="font-size:14px;color:#374151;margin-bottom:10px;"><i class="fa-solid fa-list"></i> Clinic Status Overview</h4>
-      <div id="clinicSidebarOverview" style="display:flex;flex-direction:column;gap:8px;margin-top:6px;"></div>
+      <div id="clinicSidebarOverview" class="clinic-status-scroll" tabindex="0" role="region" aria-label="Clinic Status Overview" style="display:flex;flex-direction:column;gap:8px;margin-top:6px;"></div>
     </div>
   </div>
 </div>
@@ -615,7 +680,7 @@
             <h4 style="font-size:14px;color:#374151;margin-bottom:10px;">
               <i class="fa-solid fa-list"></i> Clinic Status Overview
             </h4>
-            <div id="clinicSidebarNew" style="display:flex;flex-direction:column;gap:8px;"></div>
+            <div id="clinicSidebarNew" class="clinic-status-scroll" tabindex="0" role="region" aria-label="Clinic Status Overview" style="display:flex;flex-direction:column;gap:8px;"></div>
           </div>
         </div>
 
@@ -728,22 +793,22 @@
       </div>
 
       <div class="records-table-wrap">
-        <table class="records-table" id="recordsTable">
-          <thead>
-            <tr>
-              <th>Case ID</th><th>Year</th><th>Barangay</th><th>Animal Source</th>
-              <th>WHO Category</th><th>Severity</th><th>Outcome</th><th></th>
-            </tr>
-          </thead>
-          <tbody id="recordsTbody">
+        <div class="records-table-scroll" role="region" aria-label="Rabies records" tabindex="0">
+          <table class="records-table" id="recordsTable">
+            <thead>
+              <tr>
+                <th>Case ID</th><th>Year</th><th>Barangay</th><th>Animal Source</th>
+                <th>WHO Category</th><th>Severity</th><th>Outcome</th>
+              </tr>
+            </thead>
+            <tbody id="recordsTbody">
             <tr class="accordion-row" onclick="toggleRow(this)" data-outcome="death">
               <td><strong>CAB-2026-001</strong></td><td>2026</td><td>Mamatid</td><td>Dog</td>
               <td>Category III</td><td><span class="severity-badge sev-high">High</span></td>
               <td><span class="outcome-badge out-death">Death</span></td>
-              <td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td>
             </tr>
             <tr class="accordion-detail" id="detail-CAB-2026-001">
-              <td colspan="8"><div class="accordion-detail-grid">
+              <td colspan="7"><div class="accordion-detail-grid">
                 <div class="detail-item"><label>Patient Age</label><span>42 years old</span></div>
                 <div class="detail-item"><label>Gender</label><span>Male</span></div>
                 <div class="detail-item"><label>Bite Site</label><span>Left leg</span></div>
@@ -758,10 +823,9 @@
               <td><strong>CAB-2026-002</strong></td><td>2026</td><td>Banlic</td><td>Dog</td>
               <td>Category II</td><td><span class="severity-badge sev-medium">Medium</span></td>
               <td><span class="outcome-badge out-recovered">Recovered</span></td>
-              <td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td>
             </tr>
             <tr class="accordion-detail" id="detail-CAB-2026-002">
-              <td colspan="8"><div class="accordion-detail-grid">
+              <td colspan="7"><div class="accordion-detail-grid">
                 <div class="detail-item"><label>Patient Age</label><span>27 years old</span></div>
                 <div class="detail-item"><label>Gender</label><span>Female</span></div>
                 <div class="detail-item"><label>Bite Site</label><span>Right hand</span></div>
@@ -776,10 +840,9 @@
               <td><strong>CAB-2026-003</strong></td><td>2026</td><td>Pulo</td><td>Cat</td>
               <td>Category III</td><td><span class="severity-badge sev-high">High</span></td>
               <td><span class="outcome-badge out-ongoing">Ongoing</span></td>
-              <td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td>
             </tr>
             <tr class="accordion-detail">
-              <td colspan="8"><div class="accordion-detail-grid">
+              <td colspan="7"><div class="accordion-detail-grid">
                 <div class="detail-item"><label>Patient Age</label><span>9 years old</span></div>
                 <div class="detail-item"><label>Gender</label><span>Male</span></div>
                 <div class="detail-item"><label>Bite Site</label><span>Face</span></div>
@@ -794,10 +857,9 @@
               <td><strong>CAB-2025-047</strong></td><td>2025</td><td>Sala</td><td>Dog</td>
               <td>Category III</td><td><span class="severity-badge sev-high">High</span></td>
               <td><span class="outcome-badge out-death">Death</span></td>
-              <td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td>
             </tr>
             <tr class="accordion-detail">
-              <td colspan="8"><div class="accordion-detail-grid">
+              <td colspan="7"><div class="accordion-detail-grid">
                 <div class="detail-item"><label>Patient Age</label><span>61 years old</span></div>
                 <div class="detail-item"><label>Gender</label><span>Female</span></div>
                 <div class="detail-item"><label>Bite Site</label><span>Multiple — arms and neck</span></div>
@@ -812,10 +874,9 @@
               <td><strong>CAB-2025-039</strong></td><td>2025</td><td>Niugan</td><td>Bat</td>
               <td>Category III</td><td><span class="severity-badge sev-medium">Medium</span></td>
               <td><span class="outcome-badge out-recovered">Recovered</span></td>
-              <td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td>
             </tr>
             <tr class="accordion-detail">
-              <td colspan="8"><div class="accordion-detail-grid">
+              <td colspan="7"><div class="accordion-detail-grid">
                 <div class="detail-item"><label>Patient Age</label><span>34 years old</span></div>
                 <div class="detail-item"><label>Gender</label><span>Male</span></div>
                 <div class="detail-item"><label>Bite Site</label><span>Left shoulder</span></div>
@@ -826,13 +887,11 @@
                 <div class="detail-item"><label>Status</label><span style="color:#166534;font-weight:700;">Fully Recovered</span></div>
               </div></td>
             </tr>
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
         <div class="records-table-footer">
           <span id="recordsCount">Showing 5 of 5 records</span>
-          <span style="color:#e60000;font-weight:600;font-size:12px;">
-            <i class="fa-solid fa-circle-info"></i> Click any row to expand full case details
-          </span>
         </div>
       </div>
 
@@ -847,7 +906,7 @@
       </p>
 
       <div class="viz-grid">
-        <div class="viz-card">
+        <div class="viz-card monthly-chart-card">
           <div class="viz-card-header">
             <div>
               <h3><i class="fa-solid fa-chart-bar" style="color:#e60000;margin-right:6px;"></i>Monthly Rabies Cases &amp; Vaccinations</h3>
@@ -855,10 +914,15 @@
             </div>
             <span class="viz-period-tag">Jan – Dec 2026</span>
           </div>
-          <div class="viz-card-body"><canvas id="monthlyChart" height="200"></canvas></div>
+          <div class="viz-card-body">
+            <div class="monthly-chart-container">
+              <canvas id="monthlyChart" height="200" role="img" aria-label="Monthly rabies cases and vaccinations from January to December"></canvas>
+              <p id="monthlyChartStatus" role="status" hidden></p>
+            </div>
+          </div>
         </div>
 
-        <div class="viz-card">
+        <div class="viz-card incident-rate-card">
           <div class="viz-card-header">
             <div>
               <h3><i class="fa-solid fa-map-location-dot" style="color:#e60000;margin-right:6px;"></i>Barangay Incident Rate</h3>
@@ -988,7 +1052,7 @@
     <div class="records-hero">
       <div>
         <h2>Vaccination Record — <span id="recordName">Resident</span></h2>
-        <p>ID: RES-2026-001234 &nbsp;|&nbsp; Started: <span id="recordStart">June 25, 2026</span> &nbsp;|&nbsp; Vaccine: <span id="recordVaccine">Verorab</span></p>
+        <p>ID: <span id="recordCaseId">Not assigned</span> &nbsp;|&nbsp; Started: <span id="recordStart">June 25, 2026</span> &nbsp;|&nbsp; Vaccine: <span id="recordVaccine">Verorab</span></p>
         <p style="margin-top:8px;"><i class="fa-solid fa-location-dot"></i> Bite Site: <span id="recordBiteSite">Left hand</span> &nbsp;|&nbsp; Animal: <span id="recordAnimal">Dog</span> &nbsp;|&nbsp; WHO Category: <span id="recordCategory">III</span></p>
       </div>
       <div class="big-progress">
@@ -1000,7 +1064,7 @@
 
     <details class="vaccination-record-details">
       <summary><span><i class="fa-solid fa-list-check"></i> <span id="currentRecordDetailsLabel">Vaccination doses and uploaded documents</span></span><i class="fa-solid fa-chevron-down details-chevron"></i></summary>
-      <p class="section-label">Dose Schedule</p>
+      <p class="section-label">Dose Schedule and Clinic-Recommended Dates</p>
 
       <div class="dose-record-list" id="liveDoseRecordList">
       <div class="dose-record">
@@ -1034,12 +1098,13 @@
       <h3><i class="fa-solid fa-upload" style="color:#ef0000;margin-right:8px;"></i>Upload Vaccination Documents</h3>
       <p id="vaccinationDocumentHelp" style="font-size:13px;color:#6b7280;margin-bottom:14px;">Your vaccination card can be uploaded after all five doses have been recorded.</p>
       <div id="vaccinationDocuments" class="vaccination-documents" aria-live="polite"></div>
+      <p id="vaccinationUploadStatus" class="document-upload-status" role="status" aria-live="polite" hidden></p>
       <div id="uploadDocumentControls" class="upload-document-controls">
         <div class="upload-box" onclick="document.getElementById('fileUpload').click()">
           <i class="fa-solid fa-cloud-arrow-up"></i>
-          <p>Click to upload or drag &amp; drop</p>
+          <p>Click to upload</p>
           <span>PDF, JPG, PNG up to 10MB</span>
-          <input type="file" id="fileUpload" hidden accept=".pdf,.jpg,.png" onchange="handleUpload(this)">
+          <input type="file" id="fileUpload" hidden accept=".pdf,.jpg,.jpeg,.png" onchange="handleUpload(this)">
         </div>
         <button class="upload-btn" onclick="document.getElementById('fileUpload').click()">
           <i class="fa-solid fa-paperclip"></i> Choose File
@@ -1218,10 +1283,16 @@
           <h1 style="font-size:22px;color:#111827;margin:0;display:flex;align-items:center;gap:8px;"><i class="fa-regular fa-bell" style="color:#ef0000;"></i> Notifications</h1>
           <p style="font-size:13px;color:#6b7280;margin:6px 0 0;">You have <strong id="unreadCount">4</strong> unread notifications</p>
         </div>
-        <button class="mark-all-btn" onclick="markAllRead()" style="background:none;border:1px solid #d1d5db;padding:8px 14px;border-radius:6px;color:#374151;cursor:pointer;">
-          <i class="fa-solid fa-check-double"></i> Mark all as read
-        </button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" id="enablePushAlertsBtn" class="mark-all-btn" style="background:#fff;border:1px solid #d1d5db;padding:8px 14px;border-radius:6px;color:#374151;cursor:pointer;">
+            <i class="fa-regular fa-bell"></i> Enable push alerts
+          </button>
+          <button class="mark-all-btn" onclick="markAllRead()" style="background:none;border:1px solid #d1d5db;padding:8px 14px;border-radius:6px;color:#374151;cursor:pointer;">
+            <i class="fa-solid fa-check-double"></i> Mark all as read
+          </button>
+        </div>
       </div>
+      <p id="pushAlertsStatus" role="status" style="font-size:12px;color:#6b7280;margin:-8px 0 16px;"></p>
 
       <div class="filter-tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
         <button class="filter-tab active" onclick="filterNotifs('all', this)">All</button>
@@ -1308,23 +1379,41 @@
   <div class="modal-overlay" id="rescheduleModal">
     <div class="modal-box">
       <h2><i class="fa-solid fa-arrows-rotate" style="color:#ef0000;margin-right:8px;"></i>Reschedule Appointment</h2>
-      <p class="sub">You may move this appointment by up to one day.</p>
+      <p class="sub">You may move this appointment by up to one day. Your new date and time will need clinic staff confirmation again.</p>
       <input type="hidden" id="rescheduleAppointmentId">
       <div class="modal-field"><label for="rescheduleDate">Date</label><input id="rescheduleDate" type="date" required></div>
       <div class="modal-field"><label for="rescheduleTime">Time</label><select id="rescheduleTime" required><option value="">Choose a date first</option></select><small id="rescheduleTimeHint"></small></div>
       <div id="rescheduleMsg" style="display:none;margin-top:10px;padding:10px;border-radius:8px;font-size:13px;"></div>
-      <div class="modal-actions"><button type="button" class="modal-cancel" id="closeRescheduleBtn">Cancel</button><button type="button" class="modal-submit" id="saveRescheduleBtn"><i class="fa-solid fa-check"></i> Save Changes</button></div>
+      <div class="modal-actions"><button type="button" class="modal-cancel" id="closeRescheduleBtn">Keep Appointment</button><button type="button" class="modal-submit" id="saveRescheduleBtn"><i class="fa-solid fa-check"></i> Request Reschedule</button></div>
     </div>
   </div>
 
   <div class="modal-overlay" id="cancelModal">
     <div class="modal-box">
       <h2><i class="fa-solid fa-calendar-xmark" style="color:#ef0000;margin-right:8px;"></i>Cancel Appointment</h2>
-      <p class="sub">Please tell us why you need to cancel this appointment.</p>
+      <p class="sub">Please tell us why you need to cancel this appointment. Clinic staff will receive your cancellation and reason in the app.</p>
       <input type="hidden" id="cancelAppointmentId">
       <div class="modal-field"><label for="cancelReason">Reason for cancellation</label><textarea id="cancelReason" rows="4" maxlength="500" placeholder="Enter your reason" required></textarea></div>
       <div id="cancelMsg" style="display:none;margin-top:10px;padding:10px;border-radius:8px;font-size:13px;"></div>
       <div class="modal-actions"><button type="button" class="modal-cancel" id="closeCancelBtn">Keep Appointment</button><button type="button" class="modal-submit" id="saveCancelBtn"><i class="fa-solid fa-xmark"></i> Confirm Cancellation</button></div>
+    </div>
+  </div>
+
+  <!-- BOOKING MODAL -->
+  <div class="modal-overlay" id="batchBookingModal">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="batchBookingTitle">
+      <h2 id="batchBookingTitle">Book Recommended Vaccination Dates</h2>
+      <p class="sub">Review the clinic-recommended schedule. Choose one clinic and an appointment time for each pending dose.</p>
+      <div class="modal-field">
+        <label for="batchBookingClinic">Clinic</label>
+        <select id="batchBookingClinic" class="batch-booking-clinic"></select>
+      </div>
+      <div id="batchBookingDoseGrid" class="batch-booking-dose-grid"></div>
+      <p id="batchBookingMsg" role="status" style="display:none;margin-top:12px;"></p>
+      <div class="modal-actions">
+        <button type="button" class="modal-cancel" id="batchBookingCancelBtn">Cancel</button>
+        <button type="button" class="modal-submit" id="batchBookingConfirmBtn">Book All Dates</button>
+      </div>
     </div>
   </div>
 

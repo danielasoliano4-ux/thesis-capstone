@@ -12,9 +12,10 @@
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
 
     <link rel="stylesheet" href="staff.css"/>
-    <link rel="stylesheet" href="responsive.css">
+
 <link rel="stylesheet" href="clinic-layout.css">
     <link rel="stylesheet" href="dose-completion.css">
+    <link rel="stylesheet" href="/responsive.css">
 </head>
 <body class="clinic-dashboard">
 
@@ -220,6 +221,7 @@
                 <label>Batch Number<input id="vacBatch" required></label>
                 <label>Quantity (doses)<input id="vacQuantity" type="number" min="0" required></label>
                 <label>Expiry Date<input id="vacExpiry" type="date" required></label>
+                <p id="stockReservationNote" class="inventory-warning" role="status" hidden></p>
                 <button type="submit" class="add-btn">Save Stock</button>
             </form>
         </div>

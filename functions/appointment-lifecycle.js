@@ -1,3 +1,4 @@
+const { readStock, publishStock, releaseReservation, usable } = require('./stock-reservations');
 'use strict';
 const { resolveIntakeContext } = require('./intake-context');
 const WINDOW_MS = 90 * 60 * 1000;
@@ -74,7 +75,7 @@ function lifecycleHandler({ db, HttpsError, timestamp, now = () => new Date() })
         if(typeof item.resident_uid !== 'string' || !item.resident_uid) throw new HttpsError('failed-precondition','This appointment has no linked patient.');
         const snapshots=await Promise.all(['patient_records','appointments','vaccination_records'].map(name=>tx.get(db.collection(name).where('resident_uid','==',item.resident_uid))));
         const profile=(await tx.get(db.collection('residents').doc(item.resident_uid))).data()||{};
-        const rows=snapshots.flatMap(snapshot=>snapshot.docs.map(doc=>({...doc.data(),id:doc.id})));
+        const rows=snapshots.flatMap(snapshot=>snapshot.docs.map(doc=>({...doc.data(),id:doc.id}))).filter(row=>row.clinic_id===item.clinic_id);
         return resolveIntakeContext({...item,id},rows,profile);
       }
       const current = now();
@@ -83,6 +84,17 @@ function lifecycleHandler({ db, HttpsError, timestamp, now = () => new Date() })
       if (action === 'confirm') {
         if (item.status !== 'pending') throw new HttpsError('failed-precondition', 'Only pending appointments can be confirmed.');
         if (!Number.isFinite(start) || +current >= start) throw new HttpsError('failed-precondition', 'This pending appointment has expired. Ask the resident to book again.');
+        if (item.stock_reservation?.status !== 'reserved') {
+          const stock = await readStock(tx, db, item.clinic_id, current);
+          const batch = stock.active.filter(batch => usable(batch, item.preferred_date)).sort((a,b) => a.expiry.localeCompare(b.expiry) || a.id.localeCompare(b.id))[0];
+          if (!batch) throw new HttpsError('failed-precondition', 'No usable vaccine batch is available for this appointment date.');
+          batch.quantity = Number(batch.quantity) + (batch.quantity_mode === 'on_hand' ? 0 : Number(batch.reserved_count || 0));
+          batch.quantity_mode = 'on_hand';
+          batch.reserved_count = Number(batch.reserved_count || 0) + 1;
+          tx.update(db.collection('inventory').doc(batch.id), { quantity: batch.quantity, quantity_mode: batch.quantity_mode, reserved_count: batch.reserved_count, updated_at: timestamp() });
+          publishStock(tx, db, item.clinic_id, stock.items, timestamp, current);
+          tx.update(ref, { stock_reservation: { status: 'reserved', inventory_id: batch.id, quantity: 1, vaccine: {...batch}, reserved_at: timestamp() } });
+        }
         tx.update(ref, { status: 'confirmed', confirmed_at: timestamp(), reschedule_requested: false,
           scheduled_at_ms: start, arrival_deadline_ms: end });
         const notification = db.collection('notifications').doc();
@@ -143,6 +155,8 @@ async function deleteNoShow(db, ref, now = () => new Date()) {
     const item = (await tx.get(ref)).data();
     // Re-read inside the transaction so expiry cannot archive a recorded arrival.
     if (!isNoShow(item, now()) || typeof item.clinic_id !== 'string' || !item.clinic_id.trim()) return false;
+    const release = await releaseReservation(tx, db, item, () => now(), now());
+    if (release) { release(); tx.update(ref, {stock_reservation: {...item.stock_reservation, status:'released', released_at:now()}}); }
     archiveExpiredAppointment(db, tx, ref, item, now(), 'arrival_window_elapsed');
     return true;
   });
@@ -185,6 +199,8 @@ async function expirePendingAppointment(db, ref, now = () => new Date()) {
     const item = (await tx.get(ref)).data();
     if (!isPendingExpired(item, now()) && !(item?.status === 'expired' && !item.archived)) return false;
     if (typeof item.clinic_id !== 'string' || !item.clinic_id.trim()) return false;
+    const release = await releaseReservation(tx, db, item, () => now(), now());
+    if (release) { release(); tx.update(ref, {stock_reservation: {...item.stock_reservation, status:'released', released_at:now()}}); }
     archiveExpiredAppointment(db, tx, ref, item, now(), item.expiration_reason || 'not_confirmed_before_scheduled_time');
     return true;
   });

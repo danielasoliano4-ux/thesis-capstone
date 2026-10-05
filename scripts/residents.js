@@ -1,21 +1,27 @@
 import { renderLiveCaptions } from './live-analytics-view.js';
+import { initializeMonthlyChart, updateMonthlyChart } from './monthly-analytics-chart.js';
 import { notifyDialog, confirmDialog } from './app-dialogs.js';
 import { sessionIsTerminated } from './session-state.js';
 import { availableSlots, bookingTimeError, clockMinutes, dateStart } from './clinic-hours.js';
 import { openDosePreview, openDoseReportPreview } from './dose-preview.js';
-import { app, auth, db, storage, fetchUserProfile, onAuthStateChanged, signOutUser } from './firebase.js';
+import { app, auth, db, storage, fetchUserProfile, onAuthStateChanged } from './firebase.js';
 import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, addDoc, onSnapshot, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
 
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-functions.js';
+import { getMessaging, getToken, isSupported, onMessage } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging.js';
 import { clinicBooking, appointmentDeadline, pendingAppointmentExpired } from './booking-status.js';
+const showTab = (...args) => window.showTab(...args);
 const createBooking = httpsCallable(getFunctions(app), 'createBooking');
+const createBatchBooking = httpsCallable(getFunctions(app), 'createBatchBooking');
+const cancelBooking = httpsCallable(getFunctions(app), 'cancelBooking');
 const rescheduleBooking = httpsCallable(getFunctions(app), 'rescheduleBooking');
 
 let currentUid = null;
 let currentResidentName = '';
 let residentProfile = {};
 let residentAppointments = [];
+let activeRescheduleAppointment = null;
 let selectedClinic = null;
 let completedDoseCount = 0;
 let firstDoseDate = null;
@@ -23,6 +29,7 @@ let latestVaccineBrand = '';
 let originalDoseClinicId = '';
 let residentVaccinationRecords = [];
 let allResidentVaccinationRecords = [];
+let livePublicCaseRecords = [];
 let residentVaccinationDocuments = [];
 let allResidentVaccinationDocuments = [];
 let bookingClinicContext = null;
@@ -32,6 +39,9 @@ let patientTreatments = [];
 let pendingClinicChangeId = '';
 let confirmedClinicChangeId = '';
 let vaccinationDocumentsUnsubscribe = null;
+let vaccinationUploadInProgress = false;
+let foregroundPushMessaging = null;
+let pushSetupInProgress = false;
 const doseDayOffsets = [0, 3, 7, 14, 28];
 
 function manilaToday() {
@@ -137,12 +147,17 @@ function loadResidentNotifications(uid) {
       const iconColor = declined ? '#b91c1c' : '#2563eb';
       return `<div class="notif-item${notification.read ? '' : ' unread'}" data-id="${escapeHtml(notification.id)}" data-type="${escapeHtml(type)}" style="background:white;border:1px solid ${declined ? '#fecaca' : '#e5e7eb'};border-radius:10px;padding:16px 20px;margin-bottom:10px;display:flex;gap:14px;align-items:flex-start;position:relative;">
         <div class="notif-icon icon-blue" style="width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:${iconBg};color:${iconColor};"><i class="fa-solid ${icon}"></i></div>
-        <div class="notif-body" style="flex:1;min-width:0;"><h4 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 4px;">${escapeHtml(notification.title || 'Notification')}</h4><p style="margin:0;font-size:13px;color:#4b5563;line-height:1.5;">${escapeHtml(notification.message || notification.body || '')}</p>${buildReferralCallout(notification)}${notification.action === 'rebook' ? `<button type="button" class="action-btn notification-rebook" data-notification-id="${escapeHtml(notification.id)}">Reschedule visit</button>` : ''}<div class="notif-meta" style="display:flex;align-items:center;gap:12px;margin-top:8px;flex-wrap:wrap;"><span class="notif-time" style="font-size:12px;color:#9ca3af;"><i class="fa-regular fa-clock"></i> ${escapeHtml(createdAt)}</span><span class="notif-tag tag-${escapeHtml(type)}">${escapeHtml(type)}</span></div></div>
+        <div class="notif-body" style="flex:1;min-width:0;"><h4 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 4px;">${escapeHtml(notification.title || 'Notification')}</h4><p style="margin:0;font-size:13px;color:#4b5563;line-height:1.5;">${escapeHtml(notification.message || notification.body || '')}</p>${buildReferralCallout(notification)}${notification.action === 'rebook' ? `<button type="button" class="action-btn notification-rebook" data-notification-id="${escapeHtml(notification.id)}">Reschedule visit</button>` : ''}${notification.action === 'review_schedule' ? `<button type="button" class="action-btn notification-review-schedule" data-notification-id="${escapeHtml(notification.id)}">Review and book dates</button>` : ''}<div class="notif-meta" style="display:flex;align-items:center;gap:12px;margin-top:8px;flex-wrap:wrap;"><span class="notif-time" style="font-size:12px;color:#9ca3af;"><i class="fa-regular fa-clock"></i> ${escapeHtml(createdAt)}</span><span class="notif-tag tag-${escapeHtml(type)}">${escapeHtml(type)}</span></div></div>
         ${notification.read ? '' : '<div class="unread-dot" style="position:absolute;top:20px;right:16px;width:8px;height:8px;background:#ef0000;border-radius:50%;"></div>'}</div>`;
     }).join('');
     list.querySelectorAll('.notification-rebook').forEach(button => button.addEventListener('click', () => {
       const notification = notifications.find(item => item.id === button.dataset.notificationId);
       if (notification) openBookingModal(notification.clinic_name, notification.clinic_id);
+    }));
+    list.querySelectorAll('.notification-review-schedule').forEach(button => button.addEventListener('click', () => {
+      const notification = notifications.find(item => item.id === button.dataset.notificationId);
+      showTab('records', document.getElementById('nav-records'));
+      openBatchBookingModal(notification?.clinic_id || '');
     }));
     const unreadCount = notifications.filter(notification => !notification.read).length;
     const unread = document.getElementById('unreadCount');
@@ -156,7 +171,54 @@ function loadResidentNotifications(uid) {
     }
     const empty = document.getElementById('emptyState');
     if (empty) empty.style.display = notifications.length ? 'none' : 'block';
-  }, error => console.error('Failed to listen for resident notifications:', error));
+  }, error => reportResidentDataError('notifications', error));
+}
+
+async function registerResidentPushAlerts() {
+  const button = document.getElementById('enablePushAlertsBtn');
+  const status = document.getElementById('pushAlertsStatus');
+  if (!button || pushSetupInProgress) return;
+  pushSetupInProgress = true;
+  button.disabled = true;
+  if (status) status.textContent = 'Enabling push alerts...';
+  try {
+    if (!currentUid || !window.isSecureContext || !('Notification' in window) || !('serviceWorker' in navigator)) {
+      throw new Error('Push alerts require a signed-in account and a supported secure browser.');
+    }
+    if (!await isSupported()) throw new Error('This browser does not support push alerts.');
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') throw new Error('Push alert permission was not granted. In-app notifications will still be available.');
+
+    const serviceWorkerRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+    const messaging = getMessaging(app);
+    if (!foregroundPushMessaging) {
+      onMessage(messaging, payload => {
+        const title = payload.notification?.title || 'Vaccination schedule update';
+        const body = payload.notification?.body || '';
+        if (Notification.permission === 'granted') {
+          serviceWorkerRegistration.showNotification(title, { body, data: { source: 'foreground', url: payload.data?.url || '/residents.html' } });
+        }
+      });
+      foregroundPushMessaging = messaging;
+    }
+    const token = await getToken(messaging, { serviceWorkerRegistration });
+    if (!token) throw new Error('The browser did not provide a push token. Please try again.');
+    const tokenSnapshot = await getDocs(query(collection(db, 'resident_push_tokens'), where('resident_uid', '==', currentUid)));
+    const savedToken = tokenSnapshot.docs.find(item => item.data().token === token);
+    if (savedToken) {
+      await updateDoc(doc(db, 'resident_push_tokens', savedToken.id), { updated_at: serverTimestamp() });
+    } else {
+      await addDoc(collection(db, 'resident_push_tokens'), { resident_uid: currentUid, token, created_at: serverTimestamp(), updated_at: serverTimestamp() });
+    }
+    if (status) status.textContent = 'Push alerts are enabled on this device.';
+    button.innerHTML = '<i class="fa-solid fa-bell"></i> Push alerts enabled';
+  } catch (error) {
+    console.error('Could not enable resident push alerts:', error);
+    if (status) status.textContent = error.message || 'Could not enable push alerts. Please try again.';
+  } finally {
+    pushSetupInProgress = false;
+    button.disabled = false;
+  }
 }
 
 window.markAllRead = markAllRead;
@@ -164,79 +226,89 @@ window.filterNotifs = filterNotifs;
 
 async function loadResidentDashboard(uid, userProfile = {}) {
   currentUid = uid;
-  loadResidentNotifications(uid);
-  const residentDoc = await getDoc(doc(db, 'residents', uid));
-  const residentData = residentDoc.exists() ? residentDoc.data() : {};
-  residentProfile = residentData;
-  populateResidentProfile(residentData);
-
-  const residentName = [residentData.first_name, residentData.last_name].filter(Boolean).join(' ');
-  currentResidentName = residentName
-    || residentData.username
-    || userProfile.full_name
+  currentResidentName = userProfile.full_name
     || userProfile.name
     || auth.currentUser?.displayName
     || auth.currentUser?.email
     || 'Resident';
-
-  const displayName = currentResidentName || auth.currentUser?.email || 'Resident';
   const headerName = document.getElementById('headerName');
-  const recordName = document.getElementById('recordName');
-  if (headerName) headerName.textContent = displayName;
-  if (recordName) recordName.textContent = displayName;
+  if (headerName) headerName.textContent = currentResidentName;
+  loadResidentNotifications(uid);
+  if ('Notification' in window && Notification.permission === 'granted') registerResidentPushAlerts();
+  onSnapshot(doc(db, 'residents', uid), residentDoc => {
+    const residentData = residentDoc.exists() ? residentDoc.data() : {};
+    residentProfile = residentData;
+    populateResidentProfile(residentData);
+
+    const residentName = [residentData.first_name, residentData.last_name].filter(Boolean).join(' ');
+    currentResidentName = residentData.username
+      || residentName
+      || userProfile.full_name
+      || userProfile.name
+      || auth.currentUser?.displayName
+      || auth.currentUser?.email
+      || 'Resident';
+
+    const displayName = currentResidentName || auth.currentUser?.email || 'Resident';
+    const recordName = document.getElementById('recordName');
+    if (headerName) headerName.textContent = displayName;
+    if (recordName) recordName.textContent = displayName;
+    renderLiveRecordHeader(residentVaccinationRecords, residentAppointments);
+  }, error => reportResidentDataError('profile', error));
 
   loadResidentBookings(uid);
   let liveBookings = [];
   onSnapshot(query(collection(db, 'appointments'), where('resident_uid', '==', uid)), snapshot => {
     liveBookings = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
     residentAppointments = liveBookings;
+    residentVaccinationRecords = setCurrentVaccinationSession(allResidentVaccinationRecords);
+    firstDoseDate = toDate(residentVaccinationRecords.find(record => Number(record.dose_number) === 1)?.date_given);
+    latestVaccineBrand = residentVaccinationRecords[0]?.vaccine_name || residentVaccinationRecords[0]?.vaccine_type || '';
+    updateVaccinationProgress(residentVaccinationRecords);
+    renderLiveDoseRecords(residentVaccinationRecords, liveBookings);
+    renderPreviousVaccinationRecords(allResidentVaccinationRecords);
     renderLiveRecordHeader(residentVaccinationRecords, liveBookings);
     renderUpcomingAppointments(liveBookings);
     renderLiveAppointments(liveBookings);
-  }, error => console.error('Failed to listen for resident appointment details:', error));
+  }, error => reportResidentDataError('appointments', error));
   listenToAnimalExposure();
   listenToDashboardAnalytics();
 
-  const recordsSnap = await getDocs(query(collection(db, 'vaccination_records'), where('resident_uid', '==', uid)));
-
-  const allVaccinationRecords = recordsSnap.docs.map(item => item.data()).sort((first, second) => String(second.date_given || '').localeCompare(String(first.date_given || '')));
-  allResidentVaccinationRecords = allVaccinationRecords;
-  const vaccinationRecords = setCurrentVaccinationSession(allVaccinationRecords);
-  residentVaccinationRecords = vaccinationRecords;
-  renderPreviousVaccinationRecords(allVaccinationRecords);
-  renderLiveDoseRecords(vaccinationRecords);
-  renderLiveRecordHeader(vaccinationRecords, liveBookings);
-  updateVaccinationProgress(vaccinationRecords);
-  firstDoseDate = vaccinationRecords.reduce((earliest, record) => {
-    const value = toDate(record.date_given);
-    return value && (!earliest || value < earliest) ? value : earliest;
-  }, null);
-
-  const hasRecord = !recordsSnap.empty;
-  const latestRecord = vaccinationRecords[0] || null;
-  latestVaccineBrand = latestRecord?.vaccine_name || latestRecord?.vaccine_type || '';
-  originalDoseClinicId = getPrimaryClinicId();
-  if (window.clinicDirectory) populateClinicOptions(window.clinicDirectory);
-
-  initView(hasRecord, latestRecord);
-  updateVaccinationProgress(vaccinationRecords);
+  // Subscribe immediately so a stalled profile read cannot block other data.
   loadVaccinationDocuments(uid);
 
   onSnapshot(query(collection(db, 'treatments'), where('resident_uid', '==', uid)), snapshot => {
     patientTreatments = snapshot.docs.map(d => d.data());
     updateVaccinationProgress(residentVaccinationRecords);
     renderLiveDoseRecords(residentVaccinationRecords, residentAppointments);
-  });
+  }, error => reportResidentDataError('treatments', error));
   onSnapshot(query(collection(db, 'vaccination_records'), where('resident_uid', '==', uid)), snapshot => {
     const allRecords = snapshot.docs.map(item => item.data()).sort((first, second) => Number(second.dose_number || 0) - Number(first.dose_number || 0));
     allResidentVaccinationRecords = allRecords;
     residentVaccinationRecords = setCurrentVaccinationSession(allRecords);
+    initView(!snapshot.empty, residentVaccinationRecords[0] || null);
+    firstDoseDate = residentVaccinationRecords.reduce((earliest, record) => {
+      const value = toDate(record.date_given);
+      return value && (!earliest || value < earliest) ? value : earliest;
+    }, null);
+    latestVaccineBrand = residentVaccinationRecords[0]?.vaccine_name || residentVaccinationRecords[0]?.vaccine_type || '';
+    originalDoseClinicId = getPrimaryClinicId();
+    if (window.clinicDirectory) populateClinicOptions(window.clinicDirectory);
     renderPreviousVaccinationRecords(allRecords);
     updateVaccinationProgress(residentVaccinationRecords);
     renderLiveRecordHeader(residentVaccinationRecords, liveBookings);
     renderLiveDoseRecords(residentVaccinationRecords, liveBookings);
     loadVaccinationDocuments(uid);
-  }, error => console.error('Failed to listen for resident record header:', error));
+  }, error => reportResidentDataError('vaccination records', error));
+}
+
+function reportResidentDataError(section, error) {
+  console.error(`Could not load resident ${section}:`, error);
+  const status = document.getElementById('residentDataStatus');
+  if (status) {
+    status.hidden = false;
+    status.textContent = `Could not load ${section}. Check your connection and refresh to try again.`;
+  }
 }
 
 function populateResidentProfile(data) {
@@ -250,7 +322,7 @@ function populateResidentProfile(data) {
 }
 
 function populateClinicOptions(clinics) {
-  const bookableClinics = clinics.filter(clinic => clinic.status !== 'out');
+  const bookableClinics = clinics.filter(clinic => clinic.status === 'available');
   const orderedClinics = originalDoseClinicId
     ? [...bookableClinics].sort((first, second) => Number(second.id === originalDoseClinicId) - Number(first.id === originalDoseClinicId))
     : bookableClinics;
@@ -270,16 +342,37 @@ function populateClinicOptions(clinics) {
   populateClinicFilters(clinics);
 }
 
+async function confirmClinicWithHistory(clinic) {
+  const records = residentVaccinationRecords.length
+    ? residentVaccinationRecords : allResidentVaccinationRecords;
+  const history = [...records]
+    .filter(record => record.clinic_id)
+    .sort((a, b) => String(b.date_given || '').localeCompare(String(a.date_given || '')))[0]
+    || [...residentAppointments]
+      .filter(appointment => appointment.clinic_id
+        && !['cancelled', 'canceled', 'rejected', 'declined', 'expired'].includes(appointment.status))
+      .sort((a, b) => (b.created_at?.toMillis?.() || 0) - (a.created_at?.toMillis?.() || 0))[0];
+  if (!history || history.clinic_id === clinic.id) return true;
+  const previousName = window.clinicDirectory?.find(item => item.id === history.clinic_id)?.name
+    || history.clinic_name || 'another clinic';
+  return confirmDialog(
+    `You have a booking or vaccination dose history at ${previousName}. Are you sure you want to book at ${clinic.name || 'this clinic'}?`,
+    { title: 'Book at a different clinic?', confirmText: 'Yes, book here' }
+  );
+}
+
 function getPrimaryClinicId() {
   const firstCompletedDose = [...residentVaccinationRecords]
-    .filter(record => Number(record.dose_number) === 1)
-    .sort((a, b) => String(a.date_given || '').localeCompare(String(b.date_given || '')))[0];
+    .filter(record => record.clinic_id && record.date_given)
+    .sort((a, b) => Number(a.dose_number || 0) - Number(b.dose_number || 0)
+      || String(a.date_given).localeCompare(String(b.date_given)))[0];
   if (firstCompletedDose?.clinic_id) return firstCompletedDose.clinic_id;
   const firstBookedDose = residentAppointments
-    .filter(appointment => appointment.vaccination_session_id === currentVaccinationSessionId
-      && Number(String(appointment.dose_label || '').match(/\d+/)?.[0]) === 1)
+    .filter(appointment => (appointment.vaccination_session_id || 'legacy') === (currentVaccinationSessionId || 'legacy')
+      && appointment.clinic_id
+      && ['pending', 'confirmed', 'accepted', 'approved', 'in_progress', 'completed'].includes(appointment.status))
     .sort((a, b) => (a.created_at?.toMillis?.() || 0) - (b.created_at?.toMillis?.() || 0))[0];
-  return firstBookedDose?.primary_clinic_id || firstBookedDose?.clinic_id || originalDoseClinicId || '';
+  return firstBookedDose?.primary_clinic_id || firstBookedDose?.clinic_id || '';
 }
 
 function courseBookingContext() {
@@ -321,7 +414,7 @@ function renderClinicBookingList(clinics) {
           <h4>${escapeHtml(clinic.name)} <span style="font-size:12px;color:#6b7280;font-weight:normal;">(${escapeHtml(clinic.type)})</span></h4>
           <p>${escapeHtml(clinic.address || 'Address not provided')} &nbsp;|&nbsp; ${escapeHtml(clinic.hours || 'Hours not provided')} &nbsp;|&nbsp; <strong style="color:${color};">${statusText}</strong></p>
         </div>
-        <button class="book-btn dynamic-book-btn" data-clinic-id="${escapeHtml(clinic.id)}" ${isOut ? 'disabled' : ''}>${isOut ? 'Unavailable' : 'Book Now'}</button>
+        <button class="book-btn dynamic-book-btn" data-clinic-id="${escapeHtml(clinic.id)}" ${isOut || isLow ? 'disabled' : ''}>${isOut || isLow ? 'Unavailable' : 'Book Now'}</button>
       </div>`;
   }).join('');
 
@@ -479,7 +572,8 @@ function renderLiveDoseRecords(records, bookings = []) {
     const booking = bookingByDose.get(doseNumber);
     const dayOffset = doseDayOffsets[index];
     const first = records.find(r => Number(r.dose_number) === 1);
-    const recommended = patientTreatments.find(t => t.vaccination_session_id === (currentVaccinationSessionId || 'legacy'))?.doses?.find(d => d.dose_number === doseNumber)?.recommended_date || booking?.recommended_date || (first?.date_given ? formatInputDate(new Date(first.date_given), dayOffset) : '');
+    const treatmentDose = patientTreatments.find(t => t.vaccination_session_id === (currentVaccinationSessionId || 'legacy'))?.doses?.find(d => d.dose_number === doseNumber);
+    const recommended = treatmentDose?.recommended_date || booking?.recommended_date || (first?.date_given ? formatInputDate(new Date(first.date_given), dayOffset) : '');
     const overdue = !completed && recommended && recommended < manilaToday();
     if (completed) {
       const date = formatRecordDate(completed.date_given);
@@ -490,10 +584,27 @@ function renderLiveDoseRecords(records, bookings = []) {
       return `<div class="dose-record"><input type="checkbox" class="dose-report-checkbox current-dose-checkbox" data-dose-number="${doseNumber}" data-record-key="${escapeHtml(recordKey(completed))}" aria-label="Select Dose ${doseNumber} for report" ${selectedKeys.has(recordKey(completed)) ? 'checked' : ''}><div class="dose-circle done-circle"><i class="fa-solid fa-check"></i></div><div class="dose-record-info"><h4>Dose ${doseNumber} - Day ${dayOffset}</h4><p>${escapeHtml(date)} | ${escapeHtml(clinic)}${escapeHtml(location)} | ${escapeHtml(vaccine)}${escapeHtml(administrator)}</p></div><div class="dose-record-status"><span class="r-done">${completed.source === 'external' || /verified previous record|verified history|verified past dose/i.test(completed.status || '') ? 'Completed (Verified History)' : 'Completed'}</span><button type="button" class="completed-dose-button" data-completed-dose="${doseNumber}" aria-haspopup="dialog">View dose <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button></div></div>`;
     }
     if (booking && ['pending', 'confirmed'].includes(booking.status)) {
-      return `<div class="dose-record"><div class="dose-circle next-circle"><i class="fa-regular fa-calendar"></i></div><div class="dose-record-info"><h4>Dose ${doseNumber} - Day ${dayOffset}</h4><p>Scheduled: ${escapeHtml(booking.preferred_date || '')} at ${escapeHtml(booking.preferred_time || '')} | ${escapeHtml(booking.clinic_name || 'Clinic')}</p></div><div class="dose-record-status"><span class="r-next">${overdue ? 'Overdue' : 'Upcoming'}</span></div></div>`;
+      const recommendedMarkup = treatmentDose?.recommended_date
+        ? `<p>Clinic recommended: ${escapeHtml(formatRecordDate(treatmentDose.recommended_date))}</p>`
+        : '';
+      return `<div class="dose-record"><div class="dose-circle next-circle"><i class="fa-regular fa-calendar"></i></div><div class="dose-record-info"><h4>Dose ${doseNumber} - Day ${dayOffset}</h4>${recommendedMarkup}<p>Appointment: ${escapeHtml(formatRecordDate(booking.preferred_date))} at ${escapeHtml(booking.preferred_time || '')} | ${escapeHtml(booking.clinic_name || 'Clinic')}</p></div><div class="dose-record-status"><span class="r-next">${overdue ? 'Overdue' : 'Upcoming'}</span></div></div>`;
     }
-    return `<div class="dose-record"><div class="dose-circle pending-circle">${doseNumber}</div><div class="dose-record-info"><h4>Dose ${doseNumber} - Day ${dayOffset}</h4><p>${recommended ? 'Recommended: ' + escapeHtml(recommended) : 'Not yet scheduled'}</p></div><div class="dose-record-status"><span class="r-pending">${overdue ? 'Overdue' : 'Pending'}</span></div></div>`;
+    return `<div class="dose-record"><div class="dose-circle pending-circle">${doseNumber}</div><div class="dose-record-info"><h4>Dose ${doseNumber} - Day ${dayOffset}</h4><p>${recommended ? `${treatmentDose?.recommended_date ? 'Clinic recommended: ' : 'Recommended: '}${escapeHtml(formatRecordDate(recommended))}` : 'Not yet scheduled'}</p></div><div class="dose-record-status"><span class="r-pending">${overdue ? 'Overdue' : 'Pending'}</span></div></div>`;
   }).join('');
+  const courseTreatment = patientTreatments.find(t => t.vaccination_session_id === (currentVaccinationSessionId || 'legacy'));
+  const activeByDose = new Map(bookings.map(booking => [
+    Number(booking.dose_number || String(booking.dose_label || '').match(/\d+/)?.[0] || 0),
+    booking
+  ]));
+  const bookableDoses = Array.from({ length: 5 }, (_, index) => index + 1)
+    .filter(doseNumber => !completedByDose.has(doseNumber) && activeByDose.get(doseNumber)?.status !== 'in_progress');
+  const hasRecommendations = bookableDoses.length && bookableDoses.every(doseNumber =>
+    courseTreatment?.doses?.find(dose => dose.dose_number === doseNumber)?.recommended_date
+  );
+  if (hasRecommendations) {
+    list.insertAdjacentHTML('beforeend', `<button type="button" class="action-btn" id="openBatchBookingBtn"><i class="fa-regular fa-calendar-check"></i> Book all recommended dates (${bookableDoses.length} doses)</button>`);
+    list.querySelector('#openBatchBookingBtn').addEventListener('click', () => openBatchBookingModal());
+  }
   if (list.querySelector('.current-dose-checkbox')) {
     list.insertAdjacentHTML('afterbegin', '<p class="dose-selection-help">Select completed doses to preview and print a report.</p>');
     list.insertAdjacentHTML('beforeend', '<div class="dose-selection-actions"><span class="dose-selection-count" role="status"></span><button type="button" class="dose-report-preview-button" aria-haspopup="dialog" disabled>Preview selected doses</button></div>');
@@ -529,18 +640,47 @@ function renderLiveRecordHeader(records, bookings = []) {
     return firstDate - secondDate;
   });
   const firstRecord = orderedRecords[0];
-  if (!firstRecord) return;
+  if (!firstRecord) {
+    for (const id of ['recordCaseId', 'recordStart', 'recordVaccine', 'recordBiteSite', 'recordAnimal', 'recordCategory']) {
+      const element = document.getElementById(id);
+      if (element) element.textContent = 'Not yet recorded';
+    }
+    return;
+  }
   const linkedAppointment = bookings.find(booking => booking.id === firstRecord.appointment_id)
     || bookings.find(booking => Number(String(booking.dose_label || '').match(/\d+/)?.[0] || 0) === Number(firstRecord.dose_number || 1));
   const setText = (id, value, fallback) => {
     const element = document.getElementById(id);
     if (element) element.textContent = value || fallback;
   };
+  setText('recordCaseId', firstRecord.case_id || findPublicCaseId(firstRecord, linkedAppointment), 'Not assigned');
   setText('recordStart', formatRecordDate(firstRecord.date_given), 'Date not specified');
   setText('recordVaccine', firstRecord.vaccine_name || firstRecord.vaccine_type, 'Vaccine not specified');
   setText('recordBiteSite', linkedAppointment?.bite_body_part, 'Not recorded');
   setText('recordAnimal', linkedAppointment?.animal_type, 'Not recorded');
   setText('recordCategory', linkedAppointment?.patient_category, 'Not recorded');
+}
+
+function findPublicCaseId(firstRecord, appointment) {
+  const caseDate = [
+    appointment?.bite_date,
+    firstRecord.bite_date,
+    appointment?.preferred_date,
+    firstRecord.preferred_date,
+    firstRecord.date_given
+  ].map(value => {
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+    return toDate(value)?.toISOString().slice(0, 10);
+  }).find(Boolean);
+  const animal = String(appointment?.animal_type || firstRecord.animal_type || '').trim().toLowerCase();
+  const category = String(appointment?.patient_category || firstRecord.patient_category || '').trim().toLowerCase();
+  if (!caseDate || (!animal && !category)) return '';
+  const matches = livePublicCaseRecords.filter(record =>
+    caseDate === String(record.date || '').slice(0, 10)
+    && (!animal || String(record.animal || '').trim().toLowerCase() === animal)
+    && (!category || String(record.category || '').trim().toLowerCase() === category || record.category === 'Not recorded')
+  );
+  return matches.length === 1 ? matches[0].caseId : '';
 }
 
 function updateVaccinationProgress(records) {
@@ -575,6 +715,17 @@ function updateVaccinationProgress(records) {
 
 function setCurrentVaccinationSession(records) {
   records = records.filter(r => r.date_given && (r.source !== 'external' || r.verification_status === 'Verified'));
+  const latestAppointment = [...residentAppointments].sort((a, b) =>
+    (b.created_at?.toMillis?.() || 0) - (a.created_at?.toMillis?.() || 0))[0];
+  // A newly booked course can be current before its first dose is administered.
+  const awaitingAppointment = currentVaccinationSessionId
+    && !records.some(record => (record.vaccination_session_id || 'legacy') === currentVaccinationSessionId)
+    && !residentAppointments.some(appointment => (appointment.vaccination_session_id || 'legacy') === currentVaccinationSessionId);
+  if (latestAppointment?.vaccination_session_id && !awaitingAppointment) {
+    currentVaccinationSessionId = latestAppointment.vaccination_session_id;
+    return records.filter(record => (record.vaccination_session_id || 'legacy') === currentVaccinationSessionId);
+  }
+  if (awaitingAppointment) return [];
   if (!records.length) {
     currentVaccinationSessionId = '';
     return records;
@@ -607,7 +758,7 @@ function renderPreviousVaccinationRecords(allRecords) {
     if (!sessions.has(sessionId)) sessions.set(sessionId, []);
     sessions.get(sessionId).push(record);
   });
-  container.innerHTML = `<div class="previous-records-heading"><i class="fa-solid fa-clock-rotate-left"></i> Previous vaccination records</div>${[...sessions.values()].map((records, index) => {
+  container.innerHTML = `<div class="previous-records-heading"><i class="fa-solid fa-clock-rotate-left"></i> Previous History</div>${[...sessions.values()].map((records, index) => {
     const ordered = records.sort((first, second) => Number(first.dose_number || 0) - Number(second.dose_number || 0));
     const first = ordered[0];
     const completed = new Set(ordered.map(record => Number(record.dose_number || 0))).size;
@@ -688,7 +839,7 @@ function loadVaccinationDocuments(uid) {
   const renderDocuments = snapshot => {
     // Documents are tied to one 5-dose course. Older uploads must never leak
     // into the current course's record panel.
-    allResidentVaccinationDocuments = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+    allResidentVaccinationDocuments = snapshot.docs.map(item => ({ ...item.data(), id: item.id }));
     const documents = allResidentVaccinationDocuments
       .filter(document => (document.vaccination_session_id || 'legacy') === (currentVaccinationSessionId || 'legacy'));
     renderPreviousVaccinationRecords(allResidentVaccinationRecords);
@@ -733,6 +884,23 @@ async function deleteVaccinationDocument(documentId) {
   }
 }
 
+function appointmentActionMarkup(booking) {
+  const status = appointmentStatus(booking);
+  if (status === 'expired') return `<div class="appt-card-actions"><button type="button" class="action-btn book-again-button" data-appointment-id="${escapeHtml(booking.id)}">Book Again</button></div>`;
+  if (!['pending', 'confirmed'].includes(status) || booking.arrived_at) return '';
+  return `<div class="appt-card-actions"><button type="button" class="action-btn reschedule-button" data-appointment-id="${escapeHtml(booking.id)}"><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i> Reschedule</button><button type="button" class="action-btn danger cancel-appointment-button" data-appointment-id="${escapeHtml(booking.id)}"><i class="fa-solid fa-xmark" aria-hidden="true"></i> Cancel</button></div>`;
+}
+
+function bindAppointmentActions(container, bookings) {
+  if (!container) return;
+  container.querySelectorAll('.reschedule-button').forEach(button => button.addEventListener('click', () => openRescheduleModal(bookings.find(booking => booking.id === button.dataset.appointmentId))));
+  container.querySelectorAll('.cancel-appointment-button').forEach(button => button.addEventListener('click', () => openCancelModal(bookings.find(booking => booking.id === button.dataset.appointmentId))));
+  container.querySelectorAll('.book-again-button').forEach(button => button.addEventListener('click', () => {
+    const booking = bookings.find(item => item.id === button.dataset.appointmentId);
+    if (booking && appointmentStatus(booking) === 'expired') openBookingModal(booking.clinic_name, booking.clinic_id);
+  }));
+}
+
 function renderUpcomingAppointments(bookings) {
   const container = document.getElementById('upcomingAppointmentsList');
   if (!container) return;
@@ -750,8 +918,11 @@ function renderUpcomingAppointments(bookings) {
     const day = Number.isNaN(date.getTime()) ? '--' : date.getDate();
     const month = Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
     const doseNumber = String(booking.dose_label || 'Dose 1').match(/\d+/)?.[0] || '1';
-    return `<div class="appt-mini"><div class="appt-date-box"><div class="day">${escapeHtml(String(day))}</div><div class="mon">${escapeHtml(month)}</div></div><div class="appt-info"><h4>${escapeHtml(booking.clinic_name || 'Clinic')}</h4><p><i class="fa-regular fa-clock"></i> ${escapeHtml(booking.preferred_time || 'Time not specified')} &nbsp;|&nbsp; Dose ${escapeHtml(doseNumber)} of 5</p></div><span class="dose-badge">D${escapeHtml(doseNumber)}</span></div>`;
+    const status = appointmentStatus(booking);
+    const label = status === 'pending' ? (booking.reschedule_requested ? 'Reschedule awaiting confirmation' : 'Awaiting clinic confirmation') : status === 'confirmed' ? 'Confirmed' : 'Arrived';
+    return `<div class="appt-mini"><div class="appt-date-box"><div class="day">${escapeHtml(String(day))}</div><div class="mon">${escapeHtml(month)}</div></div><div class="appt-info"><h4>${escapeHtml(booking.clinic_name || 'Clinic')}</h4><p><i class="fa-regular fa-clock"></i> ${escapeHtml(booking.preferred_time || 'Time not specified')} &nbsp;|&nbsp; Dose ${escapeHtml(doseNumber)} of 5</p><p class="appt-mini-status">${label}</p>${appointmentActionMarkup(booking)}</div><span class="dose-badge">D${escapeHtml(doseNumber)}</span></div>`;
   }).join('');
+  bindAppointmentActions(container, bookings);
 }
 
 function renderLiveAppointments(bookings) {
@@ -761,7 +932,7 @@ function renderLiveAppointments(bookings) {
   if (!upcomingContainer && !completedContainer) return;
   const sorted = [...bookings].sort((first, second) => `${second.preferred_date || ''} ${second.preferred_time || ''}`.localeCompare(`${first.preferred_date || ''} ${first.preferred_time || ''}`));
   const upcoming = sorted.filter(booking => ['pending', 'confirmed', 'in_progress'].includes(appointmentStatus(booking)) && (!booking.preferred_date || booking.preferred_date >= manilaToday()));
-  const completed = sorted.filter(booking => booking.status === 'completed' || appointmentStatus(booking) === 'expired');
+  const completed = sorted.filter(booking => ['completed', 'cancelled', 'declined', 'expired'].includes(appointmentStatus(booking)));
   updateNextAppointmentSummary(upcoming);
   const renderCard = (booking, isCompleted) => {
     const appointmentDate = isCompleted ? (booking.completed_at || booking.preferred_date) : booking.preferred_date;
@@ -772,16 +943,15 @@ function renderLiveAppointments(bookings) {
     const vaccine = booking.vaccine_name || 'Vaccination';
     const detail = isCompleted ? `Administered on ${formatRecordDate(appointmentDate)}` : `${booking.preferred_time || 'Time not specified'} | ${booking.clinic_address || 'Clinic location not specified'}`;
     const status = appointmentStatus(booking);
-    return `<div class="appt-card ${status === 'expired' ? 'expired-appointment' : isCompleted ? 'completed' : 'upcoming'}"><div class="appt-card-date"><div class="big-day">${escapeHtml(String(day))}</div><div class="month-yr">${escapeHtml(monthYear)}</div></div><div class="appt-card-body"><div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><h3>Dose ${escapeHtml(dose)} ${escapeHtml(vaccine)} Vaccination</h3><span class="appt-status ${isCompleted ? 'status-done' : status === 'expired' ? 'status-expired' : 'status-upcoming'}">${isCompleted ? 'Completed' : status === 'expired' ? 'Expired' : status === 'in_progress' ? 'Arrived' : status === 'confirmed' ? 'Confirmed' : 'Pending'}</span></div><p><i class="fa-solid fa-hospital" style="color:#6b7280;"></i> ${escapeHtml(booking.clinic_name || 'Clinic not specified')}</p><p><i class="fa-regular fa-clock" style="color:#6b7280;"></i> ${escapeHtml(detail)}</p>${status === 'expired' ? `<div class="appt-card-actions"><button type="button" class="action-btn book-again-button" data-appointment-id="${escapeHtml(booking.id)}">Book Again</button></div>` : ''}${['pending', 'confirmed'].includes(status) ? `<div class="appt-card-actions"><button class="action-btn reschedule-button" data-appointment-id="${escapeHtml(booking.id)}"><i class="fa-solid fa-arrows-rotate"></i> Reschedule</button><button class="action-btn danger cancel-appointment-button" data-appointment-id="${escapeHtml(booking.id)}"><i class="fa-solid fa-xmark"></i> Cancel</button></div>` : ''}</div></div>`;
+    const past = ['cancelled', 'declined', 'expired'].includes(status);
+    const label = status === 'pending' ? (booking.reschedule_requested ? 'Reschedule pending' : 'Pending confirmation') : status === 'in_progress' ? 'Arrived' : status.charAt(0).toUpperCase() + status.slice(1);
+    const cancellation = status === 'cancelled' && booking.cancellation_reason ? `<p>Reason: ${escapeHtml(booking.cancellation_reason)}</p>` : '';
+    return `<div class="appt-card ${past ? 'expired-appointment' : isCompleted ? 'completed' : 'upcoming'}"><div class="appt-card-date"><div class="big-day">${escapeHtml(String(day))}</div><div class="month-yr">${escapeHtml(monthYear)}</div></div><div class="appt-card-body"><div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;"><h3>Dose ${escapeHtml(dose)} ${escapeHtml(vaccine)} Vaccination</h3><span class="appt-status ${isCompleted ? 'status-done' : past ? 'status-expired' : 'status-upcoming'}">${label}</span></div><p><i class="fa-solid fa-hospital" style="color:#6b7280;"></i> ${escapeHtml(booking.clinic_name || 'Clinic not specified')}</p><p><i class="fa-regular fa-clock" style="color:#6b7280;"></i> ${escapeHtml(detail)}</p>${cancellation}${appointmentActionMarkup(booking)}</div></div>`;
   };
   if (upcomingContainer) upcomingContainer.innerHTML = upcoming.length ? upcoming.map(booking => renderCard(booking, false)).join('') : '<p style="font-size:13px;color:#6b7280;padding:10px 0;">No upcoming appointments.</p>';
   if (completedContainer) completedContainer.innerHTML = completed.length ? completed.map(booking => renderCard(booking, booking.status === 'completed')).join('') : '<p style="font-size:13px;color:#6b7280;padding:10px 0;">No past appointments yet.</p>';
-  document.querySelectorAll('.reschedule-button').forEach(button => button.addEventListener('click', () => openRescheduleModal(bookings.find(booking => booking.id === button.dataset.appointmentId))));
-  document.querySelectorAll('.book-again-button').forEach(button => button.addEventListener('click', () => {
-    const booking = bookings.find(item => item.id === button.dataset.appointmentId);
-    if (booking && appointmentStatus(booking) === 'expired') openBookingModal(booking.clinic_name, booking.clinic_id);
-  }));
-  document.querySelectorAll('.cancel-appointment-button').forEach(button => button.addEventListener('click', () => openCancelModal(bookings.find(booking => booking.id === button.dataset.appointmentId))));
+  bindAppointmentActions(upcomingContainer, bookings);
+  bindAppointmentActions(completedContainer, bookings);
 }
 
 function updateNextAppointmentSummary(bookings) {
@@ -808,57 +978,107 @@ function distanceInKm(origin, clinic) {
   return earthRadius * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
 }
 
+function editableAppointment(appointment) {
+  if (!appointment) return null;
+  const current = residentAppointments.find(item => item.id === appointment.id) || appointment;
+  const status = appointmentStatus(current);
+  if (!['pending', 'confirmed'].includes(status) || current.arrived_at) {
+    notifyDialog(status === 'expired'
+      ? 'This appointment has expired. Please book a new appointment.'
+      : 'This appointment can no longer be changed. Please review its latest status.');
+    return null;
+  }
+  return current;
+}
+
+function nextRescheduleDate(date) {
+  const next = new Date(`${date}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
+}
+
 function openRescheduleModal(appointment) {
-  if (!appointment) return;
-  const date = appointment.preferred_date || new Date().toISOString().split('T')[0];
-  const nextDate = formatInputDate(new Date(`${date}T00:00:00`), 1);
-  document.getElementById('rescheduleAppointmentId').value = appointment.id;
+  activeRescheduleAppointment = editableAppointment(appointment);
+  if (!activeRescheduleAppointment) return;
+  const date = activeRescheduleAppointment.preferred_date || manilaToday();
+  const nextDate = nextRescheduleDate(date);
+  document.getElementById('rescheduleAppointmentId').value = activeRescheduleAppointment.id;
   const dateInput = document.getElementById('rescheduleDate');
   dateInput.value = date;
   dateInput.min = date;
   dateInput.max = nextDate;
   refreshRescheduleSlots();
   const timeSelect = document.getElementById('rescheduleTime');
-  if ([...timeSelect.options].some(option => option.value === appointment.preferred_time)) timeSelect.value = appointment.preferred_time;
+  if ([...timeSelect.options].some(option => option.value === activeRescheduleAppointment.preferred_time)) timeSelect.value = activeRescheduleAppointment.preferred_time;
   document.getElementById('rescheduleMsg').style.display = 'none';
   document.getElementById('rescheduleModal').classList.add('open');
+  dateInput.focus({ preventScroll: true });
+  dateInput.showPicker?.();
 }
 
 async function saveReschedule() {
+  const button = document.getElementById('saveRescheduleBtn');
+  if (button.disabled) return;
   const appointmentId = document.getElementById('rescheduleAppointmentId').value;
   const date = document.getElementById('rescheduleDate').value;
   const time = document.getElementById('rescheduleTime').value;
   const message = document.getElementById('rescheduleMsg');
-  if (!appointmentId || !date) return;
-  const appointment = window.residentAppointments?.find(item => item.id === appointmentId);
+  if (!appointmentId || !date || !time) {
+    message.textContent = 'Choose an appointment date and time.';
+    message.style.display = 'block';
+    message.style.color = '#b91c1c';
+    return;
+  }
+  const appointment = residentAppointments.find(item => item.id === appointmentId)
+    || (activeRescheduleAppointment?.id === appointmentId ? activeRescheduleAppointment : null);
   const originalDate = appointment?.preferred_date;
-  const allowedNextDate = originalDate ? formatInputDate(new Date(`${originalDate}T00:00:00`), 1) : date;
+  const allowedNextDate = originalDate ? nextRescheduleDate(originalDate) : date;
   if (originalDate && (date < originalDate || date > allowedNextDate)) {
     message.textContent = `You may reschedule only from ${originalDate} to ${allowedNextDate}.`;
     message.style.display = 'block';
     message.style.color = '#b91c1c';
     return;
   }
+  if (date === originalDate && clockMinutes(time) === clockMinutes(appointment?.preferred_time)) {
+    message.textContent = 'Choose a different appointment date or time.';
+    message.style.display = 'block';
+    message.style.color = '#b91c1c';
+    return;
+  }
+  button.disabled = true;
+  button.textContent = 'Sending request...';
+  message.style.display = 'none';
   try {
     await rescheduleBooking({ appointment_id: appointmentId, preferred_date: date, preferred_time: time });
-    if (appointment?.clinic_staff_uid) await addDoc(collection(db, 'notifications'), { recipient_uid: appointment.clinic_staff_uid, user_id: appointment.clinic_staff_uid, appointment_id: appointmentId, type: 'appointment', title: 'Appointment Rescheduled', message: `${currentResidentName} rescheduled an appointment to ${date} at ${time}.`, read: false, created_at: serverTimestamp() });
+    activeRescheduleAppointment = null;
     document.getElementById('rescheduleModal').classList.remove('open');
+    notifyDialog('Reschedule request sent. Clinic staff have been notified and must confirm your new date and time.');
   } catch (error) {
     message.textContent = 'Could not reschedule: ' + error.message;
     message.style.display = 'block';
     message.style.color = '#b91c1c';
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Request Reschedule';
   }
 }
 
 function openCancelModal(appointment) {
-  if (!appointment) return;
-  document.getElementById('cancelAppointmentId').value = appointment.id;
+  const current = editableAppointment(appointment);
+  if (!current) return;
+  document.getElementById('cancelAppointmentId').value = current.id;
   document.getElementById('cancelReason').value = '';
   document.getElementById('cancelMsg').style.display = 'none';
   document.getElementById('cancelModal').classList.add('open');
+  document.getElementById('cancelReason').focus({ preventScroll: true });
 }
 
+window.openRescheduleModal = openRescheduleModal;
+window.openCancelModal = openCancelModal;
+
 async function saveCancellation() {
+  const button = document.getElementById('saveCancelBtn');
+  if (button.disabled) return;
   const appointmentId = document.getElementById('cancelAppointmentId').value;
   const reason = document.getElementById('cancelReason').value.trim();
   const message = document.getElementById('cancelMsg');
@@ -868,29 +1088,20 @@ async function saveCancellation() {
     message.style.color = '#b91c1c';
     return;
   }
-  const appointment = window.residentAppointments?.find(item => item.id === appointmentId);
+  button.disabled = true;
+  button.textContent = 'Cancelling...';
+  message.style.display = 'none';
   try {
-    await updateDoc(doc(db, 'appointments', appointmentId), {
-      status: 'cancelled',
-      cancellation_reason: reason,
-      cancelled_at: serverTimestamp(),
-      cancelled_by: currentUid
-    });
-    if (appointment?.clinic_staff_uid) await addDoc(collection(db, 'notifications'), {
-      recipient_uid: appointment.clinic_staff_uid,
-      user_id: appointment.clinic_staff_uid,
-      appointment_id: appointmentId,
-      type: 'appointment',
-      title: 'Appointment Cancelled',
-      message: `${currentResidentName} cancelled the ${appointment.dose_label || 'vaccination'} appointment. Reason: ${reason}`,
-      read: false,
-      created_at: serverTimestamp()
-    });
+    await cancelBooking({appointment_id:appointmentId,reason});
     document.getElementById('cancelModal').classList.remove('open');
+    notifyDialog('Appointment cancelled successfully. Clinic staff have been notified.');
   } catch (error) {
     message.textContent = 'Could not cancel appointment: ' + error.message;
     message.style.display = 'block';
     message.style.color = '#b91c1c';
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Confirm Cancellation';
   }
 }
 
@@ -943,14 +1154,10 @@ function listenToAnimalExposure() {
 function listenToDashboardAnalytics() {
   onSnapshot(doc(db, 'system_settings', 'live_analytics'), snapshot => {
     const data = snapshot.exists() ? snapshot.data() : {};
+    livePublicCaseRecords = Array.isArray(data.publicRecords) ? data.publicRecords : [];
+    renderLiveRecordHeader(residentVaccinationRecords, residentAppointments);
     renderLiveCaptions(data);
-    const monthlyCases = Array.isArray(data.monthlyCases) ? data.monthlyCases : Array(12).fill(0);
-    const monthlyVaccinations = Array.isArray(data.monthlyVaccinations) ? data.monthlyVaccinations : Array(12).fill(0);
-    if (window.residentMonthlyChart) {
-      window.residentMonthlyChart.data.datasets[0].data = monthlyCases;
-      window.residentMonthlyChart.data.datasets[1].data = monthlyVaccinations;
-      window.residentMonthlyChart.update();
-    }
+    updateMonthlyChart(data);
     const maxCases = Math.max(1, ...(Array.isArray(data.barangays) ? data.barangays : []).map(item => Number(item.cases) || 0));
     renderAnalyticsList('barangayIncidentRate', data.barangays, item => {
       const ratio = Math.min(100, Math.round((Number(item.cases) || 0) / maxCases * 100));
@@ -990,7 +1197,6 @@ function initView(hasRecord, latestRecord) {
     setDisplay('view-new', 'block');
     setDisplay('view-active', 'none');
     setDisplay('nav-records', 'none');
-    setDisplay('panel-records', 'none');
     setDisplay('appt-new-resident', 'block');
     setDisplay('appt-active-patient', 'none');
     setTimeout(renderCasesChart, 150);
@@ -1024,26 +1230,7 @@ function populateActivePatientData(data) {
 }
 
 function renderCasesChart() {
-  const ctx = document.getElementById('monthlyChart');
-  if (!ctx || !window.Chart) return;
-  window.residentMonthlyChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-      datasets: [
-        { label: 'Rabies Cases', data: Array(12).fill(0), backgroundColor: 'rgba(239,0,0,0.75)', borderRadius: 4, borderSkipped: false },
-        { label: 'Vaccinations', data: Array(12).fill(0), backgroundColor: 'rgba(52,211,153,0.75)', borderRadius: 4, borderSkipped: false }
-      ]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { position: 'top', labels: { font: { size: 11 }, padding: 10 } } },
-      scales: {
-        y: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { font: { size: 11 } } },
-        x: { grid: { display: false }, ticks: { font: { size: 11 } } }
-      }
-    }
-  });
+  window.residentMonthlyChart = initializeMonthlyChart();
 }
 
 function renderResVizChart() {
@@ -1069,34 +1256,9 @@ function renderResVizChart() {
   });
 }
 
-function showTab(tab, el) {
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  const panel = document.getElementById('panel-' + tab);
-  if (panel) panel.classList.add('active');
-  if (el) el.classList.add('active');
-  // If the Overview panel contains maps, refresh them after layout changes
-  if (tab === 'overview' && window.refreshMaps) setTimeout(() => window.refreshMaps(), 150);
-  // Make sure the first aid and notifications panels stay visible when selected
-  if ((tab === 'firstaid' || tab === 'notifications') && panel) panel.classList.add('active');
-  // Ensure one of the appointments sub-views is visible when opening Appointments
-  if (tab === 'appointments') {
-    const newEl = document.getElementById('appt-new-resident');
-    const activeEl = document.getElementById('appt-active-patient');
-    if (newEl && activeEl) {
-      const newVis = window.getComputedStyle(newEl).display;
-      const actVis = window.getComputedStyle(activeEl).display;
-      if (newVis === 'none' && actVis === 'none') {
-        // default to new resident view
-        newEl.style.display = 'block';
-        activeEl.style.display = 'none';
-      }
-    }
-  }
-}
+window.renderResidentCasesChart = renderCasesChart;
 
-// Note: functions used by inline `onclick` will be exposed to `window` after they are defined,
-// inside DOMContentLoaded, so HTML inline handlers continue working with module scripts.
+// Other inline-handler functions are exposed in DOMContentLoaded so HTML can use module scripts.
 
 // Reads the dose level out of a "Dose N (Day D)" label, falling back to a plain
 // digit match. Residents choose the dose they are catching up on, so this is
@@ -1113,6 +1275,7 @@ function doseLevelFromLabel(label, fallback = 1) {
 // but never blocked: a resident catching up must be able to book a later dose
 // even if an earlier one was never recorded by a clinic.
 function earliestBookingDate(doseLevel) {
+  if (doseLevel === 1 && [1,2,3,4,5].every(n => residentVaccinationRecords.some(r => Number(r.dose_number) === n && r.date_given))) return manilaToday();
   const reviewed = patientTreatments.find(t => t.vaccination_session_id === (currentVaccinationSessionId || 'legacy'))?.doses?.find(d => d.dose_number === doseLevel)?.recommended_date;
   if (reviewed) return [manilaToday(), reviewed].sort().pop();
   if (!firstDoseDate || doseLevel <= 1 || doseLevel > doseDayOffsets.length) {
@@ -1132,8 +1295,12 @@ function requestSlotCapacity(clinicId, date) {
     entry = { ...entry, loading: true, updated: Date.now() }; slotCapacityCache.set(key, entry);
     getSlotAvailability({ clinic_id: clinicId, date }).then(({data}) => {
       slotCapacityCache.set(key, { data, updated: Date.now(), loading: false });
-      refreshTimeSlots(); refreshRescheduleSlots();
-    }).catch(() => { slotCapacityCache.set(key, { error: true, updated: Date.now(), loading: false }); refreshTimeSlots(); refreshRescheduleSlots(); });
+      refreshTimeSlots(); refreshRescheduleSlots(); refreshBatchTimeSlots();
+    }).catch(error => {
+      console.error('Could not check appointment slot availability:', error);
+      slotCapacityCache.set(key, { error: true, updated: Date.now(), loading: false });
+      refreshTimeSlots(); refreshRescheduleSlots(); refreshBatchTimeSlots();
+    });
   }
   return entry;
 }
@@ -1179,9 +1346,58 @@ function refreshTimeSlots() {
 }
 function refreshRescheduleSlots() {
   const id = document.getElementById('rescheduleAppointmentId')?.value;
-  const appointment = residentAppointments.find(item => item.id === id);
+  const appointment = residentAppointments.find(item => item.id === id)
+    || (activeRescheduleAppointment?.id === id ? activeRescheduleAppointment : null);
   const clinic = window.clinicDirectory?.find(item => item.id === appointment?.clinic_id);
   updateTimeSelect('rescheduleTime', 'rescheduleDate', clinic, 'rescheduleTimeHint');
+}
+function updateBatchTimeSelect(dateInput, select, clinic) {
+  const date = dateInput.value;
+  const previous = select.value || select.dataset.preferredTime;
+  const result = availableSlots(clinic, date);
+  const capacity = requestSlotCapacity(clinic?.id, date);
+  const signature = [clinic?.id, date, result.known, result.hours, JSON.stringify(capacity?.data), capacity?.error, ...result.slots].join('|');
+  if (select.dataset.scheduleSignature === signature) return;
+  select.dataset.scheduleSignature = signature;
+  const doseNumber = Number(select.dataset.doseTime);
+  const existing = residentAppointments.find(item =>
+    Number(item.dose_number || String(item.dose_label || '').match(/\d+/)?.[0] || 0) === doseNumber
+    && (item.vaccination_session_id || 'legacy') === (currentVaccinationSessionId || 'legacy')
+    && ['pending', 'confirmed', 'accepted', 'approved'].includes(item.status)
+  );
+  select.replaceChildren();
+  for (const time of result.slots) {
+    const option = document.createElement('option');
+    option.value = time;
+    const slotKey = dateStart(date) + clockMinutes(time) * 60000;
+    const count = Math.max(0, (capacity?.data?.counts[slotKey] || 0)
+      - (existing?.clinic_id === clinic?.id && existing.preferred_date === date
+        && dateStart(existing.preferred_date) + clockMinutes(existing.preferred_time) * 60000 === slotKey ? 1 : 0));
+    option.disabled = !capacity?.data || count >= 5;
+    option.textContent = time + (capacity?.data ? count >= 5 ? ' - Full' : ' - ' + (5 - count) + ' slots left' : ' - Checking availability');
+    select.appendChild(option);
+  }
+  if (!result.slots.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = !result.known ? 'Operating hours unavailable' : !result.minutes.length ? 'Clinic closed' : 'No future slots available';
+    select.appendChild(option);
+  } else if (result.slots.includes(previous)) {
+    select.value = previous;
+  }
+  delete select.dataset.preferredTime;
+  if (select.selectedOptions[0]?.disabled) select.value = [...select.options].find(option => !option.disabled)?.value || '';
+  select.disabled = !result.slots.length || !capacity?.data || ![...select.options].some(option => !option.disabled);
+}
+function refreshBatchTimeSlots() {
+  const modal = document.getElementById('batchBookingModal');
+  if (!modal?.classList.contains('open')) return;
+  const clinic = window.clinicDirectory?.find(item => item.id === document.getElementById('batchBookingClinic')?.value);
+  modal.querySelectorAll('[data-dose-date]').forEach(dateInput => {
+    const doseNumber = dateInput.dataset.doseDate;
+    const timeSelect = modal.querySelector(`[data-dose-time="${doseNumber}"]`);
+    if (timeSelect) updateBatchTimeSelect(dateInput, timeSelect, clinic);
+  });
 }
 function timeSlotError(date, time, clinic) {
   return bookingTimeError(clinic, date, time);
@@ -1195,22 +1411,30 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
     if (document.getElementById('bookingModal')?.classList.contains('open')) refreshTimeSlots();
     if (document.getElementById('rescheduleModal')?.classList.contains('open')) refreshRescheduleSlots();
+    if (document.getElementById('batchBookingModal')?.classList.contains('open')) refreshBatchTimeSlots();
   }
 });
 
 function openBookingModal(clinic, clinicId = '') {
   const select = document.getElementById('modalClinic');
   const directory = window.clinicDirectory || [];
-  selectedClinic = directory.find(item => item.id === clinicId) || directory.find(item => item.name === clinic) || directory.find(item => item.id === select.value);
+  const historyClinicId = getPrimaryClinicId();
+  const explicitClinic = directory.find(item => item.id === clinicId) || directory.find(item => item.name === clinic);
+  selectedClinic = explicitClinic || directory.find(item => item.id === historyClinicId);
+  if (!selectedClinic && historyClinicId && !clinic && !clinicId) {
+    notifyDialog('Your previous clinic is currently unavailable in the directory. Contact your clinic to arrange your next dose.');
+    return;
+  }
+  selectedClinic ||= directory.find(item => item.id === select.value);
   if (!selectedClinic) { notifyDialog('Choose a clinic from the map or directory first.'); return; }
   select.value = selectedClinic.id;
   document.getElementById('bookingClinicName').textContent = selectedClinic.name;
   const nextDose = [1,2,3,4,5].find(n => !residentVaccinationRecords.some(r => Number(r.dose_number) === n && r.date_given));
-  if (!nextDose) { notifyDialog('This treatment is complete. Contact clinic staff for a new exposure assessment.'); return; }
-  selectedDose = 'Dose ' + nextDose + ' (Day ' + doseDayOffsets[nextDose - 1] + ')';
+  const bookingDose = nextDose || 1;
+  selectedDose = 'Dose ' + bookingDose + ' (Day ' + doseDayOffsets[bookingDose - 1] + ')';
 
   const date = document.getElementById('modalDate');
-  date.min = earliestBookingDate(nextDose);
+  date.min = nextDose ? earliestBookingDate(nextDose) : manilaToday();
   date.value = date.min;
   document.getElementById('bookingMsg').style.display = 'none';
   document.getElementById('confirmBookingBtn').disabled = false;
@@ -1225,7 +1449,7 @@ function bookingPrimaryAction() { return confirmBooking(); }
 function withBookingTimeout(promise, operation, timeoutMs = 30000) {
   let timeoutId;
   const timeout = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(`${operation} timed out. Make sure Firebase Storage is enabled in the Firebase Console, then try again.`)), timeoutMs);
+    timeoutId = setTimeout(() => reject(new Error(`${operation} timed out. Check your booking records before retrying.`)), timeoutMs);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
 }
@@ -1239,7 +1463,7 @@ async function confirmBooking() {
   message.style.display = 'block';
   message.style.color = '#b91c1c';
   if (!currentUid || !selectedClinic || !date || !time) { message.textContent = 'Choose a preferred date and time.'; return; }
-  if (selectedClinic.status === 'out') { message.textContent = 'This clinic is out of stock. Choose another clinic.'; return; }
+  if ((window.clinicDirectory || []).find(clinic => clinic.id === selectedClinic.id)?.status !== 'available') { message.textContent = 'This clinic has low or out-of-stock inventory. Choose another clinic.'; return; }
   const latestClinic = window.clinicDirectory?.find(item => item.id === selectedClinic.id) || selectedClinic;
   const error = timeSlotError(date, time, latestClinic);
   if (error || date < earliestBookingDate(doseLevelFromLabel(selectedDose))) {
@@ -1249,12 +1473,32 @@ async function confirmBooking() {
   button.textContent = 'Booking...';
   message.textContent = '';
   try {
-    await withBookingTimeout(createBooking({
+    const clinicId = selectedClinic.id;
+    if (!await confirmClinicWithHistory(selectedClinic)) {
+      button.disabled = false;
+      return;
+    }
+    if (selectedClinic?.id !== clinicId || !currentUid) {
+      button.disabled = false;
+      return;
+    }
+    const result = await withBookingTimeout(createBooking({
       clinic_id: selectedClinic.id, preferred_date: date, preferred_time: time,
       dose_label: selectedDose, vaccine_name: latestVaccineBrand || '',
       vaccination_session_id: currentVaccinationSessionId || 'legacy',
       primary_clinic_id: getPrimaryClinicId() || selectedClinic.id
     }), 'Saving your appointment');
+    if (result?.data?.vaccination_session_id) {
+      currentVaccinationSessionId = result.data.vaccination_session_id;
+      residentVaccinationRecords = allResidentVaccinationRecords.filter(record =>
+        (record.vaccination_session_id || 'legacy') === currentVaccinationSessionId);
+      firstDoseDate = toDate(residentVaccinationRecords.find(record => Number(record.dose_number) === 1)?.date_given);
+      latestVaccineBrand = residentVaccinationRecords[0]?.vaccine_name || residentVaccinationRecords[0]?.vaccine_type || '';
+      renderLiveRecordHeader(residentVaccinationRecords, residentAppointments);
+      updateVaccinationProgress(residentVaccinationRecords);
+      renderLiveDoseRecords(residentVaccinationRecords, residentAppointments);
+      renderPreviousVaccinationRecords(allResidentVaccinationRecords);
+    }
     message.style.color = '#15803d';
     message.textContent = 'Appointment sent to the clinic for review.';
     setTimeout(closeBookingModal, 1500);
@@ -1264,12 +1508,188 @@ async function confirmBooking() {
   } finally { button.textContent = 'Book Appointment'; }
 }
 
+function openBatchBookingModal(preferredClinicId = '') {
+  const modal = document.getElementById('batchBookingModal');
+  const clinicSelect = document.getElementById('batchBookingClinic');
+  const grid = document.getElementById('batchBookingDoseGrid');
+  const message = document.getElementById('batchBookingMsg');
+  const treatment = patientTreatments.find(item => item.vaccination_session_id === (currentVaccinationSessionId || 'legacy'));
+  const recordsByDose = new Map(residentVaccinationRecords.map(record => [Number(record.dose_number), record]));
+  const bookingsByDose = new Map(residentAppointments
+    .filter(item => (item.vaccination_session_id || 'legacy') === (currentVaccinationSessionId || 'legacy')
+      && ['pending', 'confirmed', 'accepted', 'approved', 'in_progress'].includes(item.status))
+    .map(item => [Number(item.dose_number || String(item.dose_label || '').match(/\d+/)?.[0] || 0), item]));
+  const toBook = [1, 2, 3, 4, 5].filter(doseNumber =>
+    !recordsByDose.has(doseNumber) && bookingsByDose.get(doseNumber)?.status !== 'in_progress'
+  );
+  if (!treatment || !toBook.length || toBook.some(doseNumber =>
+    !treatment.doses?.find(dose => dose.dose_number === doseNumber)?.recommended_date
+  )) {
+    notifyDialog('The complete clinic-recommended schedule is not available yet. Please contact your clinic.');
+    return;
+  }
+
+  const clinics = (window.clinicDirectory || []).filter(clinic => clinic.id && clinic.status === 'available');
+  if (!clinics.length) {
+    notifyDialog('No clinic is currently available for booking.');
+    return;
+  }
+  clinicSelect.innerHTML = clinics.map(clinic =>
+    `<option value="${escapeHtml(clinic.id)}">${escapeHtml(clinic.name || 'Clinic')}</option>`
+  ).join('');
+  const existingClinicId = toBook.map(doseNumber => bookingsByDose.get(doseNumber)?.clinic_id).find(Boolean);
+  const chosenClinic = clinics.find(clinic => clinic.id === preferredClinicId)
+    || clinics.find(clinic => clinic.id === existingClinicId)
+    || clinics.find(clinic => clinic.id === getPrimaryClinicId())
+    || clinics[0];
+  clinicSelect.value = chosenClinic.id;
+  grid.innerHTML = toBook.map(doseNumber => {
+    const dose = treatment.doses.find(item => item.dose_number === doseNumber);
+    const existing = bookingsByDose.get(doseNumber);
+    const minimum = earliestBookingDate(doseNumber);
+    const date = existing?.preferred_date >= minimum ? existing.preferred_date : minimum;
+    return `<div class="batch-booking-dose"><strong>Dose ${doseNumber} — Clinic recommended: ${escapeHtml(formatRecordDate(dose.recommended_date))}</strong><label for="batchDoseDate${doseNumber}">Appointment date</label><input id="batchDoseDate${doseNumber}" type="date" min="${escapeHtml(minimum)}" value="${escapeHtml(date)}" data-dose-date="${doseNumber}" required><label for="batchDoseTime${doseNumber}">Appointment time</label><select id="batchDoseTime${doseNumber}" data-dose-time="${doseNumber}" data-preferred-time="${escapeHtml(existing?.preferred_time || '')}" required><option value="">Checking times...</option></select></div>`;
+  }).join('');
+  message.style.display = 'none';
+  modal.classList.add('open');
+  refreshBatchTimeSlots();
+}
+
+function closeBatchBookingModal() {
+  document.getElementById('batchBookingModal')?.classList.remove('open');
+}
+
+async function confirmBatchBooking() {
+  const button = document.getElementById('batchBookingConfirmBtn');
+  const message = document.getElementById('batchBookingMsg');
+  const clinic = window.clinicDirectory?.find(item => item.id === document.getElementById('batchBookingClinic')?.value);
+  const rows = [...document.querySelectorAll('#batchBookingDoseGrid [data-dose-date]')];
+  message.style.display = 'block';
+  message.style.color = '#b91c1c';
+  if (!currentUid || !clinic || clinic.status !== 'available' || !rows.length) {
+    message.textContent = 'Choose an available clinic and the recommended dose dates.';
+    return;
+  }
+
+  let previousDate = '';
+  const selectedSlots = new Set();
+  const appointments = [];
+  for (const dateInput of rows) {
+    const doseNumber = Number(dateInput.dataset.doseDate);
+    const timeSelect = document.querySelector(`#batchBookingDoseGrid [data-dose-time="${doseNumber}"]`);
+    const date = dateInput.value;
+    const time = timeSelect?.value || '';
+    const minimum = earliestBookingDate(doseNumber);
+    const error = timeSlotError(date, time, clinic);
+    if (!date || !time || timeSelect.disabled || date < minimum || date < previousDate || error) {
+      message.textContent = error || `Choose a future appointment date and available time for Dose ${doseNumber}, in dose order.`;
+      return;
+    }
+    const slot = dateStart(date) + clockMinutes(time) * 60000;
+    if (selectedSlots.has(slot)) {
+      message.textContent = 'Choose a different appointment time for each dose.';
+      return;
+    }
+    selectedSlots.add(slot);
+    previousDate = date;
+    appointments.push({ dose_number: doseNumber, preferred_date: date, preferred_time: time });
+  }
+
+  button.disabled = true;
+  button.textContent = 'Booking all dates...';
+  try {
+    if (!await confirmClinicWithHistory(clinic)) return;
+    const result = await withBookingTimeout(createBatchBooking({
+      clinic_id: clinic.id,
+      vaccination_session_id: currentVaccinationSessionId || 'legacy',
+      appointments
+    }), 'Booking your vaccination schedule');
+    message.style.color = '#15803d';
+    message.textContent = `${result.data.appointments.length} dose appointments were sent to ${clinic.name || 'the clinic'} for review.`;
+    setTimeout(closeBatchBookingModal, 1800);
+  } catch (error) {
+    console.error('Could not book the recommended vaccination schedule:', error);
+    message.textContent = error.message || 'Could not confirm the result. Refresh your booking records before retrying.';
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Book All Dates';
+  }
+}
+
 function filterMap(btn) {
   document.querySelectorAll('.map-filter button').forEach(b => b.classList.remove('active-btn'));
   btn.classList.add('active-btn');
 }
 
+function uploadVaccinationFile(storageRef, file, contentType, onProgress) {
+  const task = uploadBytesResumable(storageRef, file, { contentType });
+  return new Promise((resolve, reject) => {
+    let timeoutId;
+    let transferred = 0;
+    let unsubscribe;
+    let settled = false;
+    const finish = (error, snapshot) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      unsubscribe?.();
+      if (error) reject(error);
+      else resolve(snapshot);
+    };
+    const resetTimeout = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const error = new Error('The upload stopped responding. Check your internet connection and try again.');
+        error.code = 'storage/upload-timeout';
+        finish(error);
+        task.cancel();
+      }, 45000);
+    };
+    resetTimeout();
+    unsubscribe = task.on('state_changed', snapshot => {
+      if (settled) return;
+      if (snapshot.bytesTransferred > transferred) {
+        transferred = snapshot.bytesTransferred;
+        resetTimeout();
+      }
+      onProgress(Math.round(snapshot.bytesTransferred / (snapshot.totalBytes || 1) * 100));
+    }, error => finish(error), () => finish(null, task.snapshot));
+  });
+}
+
+function getVaccinationDocumentUrl(storageRef) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const error = new Error('The upload service is not responding. Please try again.');
+      error.code = 'storage/upload-timeout';
+      reject(error);
+    }, 30000);
+  });
+  return Promise.race([getDownloadURL(storageRef), timeout]).finally(() => clearTimeout(timeoutId));
+}
+
+function vaccinationUploadErrorMessage(error) {
+  switch (error.code) {
+    case 'storage/unauthenticated':
+      return 'Your session has expired. Please sign in again and upload the document.';
+    case 'storage/unauthorized':
+    case 'permission-denied':
+      return 'Your account does not have permission to upload this document. Please sign in again. If it still fails, contact the clinic.';
+    case 'storage/retry-limit-exceeded':
+    case 'storage/upload-timeout':
+      return 'The upload stopped responding. Check your internet connection and try again. If it still fails, contact the clinic.';
+    case 'storage/bucket-not-found':
+    case 'storage/project-not-found':
+    case 'storage/quota-exceeded':
+      return 'The document upload service is currently unavailable. Please contact the clinic.';
+    default:
+      return 'Could not upload the document. Please try again.';
+  }
+}
+
 async function handleUpload(input) {
+  if (vaccinationUploadInProgress) return;
   const file = input.files[0];
   if (!file || !currentUid) return;
   if (file.size > 10 * 1024 * 1024) {
@@ -1278,45 +1698,81 @@ async function handleUpload(input) {
     return;
   }
   const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-  if (!allowedTypes.includes(file.type)) {
+  const extensionTypes = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png' };
+  const contentType = file.type || extensionTypes[file.name.split('.').pop().toLowerCase()];
+  if (!allowedTypes.includes(contentType)) {
     notifyDialog('Please upload a PDF, JPG, or PNG file.');
     input.value = '';
     return;
   }
-  const uploadBox = document.querySelector('.upload-box p');
+  const controls = document.getElementById('uploadDocumentControls');
+  const uploadBox = controls?.querySelector('.upload-box');
+  const uploadText = uploadBox?.querySelector('p');
+  const chooseButton = controls?.querySelector('.upload-btn');
+  const status = document.getElementById('vaccinationUploadStatus');
+  const uid = currentUid;
+  const sessionId = currentVaccinationSessionId || 'legacy';
   const replaceId = input.dataset.replaceId || '';
-  if (uploadBox) uploadBox.textContent = 'Uploading document...';
+  let saveNoticeId;
+  const showStatus = (message, isError = false) => {
+    if (status) {
+      status.hidden = false;
+      status.textContent = message;
+      status.classList.toggle('document-error', isError);
+    }
+    if (uploadText) uploadText.textContent = message;
+  };
+  vaccinationUploadInProgress = true;
+  input.disabled = true;
+  if (chooseButton) chooseButton.disabled = true;
+  controls?.setAttribute('aria-busy', 'true');
+  uploadBox?.setAttribute('aria-disabled', 'true');
+  showStatus('Uploading document... 0%');
   try {
-    const storageRef = ref(storage, `vaccination-documents/${currentUid}/${Date.now()}-${file.name}`);
-    await uploadBytes(storageRef, file, { contentType: file.type });
-    const downloadUrl = await getDownloadURL(storageRef);
+    if (!navigator.onLine) throw Object.assign(new Error('You are offline.'), { code: 'storage/upload-timeout' });
+    storage.maxUploadRetryTime = 120000;
+    storage.maxOperationRetryTime = 30000;
+    const safeFileName = file.name.replace(/[\\/]/g, '_');
+    const storageRef = ref(storage, `vaccination-documents/${uid}/${Date.now()}-${safeFileName}`);
+    await uploadVaccinationFile(storageRef, file, contentType, percent => showStatus(`Uploading document... ${percent}%`));
+    showStatus('Upload complete. Preparing document...');
+    const downloadUrl = await getVaccinationDocumentUrl(storageRef);
     const documentData = {
-      id: replaceId || `local-${Date.now()}`,
-      resident_uid: currentUid,
-      vaccination_session_id: currentVaccinationSessionId || 'legacy',
+      resident_uid: uid,
+      vaccination_session_id: sessionId,
       file_name: file.name,
-      file_type: file.type,
+      file_type: contentType,
       file_size: file.size,
       storage_path: storageRef.fullPath,
       download_url: downloadUrl,
       uploaded_at: serverTimestamp()
     };
+    showStatus('Upload complete. Saving document...');
+    // Firestore queues writes while offline. Keep this upload locked until the
+    // server acknowledges it so retrying cannot create duplicate documents.
+    saveNoticeId = setTimeout(() => showStatus('Photo uploaded. Waiting for a connection to save the document. Keep this page open.'), 30000);
     if (replaceId) {
       await updateDoc(doc(db, 'vaccination_documents', replaceId), documentData);
     } else {
       await addDoc(collection(db, 'vaccination_documents'), documentData);
     }
-    localStorage.setItem(`vaccination-document-${currentUid}`, JSON.stringify({
-      ...documentData,
-      uploaded_at: { localDate: new Date().toLocaleString() }
-    }));
-    loadVaccinationDocuments(currentUid);
+    clearTimeout(saveNoticeId);
+    showStatus(replaceId ? 'Vaccination document replaced successfully.' : 'Vaccination document uploaded successfully.');
+    if (currentUid === uid) loadVaccinationDocuments(uid);
     notifyDialog(replaceId ? 'Vaccination document replaced successfully.' : 'Vaccination document uploaded successfully.');
   } catch (error) {
     console.error('Failed to upload vaccination document:', error);
-    notifyDialog('Could not upload the document: ' + error.message);
+    const message = vaccinationUploadErrorMessage(error);
+    showStatus(message, true);
+    notifyDialog(message);
   } finally {
-    if (uploadBox) uploadBox.textContent = 'Click to upload or drag & drop';
+    clearTimeout(saveNoticeId);
+    vaccinationUploadInProgress = false;
+    input.disabled = false;
+    if (chooseButton) chooseButton.disabled = false;
+    controls?.setAttribute('aria-busy', 'false');
+    uploadBox?.removeAttribute('aria-disabled');
+    if (uploadText) uploadText.textContent = 'Click to upload';
     delete input.dataset.replaceId;
     input.value = '';
   }
@@ -1363,81 +1819,37 @@ function resApplyFilter(q = '') {
   document.getElementById('resRecordsCount').textContent = 'Showing ' + shown + ' of 5 records';
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+function initializeResidentDashboard() {
   document.getElementById('modalDate')?.addEventListener('change', refreshTimeSlots);
   document.getElementById('rescheduleDate')?.addEventListener('change', refreshRescheduleSlots);
-  document.getElementById('closeRescheduleBtn')?.addEventListener('click', () => document.getElementById('rescheduleModal').classList.remove('open'));
+  document.getElementById('enablePushAlertsBtn')?.addEventListener('click', registerResidentPushAlerts);
+  document.getElementById('batchBookingClinic')?.addEventListener('change', refreshBatchTimeSlots);
+  document.getElementById('batchBookingDoseGrid')?.addEventListener('change', event => {
+    if (event.target.matches('[data-dose-date]')) refreshBatchTimeSlots();
+  });
+  document.getElementById('batchBookingConfirmBtn')?.addEventListener('click', confirmBatchBooking);
+  document.getElementById('batchBookingCancelBtn')?.addEventListener('click', closeBatchBookingModal);
+  document.getElementById('batchBookingModal')?.addEventListener('click', event => {
+    if (event.target === event.currentTarget) closeBatchBookingModal();
+  });
+  document.getElementById('closeRescheduleBtn')?.addEventListener('click', () => {
+    activeRescheduleAppointment = null;
+    document.getElementById('rescheduleModal').classList.remove('open');
+  });
   document.getElementById('saveRescheduleBtn')?.addEventListener('click', saveReschedule);
   document.getElementById('closeCancelBtn')?.addEventListener('click', () => document.getElementById('cancelModal').classList.remove('open'));
   document.getElementById('saveCancelBtn')?.addEventListener('click', saveCancellation);
-  const profileModal = document.getElementById('profileModal');
-  const profileMessage = document.getElementById('profileMessage');
-  const openProfile = () => {
-    profileModal.classList.add('open');
-    profileModal.setAttribute('aria-hidden', 'false');
-  };
-  const closeProfile = () => {
-    profileModal.classList.remove('open');
-    profileModal.setAttribute('aria-hidden', 'true');
-  };
-  document.getElementById('profileBtn')?.addEventListener('click', openProfile);
-  document.getElementById('profileClose')?.addEventListener('click', closeProfile);
-  profileModal?.addEventListener('click', event => {
-    if (event.target === profileModal) closeProfile();
-  });
-  document.getElementById('profileForm')?.addEventListener('submit', async event => {
-    event.preventDefault();
-    if (!currentUid) return;
-    const username = document.getElementById('profileUsername').value.trim();
-    if (!username) return;
-    const saveButton = event.currentTarget.querySelector('.profile-save-btn');
-    saveButton.disabled = true;
-    profileMessage.textContent = 'Saving profile...';
-    profileMessage.style.color = '#6b7280';
-    try {
-      await updateDoc(doc(db, 'residents', currentUid), {
-        username,
-        phone: document.getElementById('profilePhone').value.trim(),
-        birthday: document.getElementById('profileBirthday').value,
-        gender: document.getElementById('profileGender').value,
-        address: document.getElementById('profileAddress').value.trim()
-      });
-      residentProfile = {
-        ...residentProfile,
-        username,
-        phone: document.getElementById('profilePhone').value.trim(),
-        birthday: document.getElementById('profileBirthday').value,
-        gender: document.getElementById('profileGender').value,
-        address: document.getElementById('profileAddress').value.trim()
-      };
-      currentResidentName = username;
-      const headerName = document.getElementById('headerName');
-      if (headerName) headerName.textContent = username;
-      profileMessage.textContent = 'Profile saved successfully.';
-      profileMessage.style.color = '#15803d';
-    } catch (error) {
-      profileMessage.textContent = 'Could not save profile: ' + error.message;
-      profileMessage.style.color = '#b91c1c';
-    } finally {
-      saveButton.disabled = false;
-    }
-  });
-
   document.getElementById('bookingModal')?.addEventListener('click', function(e) {
     if (e.target === this) closeBookingModal();
+  });
+  document.getElementById('batchBookingModal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeBatchBookingModal();
   });
 
 
   document.getElementById('confirmBookingBtn')?.addEventListener('click', bookingPrimaryAction);
   document.getElementById('bookingCancelBtn')?.addEventListener('click', closeBookingModal);
 
-  const signOutBtn = document.getElementById('signOutBtn');
-  if (signOutBtn) signOutBtn.addEventListener('click', () => {
-    signOutUser().then(() => window.location.href = 'login.html');
-  });
-
-
-  window.showTab = showTab;
   window.openBookingModal = openBookingModal;
   window.closeBookingModal = closeBookingModal;
   window.confirmBooking = confirmBooking;
@@ -1466,9 +1878,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (user && !sessionIsTerminated()) {
       fetchUserProfile(user.uid).then(profile => {
         if (profile?.role !== 'resident' || auth.currentUser?.uid !== user.uid || sessionIsTerminated()) return;
-        loadResidentDashboard(user.uid, profile);
+        return loadResidentDashboard(user.uid, profile);
       }).catch(error => {
-        console.error('Could not initialize resident dashboard:', error);
+        reportResidentDataError('dashboard', error);
       });
     }
   });
@@ -1479,7 +1891,13 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   renderCasesChart();
   setTimeout(renderResVizChart, 300);
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeResidentDashboard, { once: true });
+} else {
+  initializeResidentDashboard();
+}
 
 let appointmentDisplayKey = '';
 setInterval(() => {

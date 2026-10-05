@@ -4,6 +4,13 @@
 .nearest-clinic-button:hover { background: #c90000; }
 .nearest-clinic-button:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
 .nearest-clinic-button:disabled { opacity: .65; cursor: wait; }
+.map-exit-directions { min-height: 42px; margin: 0 0 12px 12px !important; padding: 9px 13px; border: 1px solid #b91c1c; border-radius: 8px; background: #dc2626; color: #fff; font: 700 13px Arial, sans-serif; cursor: pointer; box-shadow: 0 2px 8px rgba(15,23,42,.35); }
+.map-exit-directions:hover { background: #b91c1c; }
+.map-exit-directions:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.map-exit-directions[hidden] { display: none; }
+.clinic-popup-actions .map-popup-exit-directions { border: 1px solid #b91c1c; background: #dc2626; color: #fff; }
+.clinic-popup-actions .map-popup-exit-directions:hover { background: #b91c1c; }
+.clinic-popup-actions .map-popup-exit-directions[hidden] { display: none; }
 .map-box > .leaflet-container { flex: 1 1 100%; min-width: 0; width: 100%; }
 .clinic-popup .leaflet-popup-content-wrapper { border-radius: 16px; padding: 1px; box-shadow: 0 6px 24px rgba(15,23,42,.2); }
 .clinic-popup .leaflet-popup-content { margin: 18px; max-width: calc(100vw - 90px); font-family: Arial, sans-serif; line-height: 1.45; }
@@ -17,6 +24,8 @@
 .clinic-popup-card dt { color: #64748b; font-weight: 400; }
 .clinic-popup-card dd { margin: 0; color: #334155; overflow-wrap: anywhere; }
 .clinic-popup-actions { display: grid; gap: 8px; }
+.clinic-booking-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.clinic-booking-actions .action-btn { flex: 1; padding: 8px 10px; }
 .clinic-popup-actions button { box-sizing: border-box; width: 100%; min-height: 40px; margin: 0 !important; padding: 10px 12px; border-radius: 8px; font: 600 12px Arial, sans-serif; cursor: pointer; }
 .clinic-popup-actions .map-book-button { background: #e60000; color: white; border: 1px solid #e60000; }
 .clinic-popup-actions .map-book-button:disabled { border-color: #e5e7eb; }

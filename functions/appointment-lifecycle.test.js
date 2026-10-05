@@ -6,8 +6,8 @@ const base = { clinic_id:'clinic', resident_uid:'resident', resident_name:'Resid
 const intake = { bite_type:'Scratch', wound_washed:'Yes', animal_type:'Dog', bite_body_part:'Left leg', bite_date:'2026-09-23', date_of_birth:'2002-09-24', patient_sex:'Female', patient_category:'Category II' };
 function fixture(item = base) {
   let clock = new Date('2026-09-24T00:00:00Z'), sequence=0, queue=Promise.resolve();
-  const rows=new Map([['users/staff',{role:'clinic_staff',is_active:true,clinic_id:'clinic'}],['appointments/a',{...item}]]);
-  const db={collection:name=>({path:name,where:(field,op,value)=>({path:name,filter:{field,value}}),doc:id=>({path:name+'/'+(id || ++sequence)})}),
+  const rows=new Map([['users/staff',{role:'clinic_staff',is_active:true,clinic_id:'clinic'}],['inventory/batch',{clinic_id:'clinic',type:'Vaccine',expiry:'2099-01-01',quantity:20}],['appointments/a',{...item}]]);
+  const db={collection:name=>({path:name,where:(field,op,value)=>({path:name,filter:{field,value}}),doc:id=>{const value=id || String(++sequence);return {id:value,path:name+'/'+value};}}),
     runTransaction:fn=>{
       const result=queue.then(async()=>{
         const writes=[];
@@ -234,7 +234,8 @@ test('blank, oversized and non-text patient names are rejected without writes', 
 
 test('intake lookup is scoped to arrived patient and preserves prior records',async()=>{
  const f=fixture({...base,status:'confirmed',vaccination_session_id:'course'});
- f.rows.set('patient_records/old',{...intake,resident_uid:'resident',vaccination_session_id:'course'});
+ f.rows.set('patient_records/old',{...intake,clinic_id:base.clinic_id,resident_uid:'resident',vaccination_session_id:'course'});
+ f.rows.set('patient_records/other-clinic',{...intake,clinic_id:'other-clinic',resident_uid:'resident',vaccination_session_id:'course',bite_body_part:'Other clinic private notes'});
  f.rows.set('patient_records/stranger',{...intake,resident_uid:'other',patient_sex:'Male',vaccination_session_id:'course'});
  await assert.rejects(f.call('intake_context'),/arrival/);
  await f.call('arrive');
@@ -247,4 +248,114 @@ test('intake lookup is scoped to arrived patient and preserves prior records',as
  assert.equal(f.rows.get('patient_records/old').bite_body_part,'Left leg');
  assert.equal(f.rows.get('patient_records/a').bite_body_part,'Right leg');
  await assert.rejects(f.call('intake_context',{}, {uid:'intruder',token:{secure_login:true,email_verified:true,firebase:{sign_in_provider:'custom'}}}),/active staff/);
+});
+
+test('confirmation reserves stock once and publishes availability without clinical completion',async()=>{
+ const f=fixture();
+ await f.call('confirm');
+ assert.equal(f.rows.get('inventory/batch').quantity,20);
+ assert.equal(f.rows.get('inventory/batch').reserved_count,1);
+ assert.equal(f.rows.get('clinics/clinic').stock_total,19);
+ assert.equal(f.rows.get('appointments/a').stock_reservation.status,'reserved');
+ assert.equal([...f.rows.keys()].some(key=>key.startsWith('vaccination_records/')),false);
+ await assert.rejects(f.call('confirm'));
+ assert.equal(f.rows.get('inventory/batch').quantity,20);
+});
+
+test('50 physical doses stay on hand through acceptance and intake, then completion leaves 49 available',async()=>{
+ const {treatmentHandler,key}=require('./treatment');
+ const {availableQuantity,physicalQuantity,summarizeStock}=await import('../scripts/stock-summary.mjs');
+ const {availableStock}=await import('../scripts/dose-stock.mjs');
+ for(const quantity_mode of [undefined,'on_hand']) {
+  const f=fixture();
+  Object.assign(f.rows.get('inventory/batch'),{quantity:50,...(quantity_mode?{quantity_mode}:{})});
+  const batch=()=>f.rows.get('inventory/batch');
+  const mapItems=()=>availableStock([{...batch(),id:'batch'}],'clinic','2026-09-24');
+  assert.equal(physicalQuantity(batch()),50);
+  assert.equal(availableQuantity(batch()),50);
+  await f.call('confirm');
+  assert.equal(batch().quantity,50);
+  assert.equal(batch().reserved_count,1);
+  assert.equal(physicalQuantity(batch()),50);
+  assert.equal(summarizeStock(mapItems()),'Vaccine: 49');
+  assert.equal(f.rows.get('clinics/clinic').stock_total,49);
+  f.at('2026-09-24T01:00:00Z');
+  await f.call('arrive');
+  await f.call('intake',{intake});
+  assert.equal(batch().quantity,50);
+  assert.equal(availableQuantity(batch()),49);
+  const complete=treatmentHandler({db:f.db,HttpsError,timestamp:()=>f.now().toISOString()});
+  const request={auth:{uid:'staff',token:{secure_login:true,email_verified:true,firebase:{sign_in_provider:'custom'}}},
+   data:{action:'complete',appointment_id:'a',stock_id:'batch',dose_number:1,confirmed:true,date:'2026-09-24'}};
+  await complete(request);
+  assert.equal(batch().quantity,49);
+  assert.equal(batch().reserved_count,0);
+  assert.equal(physicalQuantity(batch()),49);
+  assert.equal(summarizeStock(mapItems()),'Vaccine: 49');
+  assert.equal(f.rows.get('clinics/clinic').stock_total,49);
+  assert.equal(f.rows.get('appointments/a').stock_reservation.status,'consumed');
+  assert.equal(f.rows.get('vaccination_records/'+key('resident','legacy')+'-dose-1').inventory_id,'batch');
+  await assert.rejects(complete(request),{code:'failed-precondition'});
+  assert.equal(batch().quantity,49);
+ }
+});
+test('concurrent confirmations cannot reserve the same last dose',async()=>{
+ const f=fixture();f.rows.get('inventory/batch').quantity=1;
+ f.rows.set('appointments/b',{...base,resident_uid:'another-resident'});
+ const results=await Promise.allSettled([f.call('confirm'),f.call('confirm',{appointment_id:'b'})]);
+ assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+ assert.equal(f.rows.get('inventory/batch').quantity,1);
+ assert.equal(f.rows.get('inventory/batch').reserved_count,1);
+ assert.equal(['a','b'].filter(id=>f.rows.get('appointments/'+id).status==='confirmed').length,1);
+ assert.equal(['a','b'].filter(id=>f.rows.get('appointments/'+id).status==='pending').length,1);
+ assert.equal(f.rows.get('clinics/clinic').stock_status,'out');
+});
+
+test('confirmation rejects invalid reservation counters without changing the appointment',async()=>{
+ for(const reserved_count of [-1,0.5,'invalid']) {
+  const f=fixture();Object.assign(f.rows.get('inventory/batch'),{quantity:50,quantity_mode:'on_hand',reserved_count});
+  await assert.rejects(f.call('confirm'),{code:'failed-precondition'});
+  assert.equal(f.rows.get('inventory/batch').quantity,50);
+  assert.equal(f.rows.get('inventory/batch').reserved_count,reserved_count);
+  assert.equal(f.rows.get('appointments/a').status,'pending');
+ }
+});
+test('no-show releases its reserved dose exactly once',async()=>{
+ const f=fixture();await f.call('confirm');f.at('2026-09-24T03:00:00Z');
+ await f.clean();await f.clean();
+ assert.equal(f.rows.get('inventory/batch').quantity,20);
+ assert.equal(f.rows.get('inventory/batch').reserved_count,0);
+ assert.equal(f.rows.get('clinics/clinic').stock_total,20);
+ assert.equal(f.rows.get('appointments/a').stock_reservation.status,'released');
+});
+test('confirmation rejects expired, archived, empty and prematurely expiring batches',async()=>{
+ for(const change of [{quantity:0},{archived:true},{expiry:'2026-09-24'},{expiry:'2026-09-23'}]) {
+  const f=fixture();Object.assign(f.rows.get('inventory/batch'),change);
+  await assert.rejects(f.call('confirm'),{code:'failed-precondition'});
+  assert.equal(f.rows.get('appointments/a').status,'pending');
+ }
+});
+test('resident cancellation releases confirmed stock atomically and retry is safe',async()=>{
+ const {cancelBookingHandler}=require('./booking');
+ const f=fixture();f.rows.set('users/resident',{role:'resident'});await f.call('confirm');
+ const cancel=cancelBookingHandler({db:f.db,HttpsError,timestamp:()=> 'timestamp'});
+ const request={auth:{uid:'resident',token:{secure_login:true,email_verified:true,firebase:{sign_in_provider:'custom'}}},data:{appointment_id:'a',reason:'Cannot attend'}};
+ await cancel(request);await cancel(request);
+ assert.equal(f.rows.get('inventory/batch').quantity,20);
+ assert.equal(f.rows.get('inventory/batch').reserved_count,0);
+ assert.equal(f.rows.get('clinics/clinic').stock_total,20);
+ assert.equal(f.rows.get('appointments/a').stock_reservation.status,'released');
+});
+
+test('rescheduling releases stock and reconfirming reserves just one dose',async()=>{
+ const {rescheduleBookingHandler}=require('./booking');
+ const f=fixture();f.rows.set('users/resident',{role:'resident',is_active:true});
+ await f.call('confirm');f.rows.get('clinics/clinic').hours='24 hours';
+ const reschedule=rescheduleBookingHandler({db:f.db,HttpsError,timestamp:()=> 'timestamp',now:f.now});
+ await reschedule({auth:{uid:'resident',token:{secure_login:true,email_verified:true,firebase:{sign_in_provider:'custom'}}},data:{appointment_id:'a',preferred_date:'2026-09-24',preferred_time:'9:30 AM'}});
+ assert.equal(f.rows.get('inventory/batch').quantity,20);
+ assert.equal(f.rows.get('appointments/a').stock_reservation.status,'released');
+ await f.call('confirm');
+ assert.equal(f.rows.get('inventory/batch').quantity,20);
+ assert.equal(f.rows.get('inventory/batch').reserved_count,1);
 });

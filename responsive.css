@@ -70,7 +70,7 @@ input, select, textarea, button { max-width: 100%; font: inherit; }
 @media (max-width: 480px) {
   .tab-panel, .main-container { padding: 14px 12px; }
   .header-right .profile-btn { font-size: 21px; }
-  .signout-btn { font-size: 0; padding: 9px 11px; }
+  .signout-btn { font-size: 12px; padding: 9px 11px; }
   .signout-btn i { margin: 0; font-size: 14px; }
   .stats-grid, .records-summary-row, .users-grid, .steps-flow, .appt-steps,
   .accordion-detail-grid, .animal-exposure-form, .dashboard-analytics-form,
@@ -85,4 +85,80 @@ input, select, textarea, button { max-width: 100%; font: inherit; }
   .history-list { padding: 16px 12px; }
   .history-changes strong { min-width: 0; width: 100%; }
   .role-section, .signin-section { padding: 22px 18px; }
+}
+
+/* Intrinsic sizing lets long clinic names and booking states wrap in their own column. */
+.map-clinic-row > *, .map-clinic-details > *, .map-clinic-actions > *,
+.clinic-row-info, .appt-info, .appt-card-body, .logo-section > div,
+.resident-appointment-info, .appointment-tags > *, .stat-card > div { min-width: 0; }
+.map-clinic-details, .clinic-row-info, .appt-card-body,
+.resident-appointment-info, .appointment-tags, .clinic-booking-widget { overflow-wrap: anywhere; }
+.clinic-booking-widget { min-width: 0; max-width: 100%; }
+.clinic-scheduled-status { margin-top: 12px; padding: 12px; border-radius: 8px; background: #ecfdf5; color: #166534; line-height: 1.5; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 600px) {
+  .map-clinic-row { flex-direction: column; align-items: stretch !important; gap: 12px; }
+  .map-clinic-row .map-clinic-details { flex: auto !important; align-items: flex-start !important; }
+  .map-clinic-details > div > div:first-child { flex-wrap: wrap; gap: 4px !important; }
+  .map-clinic-row .map-clinic-actions,
+  .map-clinic-actions > div { width: 100%; flex-wrap: wrap; }
+  .map-clinic-actions > div > span { text-align: left !important; }
+  .map-clinic-actions .clinic-booking-widget { flex: 1 1 100%; width: 100%; }
+  .clinic-booking-widget .map-book-button { margin: 0; min-height: 40px; white-space: normal; }
+  .map-clinic-actions .clinic-scheduled-status { margin-top: 0; }
+  .clinic-row { flex-wrap: wrap; align-items: flex-start; }
+  .clinic-row-icon { flex: 0 0 36px; }
+  .clinic-row-info { flex: 1 1 calc(100% - 48px); }
+  .clinic-row > .book-btn { flex: 1 1 100%; min-height: 40px; }
+}
+
+@media (max-width: 480px) {
+  :root { --page-gutter: 12px; }
+  *, *::before, *::after { box-sizing: border-box; }
+  .top-header, .clinic-dashboard .clinic-header { flex-wrap: nowrap; gap: 8px; padding: 10px 12px; }
+  .top-header .logo-section { flex: 1 1 0; gap: 6px; }
+  .top-header .logo-section h2 { font-size: clamp(12px, 3.8vw, 15px); line-height: 1.3; overflow-wrap: anywhere; }
+  .top-header .system-logo { width: 32px; height: 32px; flex: 0 0 32px; }
+  .top-header .header-right { flex: 0 0 auto; gap: 6px; margin-left: 0; }
+  .top-header .signout-btn { font-size: 12px; padding: 8px; min-height: 40px; }
+  .top-header .profile-btn, .top-header .menu-btn { width: 36px; min-height: 40px; padding: 4px; flex-shrink: 0; }
+  .clinic-dashboard .main-container { padding: 20px 12px 28px; }
+  .clinic-dashboard .page-title h1 { font-size: clamp(22px, 7vw, 28px); }
+  .clinic-dashboard .page-title p { font-size: 13px; }
+  .nav-tabs-bar, .admin-tabs-bar, .clinic-dashboard .tabs,
+  .clinic-dashboard .clinic-notification-nav { flex-wrap: wrap; overflow-x: visible; gap: 4px; padding: 6px 12px; }
+  .nav-tab, .admin-tab, .clinic-dashboard .tabs a,
+  .clinic-dashboard .clinic-notification-nav a { flex: 1 1 120px; min-width: 0; white-space: normal; }
+  .nav-tab, .admin-tab, .clinic-dashboard .tabs button,
+  .clinic-dashboard .clinic-notification-nav a { padding: 10px 8px; font-size: 12px; min-height: 44px; white-space: normal; }
+  .clinic-dashboard .tabs button { width: 100%; }
+  .hub-section-title, .clinic-top, .profile-dialog-header,
+  .records-controls, .appointment-tags, .appt-card-actions { flex-wrap: wrap; gap: 8px; }
+  .hub-section-title h2 { font-size: 22px; }
+  .clinic-card, .clinic-box, .section-card-body, .guide-container,
+  .cta-box, .confirmed-card, .booking-progress-panel { padding: 14px; }
+  .clinic-list { padding: 12px; }
+  .clinic-scroll { padding-right: 0; }
+  .clinic-top h3 { font-size: 18px; }
+  .clinic-box p { font-size: 13px; line-height: 1.5; }
+  .stock-grid, .profile-form-grid, .patient-intake-details dl,
+  .report-summary { grid-template-columns: minmax(0, 1fr); }
+  .map-filter { display: flex; flex-wrap: wrap; width: 100%; gap: 6px; overflow-x: visible; }
+  .map-filter button { flex: 1 1 100px; white-space: normal; }
+  .nearest-clinic-button { width: 100%; margin-left: 0; white-space: normal; }
+  .appt-card { flex-wrap: wrap; gap: 12px; padding: 12px; }
+  .appt-card-body { flex: 1 1 100%; }
+  .appt-card-body > div:first-child { flex-wrap: wrap; }
+  .appt-card-actions > button, .confirmed-actions > * { flex: 1 1 100%; white-space: normal; }
+  .dose-record-info { flex-basis: 100%; }
+  .dose-record-status { min-width: 0; align-items: flex-start; }
+  .dose-record-status > span, .badge, .booking-status { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+  .resident-appointment-actions { min-width: 0; margin-left: 0; width: 100%; }
+  .patient-filters label, .confirmed-filters label { min-width: 0; width: 100%; }
+  .confirmed-filters input { width: 100%; min-width: 0; }
+  .clinic-dashboard .clinic-module > .expiry-panel, .clinic-dashboard .history-list { padding: 14px; }
+  .main-logo h1 { font-size: 24px; overflow-wrap: anywhere; }
+  .login-container { min-width: 0; max-width: 100%; }
+  .modal-content, .modal-box, .profile-dialog { max-height: calc(100dvh - 24px); overflow-y: auto; }
 }

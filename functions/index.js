@@ -10,7 +10,8 @@
 const { setGlobalOptions } = require('firebase-functions');
 const admin = require('firebase-admin');
 const sgMail = require('@sendgrid/mail');
-const { onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const logger = require('firebase-functions/logger');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onCall: firebaseOnCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret, defineString } = require('firebase-functions/params');
@@ -185,9 +186,10 @@ const otpHandlers = createEmailOtp({
 });
 exports.requestEmailOtp = onCall({ secrets: [sendGridApiKey, emailOtpSecret] }, otpHandlers.requestCode);
 exports.verifyEmailOtp = onCall({ secrets: [emailOtpSecret] }, otpHandlers.verifyCode);
-const { createBookingHandler, rescheduleBookingHandler } = require('./booking');
+const { createBookingHandler, createBatchBookingHandler, rescheduleBookingHandler } = require('./booking');
 exports.rescheduleBooking = onCall(rescheduleBookingHandler({ db, HttpsError, timestamp: () => admin.firestore.FieldValue.serverTimestamp() }));
 exports.createBooking = onCall(createBookingHandler({ db, HttpsError, timestamp: () => admin.firestore.FieldValue.serverTimestamp() }));
+exports.createBatchBooking = onCall(createBatchBookingHandler({ db, HttpsError, timestamp: () => admin.firestore.FieldValue.serverTimestamp() }));
 
 const { createPasswordRecovery } = require('./password-recovery');
 const recovery = createPasswordRecovery({
@@ -216,7 +218,20 @@ exports.manageTreatment=onCall(treatmentHandler({db,HttpsError,timestamp:()=>adm
 exports.refreshOverdueDoses=onSchedule({schedule:'every day 00:05',timeZone:'Asia/Manila'},()=>refreshOverdue(db));
 
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { inventoryStockHandler } = require('./inventory-stock');
+exports.refreshInventoryStock = onDocumentWritten(
+  { document: 'inventory/{inventoryId}', retry: true },
+  inventoryStockHandler({ db, timestamp: () => admin.firestore.FieldValue.serverTimestamp() })
+);
 const { refreshAnalytics } = require('./live-analytics');
 for (const [name, collection] of Object.entries({ refreshAppointmentAnalytics:'appointments', refreshVaccinationAnalytics:'vaccination_records', refreshPatientAnalytics:'patient_records', refreshResidentAnalytics:'residents' })) {
 exports[name] = onDocumentWritten(collection + '/{recordId}', () => refreshAnalytics(db, () => admin.firestore.FieldValue.serverTimestamp()));
 }
+
+const { createSchedulePushHandler } = require('./schedule-push');
+exports.sendVaccinationSchedulePush = onDocumentCreated(
+  { document: 'notifications/{notificationId}', retry: true },
+  createSchedulePushHandler({ db, messaging: admin.messaging(), logger })
+);
+const { cancelBookingHandler } = require('./booking');
+exports.cancelBooking = onCall(cancelBookingHandler({db,HttpsError,timestamp:()=>admin.firestore.FieldValue.serverTimestamp()}));

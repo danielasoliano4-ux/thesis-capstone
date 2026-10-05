@@ -6,6 +6,15 @@ document.head.append(stylesheet);
 let queue = Promise.resolve();
 let sequence = 0;
 
+// Inline icons keep every dialog consistent without relying on an icon font.
+const dialogIcons = {
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><path d="M12 7h.01"/>',
+  confirm: '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+  success: '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+  warning: '<path d="m10.3 4.5-8 14A1.7 1.7 0 0 0 3.8 21h16.4a1.7 1.7 0 0 0 1.5-2.5l-8-14a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  prompt: '<path d="M12 20h9M16 3l5 5M4 16 16 4a2.1 2.1 0 0 1 3 3L7 19l-4 1Z"/>'
+};
+
 function showDialog(kind, message, options = {}) {
   const task = queue.then(() => new Promise(resolve => {
     const id = 'app-dialog-' + (++sequence);
@@ -22,7 +31,8 @@ function showDialog(kind, message, options = {}) {
     heading.id = id + '-title'; heading.textContent = title;
     const description = dialog.querySelector('p');
     description.id = id + '-message'; description.textContent = String(message);
-    dialog.querySelector('.app-dialog__icon').textContent = destructive || error ? '!' : success ? '?' : kind === 'prompt' ? '?' : 'i';
+    const iconKind = destructive || error ? 'warning' : success ? 'success' : kind === 'prompt' ? 'prompt' : kind === 'confirm' ? 'confirm' : 'info';
+    dialog.querySelector('.app-dialog__icon').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + dialogIcons[iconKind] + '</svg>';
     const input = dialog.querySelector('input');
     const cancel = dialog.querySelector('.app-dialog__cancel');
     const accept = dialog.querySelector('.app-dialog__accept');

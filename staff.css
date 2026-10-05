@@ -348,6 +348,9 @@ body {
 
 .table-container {
     overflow-x: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fff;
 }
 
 table {
@@ -370,6 +373,11 @@ tbody td {
     padding: 20px 16px;
     border-top: 1px solid #e5e7eb;
     font-size: 15px;
+    vertical-align: middle;
+}
+
+tbody td:last-child {
+    text-align: right;
 }
 
 .status {
@@ -395,19 +403,113 @@ tbody td {
     color: #dc2626;
 }
 
-.update-link {
-    color: red;
+.inventory-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    min-width: 248px;
+}
+
+.inventory-actions .update-link,
+.inventory-actions .inventory-action {
+    color: #111827;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
     text-decoration: none;
     font-weight: 600;
-    border-radius: 4px;
-    font-size: 13px; 
-    padding: 6px 10px; 
-    display: inline-block; 
-    background-color: #fff6f6; 
+    font-size: 13px;
+    padding: 8px 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 76px;
+    min-height: 36px;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.update-link:hover {
+    background: #f9fafb;
+    border-color: #6b7280;
 }
 
 .update-link i {
     margin-right: 5px;
+}
+
+.inventory-action {
+    font-family: inherit;
+}
+
+.inventory-actions .inventory-action {
+    color: #b91c1c;
+    background: #fff7f7;
+    border-color: #fecaca;
+}
+
+.inventory-actions .inventory-action.secondary {
+    color: #2563eb;
+    background: #eff6ff;
+    border-color: #bfdbfe;
+}
+
+.inventory-actions .inventory-action:hover {
+    background: #fee2e2;
+}
+
+.inventory-actions .inventory-action.secondary:hover {
+    background: #dbeafe;
+}
+
+.inventory-actions button:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 3px;
+}
+
+.inventory-actions .inventory-reserved-action {
+    color: #4b5563;
+    background: #f9fafb;
+    border-color: #d1d5db;
+}
+
+.inventory-actions .inventory-reserved-action:hover {
+    background: #f3f4f6;
+}
+
+.inventory-action-note {
+    margin: 8px 0 0;
+    color: #6b7280;
+    font-size: 12px;
+    line-height: 1.5;
+    text-align: left;
+}
+
+.inventory-available {
+    color: #6b7280;
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+#inventoryPanel tbody td:nth-child(5) {
+    min-width: 190px;
+}
+
+#inventoryPanel .status {
+    display: inline-block;
+    white-space: nowrap;
+}
+
+#inventoryPanel .status.archived {
+    background: #f3f4f6;
+    color: #4b5563;
+}
+
+.inventory-action:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* Dose completion form */
@@ -427,9 +529,6 @@ tbody td {
 .inventory-controls select { min-height:40px; padding:8px 10px; border:1px solid #d1d5db; border-radius:7px; background:#fff; font:inherit; }
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 .inventory-warning { color:#b45309; font-size:12px; font-weight:700; margin-top:4px; }
-.inventory-actions { display:flex; flex-wrap:wrap; gap:6px; }
-.inventory-action { border:0; background:transparent; color:#b91c1c; cursor:pointer; font:inherit; font-weight:700; padding:4px; }
-.inventory-action.secondary { color:#2563eb; }
 
 /* RESPONSIVE */
 
@@ -487,6 +586,7 @@ tbody td {
 .resident-appointment-info h3 { font-size: 16px; margin: 0 0 5px; }
 .resident-appointment-info p { color: #6b7280; font-size: 13px; margin: 0 0 8px; }
 .appointment-tags { display: flex; flex-wrap: wrap; gap: 7px; }
+.resident-appointment-info .appointment-reschedule-note { color: #b45309; margin: 6px 0; line-height: 1.5; }
 .appointment-tags span { background: #eff6ff; border-radius: 5px; color: #2563eb; font-size: 12px; font-weight: 700; padding: 4px 8px; }
 .appointment-tags span:nth-child(2) { background: #f3f4f6; color: #374151; }
 .appointment-tags span:nth-child(3) { background: #ecfdf5; color: #166534; }

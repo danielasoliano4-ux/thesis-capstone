@@ -74,13 +74,16 @@ service cloud.firestore {
     }
     match /clinics/{clinicId} {
       allow read: if true;
-      allow create: if (isAdmin() && !request.resource.data.keys().hasAny(['lat', 'lng', 'location'])) || (belongsToClinic(clinicId)
-        && !request.resource.data.keys().hasAny(['lat', 'lng', 'location', 'geocoding_provider', 'geocoding_accuracy', 'geocoded_at', 'approved_by', 'approval_status']));
-      allow update: if (isAdmin()
+      // Stock summaries are derived by server transactions and inventory events.
+      allow create: if !request.resource.data.keys().hasAny(['stock_total', 'stock_status', 'stock_summary'])
+        && ((isAdmin() && !request.resource.data.keys().hasAny(['lat', 'lng', 'location'])) || (belongsToClinic(clinicId)
+        && !request.resource.data.keys().hasAny(['lat', 'lng', 'location', 'geocoding_provider', 'geocoding_accuracy', 'geocoded_at', 'approved_by', 'approval_status'])));
+      allow update: if !request.resource.data.diff(resource.data).affectedKeys().hasAny(['stock_total', 'stock_status', 'stock_summary'])
+        && ((isAdmin()
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['lat', 'lng', 'location']))
         || (belongsToClinic(clinicId)
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['staff_uid', 'geocoding_provider', 'geocoding_accuracy', 'geocoded_at', 'approved_by', 'approval_status'])
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lat', 'lng', 'location']) || validClinicPin()));
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lat', 'lng', 'location']) || validClinicPin())));
       allow delete: if isAdmin();
     }
 
@@ -90,21 +93,29 @@ service cloud.firestore {
     }
 
     match /inventory/{inventoryId} {
-      allow read: if isAdmin() || belongsToClinic(resource.data.clinic_id);
-      allow create: if isAdmin() || (belongsToClinic(request.resource.data.clinic_id)
+      allow read: if isResident() || isAdmin() || belongsToClinic(resource.data.clinic_id);
+      allow create: if request.resource.data.quantity is int && request.resource.data.quantity >= 0
+        && request.resource.data.get('quantity_mode', '') in ['', 'on_hand']
+        && request.resource.data.get('reserved_count', 0) == 0 && (isAdmin() || (belongsToClinic(request.resource.data.clinic_id)
         && request.resource.data.type is string
         && request.resource.data.manufacturer is string
         && request.resource.data.batch is string
         && request.resource.data.quantity is number
-        && request.resource.data.expiry is string);
-      allow update: if isAdmin() || (belongsToClinic(resource.data.clinic_id)
+        && request.resource.data.expiry is string));
+      allow update: if request.resource.data.quantity is int && request.resource.data.quantity >= 0
+        && request.resource.data.get('quantity_mode', '') in ['', 'on_hand']
+        && request.resource.data.quantity >= request.resource.data.get('reserved_count', 0)
+        && (resource.data.get('quantity_mode', '') != 'on_hand' || request.resource.data.get('quantity_mode', '') == 'on_hand')
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['reserved_count'])
+        && (resource.data.get('reserved_count', 0) == 0 || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['clinic_id', 'type', 'brand_name', 'generic_name', 'batch', 'expiry', 'archived']))
+        && (isAdmin() || (belongsToClinic(resource.data.clinic_id)
         && belongsToClinic(request.resource.data.clinic_id)
         && request.resource.data.type is string
         && request.resource.data.manufacturer is string
         && request.resource.data.batch is string
         && request.resource.data.quantity is number
-        && request.resource.data.expiry is string);
-      allow delete: if isAdmin() || belongsToClinic(resource.data.clinic_id);
+        && request.resource.data.expiry is string));
+      allow delete: if resource.data.get('reserved_count', 0) == 0 && (isAdmin() || belongsToClinic(resource.data.clinic_id));
     }
 
     match /appointments/{appointmentId} {
@@ -120,7 +131,7 @@ service cloud.firestore {
           && request.resource.data.clinic_id == resource.data.clinic_id
           && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
             'vaccination_session_id', 'treatment_id', 'dose_number', 'dose_label', 'recommended_date', 'course_vaccination_history', 'resident_uid', 'preferred_date', 'preferred_time', 'confirmed_at', 'arrived_at', 'arrived_by', 'arrival_deadline_ms', 'scheduled_at_ms',
-            'intake_completed_at', 'patient_record_id', 'course_intake_data'
+            'intake_completed_at', 'patient_record_id', 'course_intake_data', 'stock_reservation'
           ])
           && (resource.data.get('intake_completed_at', null) == null
             || !request.resource.data.diff(resource.data).affectedKeys().hasAny([
@@ -128,15 +139,9 @@ service cloud.firestore {
             ]))
           && (request.resource.data.status == resource.data.status
             || (resource.data.status == 'pending' && request.resource.data.status == 'declined')
-            ))
-        || (isResident()
-          && resource.data.resident_uid == request.auth.uid
-          && resource.data.status in ['pending', 'confirmed']
-          && (resource.data.status != 'pending' || (resource.data.get('scheduled_at_ms', null) != null && request.time.toMillis() < resource.data.scheduled_at_ms))
-          && request.resource.data.status == 'cancelled'
-          && request.resource.data.cancellation_reason is string
-          && request.resource.data.cancellation_reason.size() > 0
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancellation_reason', 'cancelled_at', 'cancelled_by']));
+            ));
+      // Residents cancel/reschedule through callables so staff notifications
+      // and reservation updates are committed with the appointment change.
       allow delete: if false; // Appointment history is retained; use cancellation instead.
     }
 
@@ -150,17 +155,30 @@ service cloud.firestore {
     match /notifications/{notificationId} {
       allow read: if isAdmin()
         || (isLoggedIn() && (
-          resource.data.recipient_uid == request.auth.uid
-          || resource.data.user_id == request.auth.uid
-          || belongsToClinic(resource.data.clinic_id)
+          resource.data.get('recipient_uid', '') == request.auth.uid
+          || resource.data.get('user_id', '') == request.auth.uid
+          || belongsToClinic(resource.data.get('clinic_id', ''))
         ));
-      allow create: if isAdmin()
-        || isClinicStaff()
-        || (isResident() && request.resource.data.type == 'appointment');
+      allow create: if request.resource.data.get('push', false) != true
+        && (isAdmin()
+          || isClinicStaff()
+          || (isResident() && request.resource.data.type == 'appointment'));
       allow update: if isLoggedIn()
-        && (resource.data.recipient_uid == request.auth.uid
-          || resource.data.user_id == request.auth.uid);
+        && (resource.data.get('recipient_uid', '') == request.auth.uid
+          || resource.data.get('user_id', '') == request.auth.uid
+          || belongsToClinic(resource.data.get('clinic_id', '')))
+        && request.resource.data.read is bool
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
       allow delete: if isAdmin();
+    }
+
+    match /resident_push_tokens/{tokenId} {
+      allow read, delete: if isResident() && resource.data.resident_uid == request.auth.uid;
+      allow create, update: if isResident()
+        && request.resource.data.resident_uid == request.auth.uid
+        && request.resource.data.token is string
+        && request.resource.data.token.size() > 0
+        && request.resource.data.token.size() <= 4096;
     }
 
     match /history/{historyId} {
@@ -172,7 +190,7 @@ service cloud.firestore {
     match /vaccination_records/{recordId} {
       allow read: if isAdmin() 
         || (isResident() && resource.data.resident_uid == request.auth.uid)
-        || isClinicStaff();
+        || belongsToClinic(resource.data.clinic_id);
       allow create: if false; // Server validates sequence, verification and stock.
       allow update, delete: if false;
     }

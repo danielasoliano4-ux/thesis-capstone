@@ -9,10 +9,10 @@ function fixture(initial = [], clinic = { name: 'Clinic', hours: '24 hours' }) {
  const db = {
   collection: name => ({
    doc: id => ({ name, id: id || 'new-' + (++sequence) }),
-   where: (key, op, value) => { const q = { filters: [[key,value]], where: (k,o,v) => { q.filters.push([k,v]); return q; } }; return q; }
+   where: (key, op, value) => { const q = { name, filters: [[key,value]], where: (k,o,v) => { q.filters.push([k,v]); return q; } }; return q; }
   }),
   runTransaction: fn => { const p = queue.then(() => fn({
-   get: async ref => ref.filters ? { docs: appointments.filter(d => ref.filters.every(([k,v]) => d.data()[k] === v)) } : { data: () => ref.name === 'users' ? (profiles[ref.id] || profiles.resident) : ref.name === 'clinics' ? clinic : undefined },
+   get: async ref => ref.filters ? { docs: ref.name === 'inventory' ? [{id:'batch',data:()=>({clinic_id:'clinic-a',type:'Vaccine',quantity:20,expiry:'2099-01-01'})}] : appointments.filter(d => ref.filters.every(([k,v]) => d.data()[k] === v)) } : { data: () => ref.name === 'users' ? (profiles[ref.id] || profiles.resident) : ref.name === 'clinics' ? clinic : undefined },
    set: (ref, data) => { if (ref.name === 'appointments') appointments.push({ id: ref.id, data: () => data }); }
   })); queue = p.catch(() => {}); return p; }
  };
@@ -68,15 +68,16 @@ test('UI status selection matches backend and prioritizes acceptance over pendin
  assert.equal(clinicBooking([{ clinic_id: 'a', status: 'pending' }, { clinic_id: 'a', status: 'confirmed' }], 'a', '2026-09-21').status, 'confirmed');
 });
 
-test('popup renders default, disabled pending, and accepted schedule without a button', async () => {
+test('popup shows booking actions for pending and confirmed appointments, with no actions after arrival', async () => {
  const fs = require('node:fs');
  const path = require('node:path');
  const vm = require('node:vm');
  const source = fs.readFileSync(path.join(__dirname, '../scripts/residents-map.js'), 'utf8');
  const helper = fs.readFileSync(path.join(__dirname, '../scripts/booking-status.js'), 'utf8').replaceAll('export function', 'function');
  const renderer = source.slice(source.indexOf('function mountBookingWidget('), source.indexOf('let CLINICS ='));
- const makeElement = tag => ({ tag, style: {}, children: [], isConnected: true, append(child) { this.children.push(child); }, replaceChildren() { this.children = []; }, setAttribute() {}, addEventListener() {} });
- const context = { Intl, Date, bookingRows: [], bookingState: 'ready', bookingWidgets: new Set(), document: { createElement: makeElement }, window: {} };
+ const makeElement = tag => ({ tag, classList:{add(){}}, style: {}, children: [], isConnected: true, append(child) { this.children.push(child); }, replaceChildren() { this.children = []; }, setAttribute() {}, addEventListener(event, callback) { this[event] = callback; } });
+ const actions = [];
+ const context = { Intl, Date, bookingRows: [], bookingState: 'ready', bookingWidgets: new Set(), document: { createElement: makeElement }, window: { openRescheduleModal: appointment => actions.push(['reschedule', appointment.id]), openCancelModal: appointment => actions.push(['cancel', appointment.id]) } };
  vm.createContext(context);
  vm.runInContext(helper + '\n' + renderer, context);
  const host = makeElement('div');
@@ -84,14 +85,21 @@ test('popup renders default, disabled pending, and accepted schedule without a b
  context.mountBookingWidget(host, clinic, 'googleMapOverview');
  assert.equal(host.children[0].textContent, 'Book Appointment');
  assert.equal(host.children[0].disabled, false);
- context.bookingRows = [{ clinic_id: 'a', status: 'pending' }];
+ context.bookingRows = [{ id: 'pending', clinic_id: 'a', status: 'pending' }];
  context.mountBookingWidget(host, clinic, 'googleMapOverview');
- assert.equal(host.children[0].textContent, 'Pending');
- assert.equal(host.children[0].disabled, true);
+ assert.match(host.children[0].textContent, /Awaiting clinic confirmation/);
+ assert.deepEqual(host.children[1].children.map(button => button.textContent), ['Reschedule', 'Cancel']);
+ host.children[1].children[0].click({ preventDefault() {}, stopPropagation() {} });
+ host.children[1].children[1].click({ preventDefault() {}, stopPropagation() {} });
+ assert.deepEqual(actions, [['reschedule', 'pending'], ['cancel', 'pending']]);
  context.bookingRows = [{ clinic_id: 'a', status: 'confirmed', preferred_date: '2099-09-22', preferred_time: '09:00' }];
  context.mountBookingWidget(host, clinic, 'googleMapOverview');
  assert.equal(host.children.some(child => child.tag === 'button'), false);
  assert.match(host.children[0].textContent, /2099-09-22 at 09:00/);
+ assert.equal(host.children[1].children.length, 2);
+ context.bookingRows = [{ clinic_id: 'a', status: 'in_progress', arrived_at: 'server' }];
+ context.mountBookingWidget(host, clinic, 'googleMapOverview');
+ assert.equal(host.children.length, 1);
 });
 
 test('minimal booking ignores client medical, ID, arrival and permanent-record fields', async () => {

@@ -5,18 +5,24 @@ import { collection, query, where, onSnapshot } from 'https://www.gstatic.com/fi
 import { availableStock } from './dose-stock.mjs';
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date());
 let unsubscribe;
-export function watchDoseStock(clinicId) {
+let reservedStock = null;
+let stockClinicId = null;
+export function watchDoseStock(clinicId, reservation = null) {
+  if (typeof clinicId !== 'string' || !clinicId) throw new Error('The clinic account is still loading. Reopen the dose form after signing in.');
+  stockClinicId = clinicId;
+  reservedStock = reservation;
   unsubscribe?.();
   const select = document.getElementById('completionVaccine');
   select.replaceChildren(new Option('Loading clinic stock...', ''));
   select.disabled = true;
   unsubscribe = onSnapshot(query(collection(db, 'inventory'), where('clinic_id', '==', clinicId)), snapshot => {
     const selected = select.value;
-    const items = availableStock(snapshot.docs.map(item => ({...item.data(), id:item.id})), clinicId, today());
+    const items = availableStock(snapshot.docs.map(item => ({...item.data(), id:item.id})), clinicId, today(), reservedStock);
     select.replaceChildren(new Option(items.length ? 'Select vaccine / batch...' : 'No available vaccine stock', ''));
     for (const item of items) select.add(new Option(item.type + ' | Batch ' + (item.batch || 'unspecified'), item.id));
     select.disabled = false;
-    select.value = items.some(item => item.id === selected) ? selected : '';
+    select.value = reservedStock?.status === 'reserved' && items.length ? reservedStock.inventory_id : items.some(item => item.id === selected) ? selected : '';
+    select.disabled = reservedStock?.status === 'reserved';
     select.setCustomValidity(items.length ? '' : 'Add available vaccine stock before completing this dose.');
   }, error => {
     select.replaceChildren(new Option('Could not load clinic stock', ''));
@@ -32,19 +38,22 @@ let reviewGeneration = 0;
 export async function reviewTreatment(appointmentId, selectedDoseNumber) {
   const generation = ++reviewGeneration;
   reviewedAppointment = '';
+  reservedStock = null;
   const form = document.getElementById('doseCompletionForm');
   let panel = document.getElementById('treatmentReview');
   if (!panel) { panel = document.createElement('section'); panel.id = 'treatmentReview'; form.prepend(panel); }
   const submit = form.querySelector('[type="submit"]');
   submit.disabled = true;
-  panel.textContent = 'Loading verified vaccination history...';
+  panel.textContent = 'Loading treatment details...';
   try {
     const {data} = await manageTreatment({action:'review', appointment_id:appointmentId});
     if (generation !== reviewGeneration) return;
+    reservedStock = data.stock_reservation;
+    if (reservedStock?.status === 'reserved') watchDoseStock(data.clinic_id || stockClinicId, reservedStock);
     panel.replaceChildren();
     const treatmentSummary = document.createElement('details'); treatmentSummary.className='treatment-card'; panel.append(treatmentSummary);
-    const title = document.createElement('summary'); title.textContent = 'View vaccination history'; treatmentSummary.append(title);
-    for (const dose of data.doses) {
+    const title = document.createElement('summary'); title.textContent = 'View doses recorded at this clinic'; treatmentSummary.append(title);
+    for (const dose of data.doses.filter(dose => data.history.some(record => Number(record.dose_number) === dose.dose_number))) {
       const record = data.history.find(r => Number(r.dose_number) === dose.dose_number);
       const line = document.createElement('p');
       line.textContent = 'Dose '+dose.dose_number+' \u2014 '+dose.status+(record||dose.actual_administration_date?'':' | Recommended: '+(dose.recommended_date||'Awaiting clinical schedule confirmation'))+(record?' | '+record.date_given+' | '+record.clinic_name+' | '+record.vaccine_name+' | Verified':'')+(dose.appointment_date?' | Appointment: '+dose.appointment_date:'');
@@ -91,7 +100,7 @@ export async function reviewTreatment(appointmentId, selectedDoseNumber) {
     const updateSelection=()=>{
       selected=pending.find(d=>d.dose_number===Number(selection.value));
       const missing=data.doses.filter(d=>selected&&d.dose_number<selected.dose_number&&!d.actual_administration_date);
-      treatmentSummary.hidden=selected?.dose_number===1;
+      treatmentSummary.hidden=!data.history.length||selected?.dose_number===1;
       doseInput.value=selected?'Dose '+selected.dose_number:'Treatment complete';
       doseInput.dataset.doseNumber=selected?.dose_number||'';
       check.checked=false;check.disabled=!selected||!!missing.length;
@@ -126,11 +135,11 @@ export async function reviewTreatment(appointmentId, selectedDoseNumber) {
     console.error('Treatment review failed:', error);
     const message = document.createElement('p');
     message.textContent = ['functions/internal', 'functions/not-found'].includes(error.code)
-      ? 'Vaccination history is temporarily unavailable. Please retry. If this continues, contact the system administrator.'
-      : 'Unable to load vaccination history. ' + error.message;
+      ? 'Treatment details are temporarily unavailable. Please retry. If this continues, contact the system administrator.'
+      : 'Unable to load treatment details. ' + error.message;
     const retry = document.createElement('button');
     retry.type = 'button';
-    retry.textContent = 'Retry loading history';
+    retry.textContent = 'Retry loading treatment';
     retry.onclick = () => reviewTreatment(appointmentId);
     panel.replaceChildren(message, retry);
   }

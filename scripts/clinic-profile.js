@@ -1,3 +1,4 @@
+import { CABUYAO_BARANGAYS, extractBarangay } from './clinic-barangays.js';
 import { notifyDialog } from './app-dialogs.js';
 import { initializeHoursPickers, setHoursPicker } from './clinic-hours-picker.js';
 import { auth, db, fetchUserProfile, signOutUser } from './firebase.js';
@@ -8,6 +9,11 @@ import { protectPage } from './role-guard.js';
 protectPage('clinic_staff');
 initializeHoursPickers();
 
+const barangaySelect = document.getElementById('profileBarangay');
+CABUYAO_BARANGAYS.forEach(barangay => {
+    barangaySelect.add(new Option(barangay, barangay));
+});
+
 let currentClinicId = null;
 let currentClinicProfile = null;
 const form = document.getElementById('clinicProfileForm');
@@ -15,6 +21,7 @@ const defaultProfile = {
     name: document.getElementById('profileName').value,
     type: document.getElementById('profileType').value,
     address: document.getElementById('profileAddress').value,
+    barangay: barangaySelect.value,
     contact: document.getElementById('profileContact').value,
     email: document.getElementById('profileEmail').value,
     priceRange: document.getElementById('profilePriceRange').value,
@@ -44,6 +51,8 @@ async function loadProfile(clinicId) {
             ? profile.type
             : 'Animal Bite Center';
         document.getElementById('profileAddress').value = profile.address || '';
+        const savedBarangay = extractBarangay(savedProfile.address || '', savedProfile.barangay || '');
+        barangaySelect.value = CABUYAO_BARANGAYS.includes(savedBarangay) ? savedBarangay : '';
         document.getElementById('profileContact').value = profile.contact || '';
         document.getElementById('profileEmail').value = profile.email || '';
         document.getElementById('profilePriceRange').value = profile.priceRange || '';
@@ -65,6 +74,7 @@ form.addEventListener('submit', async (event) => {
         name: document.getElementById('profileName').value.trim(),
         type: document.getElementById('profileType').value.trim(),
         address: document.getElementById('profileAddress').value.trim(),
+        barangay: barangaySelect.value,
         contact: document.getElementById('profileContact').value.trim(),
         email: document.getElementById('profileEmail').value.trim(),
         priceRange: document.getElementById('profilePriceRange').value.trim(),
@@ -92,7 +102,7 @@ form.addEventListener('submit', async (event) => {
 
 function getProfileChanges(before, after) {
     const labels = {
-        name: 'Clinic name', type: 'Clinic type', address: 'Address', contact: 'Contact', email: 'Email', priceRange: 'Vaccination price range',
+        name: 'Clinic name', type: 'Clinic type', address: 'Address', barangay: 'Barangay', contact: 'Contact', email: 'Email', priceRange: 'Vaccination price range',
         weekdayHours: 'Weekday operating hours', weekendHours: 'Weekend operating hours', services: 'Services offered'
     };
     return Object.keys(labels).reduce((changes, field) => {

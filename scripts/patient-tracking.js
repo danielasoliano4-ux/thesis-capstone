@@ -22,8 +22,6 @@ let activeAppointment = null;
 
 let patientAppointments = [], patientVaccinations = [], patientIntakes = [];
 let patientUnsubscribes = [], patientTimer;
-const crossClinicListeners = new Map();
-const crossClinicRecords = new Map();
 function startPatientListeners() {
  patientUnsubscribes.forEach(unsubscribe => unsubscribe());
  clearInterval(patientTimer);
@@ -31,14 +29,7 @@ function startPatientListeners() {
  patientUnsubscribes = ['appointments','vaccination_records','patient_records'].map(name =>
   onSnapshot(query(collection(db,name),where('clinic_id','==',currentClinicId)), snapshot => {
    const rows = snapshot.docs.map(item => ({...item.data(),id:item.id}));
-   if(name === 'appointments') {
-     patientAppointments = rows;
-     for(const uid of new Set(rows.map(a=>a.resident_uid).filter(Boolean))) if(!crossClinicListeners.has(uid)) {
-       crossClinicListeners.set(uid,onSnapshot(query(collection(db,'vaccination_records'),where('resident_uid','==',uid)),snapshot=>{
-         crossClinicRecords.set(uid,snapshot.docs.map(d=>({...d.data(),id:d.id})));loadPatients();
-       }));
-     }
-   }
+   if(name === 'appointments') patientAppointments = rows;
    if(name === 'vaccination_records') patientVaccinations = rows;
    if(name === 'patient_records') patientIntakes = rows;
    loadPatients();
@@ -54,7 +45,7 @@ function loadPatients() {
  }
  const patients = [...groups.values()].map(group => {
   const appointments = patientAppointments.filter(item => courseKey(item) === group.key);
-  const records = (crossClinicRecords.get(group.source.resident_uid) || patientVaccinations).filter(item => courseKey(item) === group.key && item.date_given && (item.source !== 'external' || item.verification_status === 'Verified'));
+  const records = patientVaccinations.filter(item => courseKey(item) === group.key && item.date_given && (item.source !== 'external' || item.verification_status === 'Verified'));
   const intake = patientIntakes.find(item => courseKey(item) === group.key);
   if (!intake && !records.length && !appointments.some(item => item.status === 'in_progress')) return null;
   const source = intake || appointments.find(item=>item.intake_completed_at) || group.source;
@@ -73,7 +64,7 @@ function loadPatients() {
   const source=patient.source, pct=patient.doses*20;
   const fields = {bite_type:'Exposure type',animal_type:'Animal',wound_washed:'Wound washed',bite_body_part:'Body part',bite_date:'Date of bite',date_of_birth:'Date of birth',patient_age:'Age',patient_sex:'Sex'};
   const details = Object.entries(fields).map(([key,label])=>'<div><dt>'+label+'</dt><dd>'+displayValue(source[key])+'</dd></div>').join('');
-  return '<article class="patient-card"><div class="patient-header"><h3>'+escapeHtml(source.resident_name||'Resident')+'</h3><span class="course-status '+patient.status+'">'+patient.status.charAt(0).toUpperCase()+patient.status.slice(1)+'</span></div><div class="treatment-section"><label>Treatment progress</label><span class="doses-badge">'+patient.doses+'/5 doses</span><div class="progress-bar-container"><div class="progress-bar" style="width:'+pct+'%"></div></div></div><p class="course-note">'+escapeHtml(patient.note)+'</p><details class="patient-intake-details"><summary>Patient intake details</summary><dl>'+details+'</dl></details>'+(patient.appointment ? '<button class="view-record-btn" data-patient-index="'+index+'">View Full Record</button>':'')+'</article>';
+  return '<article class="patient-card"><div class="patient-header"><h3>'+escapeHtml(source.resident_name||'Resident')+'</h3><span class="course-status '+patient.status+'">'+patient.status.charAt(0).toUpperCase()+patient.status.slice(1)+'</span></div><div class="treatment-section"><label>Doses recorded at this clinic</label><span class="doses-badge">'+patient.doses+'/5 doses</span><div class="progress-bar-container"><div class="progress-bar" style="width:'+pct+'%"></div></div></div><p class="course-note">'+escapeHtml(patient.note)+'</p><details class="patient-intake-details"><summary>Patient intake details</summary><dl>'+details+'</dl></details>'+(patient.appointment ? '<button class="view-record-btn" data-patient-index="'+index+'">View Full Record</button>':'')+'</article>';
  }).join('') || '<p class="patient-empty">No patients match these filters.</p>';
  grid.querySelectorAll('[data-patient-index]').forEach(button=>button.onclick=()=>openRecordModal(visible[Number(button.dataset.patientIndex)].appointment.id));
 }

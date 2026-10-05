@@ -3,6 +3,73 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
+test('new appointment defaults to course history instead of the hidden clinic selection', () => {
+ const source = fs.readFileSync(path.join(__dirname, '../scripts/residents.js'), 'utf8');
+ const elements = {
+  modalClinic: { value: 'other' }, bookingClinicName: {}, modalDate: {},
+  bookingMsg: { style: {} }, confirmBookingBtn: {},
+  bookingModal: { classList: { add() {} } }
+ };
+ const messages = [];
+ const context = {
+  residentVaccinationRecords: [{ dose_number: 2, clinic_id: 'abc2', date_given: '2026-09-20' }],
+  residentAppointments: [], currentVaccinationSessionId: 'course',
+  window: { clinicDirectory: [{ id: 'other', name: 'Other' }, { id: 'abc2', name: 'ABC 2' }] },
+  document: { getElementById: id => elements[id] },
+  notifyDialog: message => messages.push(message), doseDayOffsets: [0, 3, 7, 14, 28],
+  earliestBookingDate: () => '2026-10-05', refreshTimeSlots() {}
+ };
+ vm.createContext(context);
+ vm.runInContext(source.slice(source.indexOf('function getPrimaryClinicId('), source.indexOf('function courseBookingContext(')), context);
+ vm.runInContext(source.slice(source.indexOf('function openBookingModal('), source.indexOf('function closeBookingModal(')), context);
+ context.openBookingModal('');
+ assert.equal(context.selectedClinic.id, 'abc2');
+ assert.equal(elements.bookingClinicName.textContent, 'ABC 2');
+ context.openBookingModal('Other', 'other');
+ assert.equal(context.selectedClinic.id, 'other');
+ context.window.clinicDirectory = [{ id: 'other', name: 'Other' }];
+ context.openBookingModal('');
+ assert.match(messages.pop(), /previous clinic.*unavailable/);
+ context.residentVaccinationRecords = [];
+ context.residentAppointments = [
+  { clinic_id: 'other', status: 'completed', vaccination_session_id: 'old' },
+  { clinic_id: 'other', status: 'cancelled', vaccination_session_id: 'course' },
+  { clinic_id: 'abc2', status: 'completed', vaccination_session_id: 'course' }
+ ];
+ assert.equal(context.getPrimaryClinicId(), 'abc2');
+ context.currentVaccinationSessionId = 'legacy';
+ context.residentAppointments = [{ clinic_id: 'abc2', status: 'completed' }];
+ assert.equal(context.getPrimaryClinicId(), 'abc2');
+ context.residentAppointments = [];
+ elements.modalClinic.value = 'other';
+ context.openBookingModal('');
+ assert.equal(context.selectedClinic.id, 'other');
+});
+test('different clinic confirmation uses dose or booking history and honors cancellation', async () => {
+ const source=fs.readFileSync(path.join(__dirname,'../scripts/residents.js'),'utf8');
+ const prompts=[];
+ const context={residentVaccinationRecords:[],allResidentVaccinationRecords:[],residentAppointments:[],
+  window:{clinicDirectory:[{id:'first',name:'First Clinic'}]},
+  confirmDialog:async(message,options)=>{prompts.push({message,options});return false;}};
+ vm.createContext(context);
+ vm.runInContext(source.slice(source.indexOf('async function confirmClinicWithHistory('),source.indexOf('function getPrimaryClinicId(')),context);
+ assert.equal(await context.confirmClinicWithHistory({id:'second',name:'Second Clinic'}),true);
+ context.residentVaccinationRecords=[{clinic_id:'first',date_given:'2026-09-20'}];
+ assert.equal(await context.confirmClinicWithHistory({id:'first'}),true);
+ assert.equal(prompts.length,0);
+ assert.equal(await context.confirmClinicWithHistory({id:'second',name:'Second Clinic'}),false);
+ assert.match(prompts[0].message,/First Clinic.*Second Clinic/);
+ context.residentVaccinationRecords=[];
+ context.residentAppointments=[{clinic_id:'first',status:'completed'}];
+ assert.equal(await context.confirmClinicWithHistory({id:'second'}),false);
+ context.confirmDialog=async()=>true;
+ assert.equal(await context.confirmClinicWithHistory({id:'second'}),true);
+ context.residentAppointments=[{clinic_id:'first',status:'cancelled'}];
+ assert.equal(await context.confirmClinicWithHistory({id:'second'}),true);
+ context.allResidentVaccinationRecords=[{clinic_id:'first',date_given:'2026-01-01'}];
+ context.confirmDialog=async()=>false;
+ assert.equal(await context.confirmClinicWithHistory({id:'second'}),false);
+});
 test('resident books with only date and time, no ID or medical controls', async () => {
  const source=fs.readFileSync(path.join(__dirname,'../scripts/residents.js'),'utf8');
  const elements={
@@ -11,11 +78,11 @@ test('resident books with only date and time, no ID or medical controls', async 
  };
  const calls=[];
  const context={
-  window: {},
+  window: {clinicDirectory:[{id:'clinic',status:'available'}]},
   document:{getElementById:id=>{assert.ok(elements[id],'Unexpected required input: '+id);return elements[id]}},
   currentUid:'resident',selectedClinic:{id:'clinic',status:'available'},selectedDose:'Dose 1 (Day 0)',
   latestVaccineBrand:'',currentVaccinationSessionId:'course',
-  getPrimaryClinicId:()=>'',earliestBookingDate:()=>'2026-09-24',doseLevelFromLabel:()=>1,
+  getPrimaryClinicId:()=>'',confirmClinicWithHistory:async()=>true,earliestBookingDate:()=>'2026-09-24',doseLevelFromLabel:()=>1,
   timeSlotError:()=>'',withBookingTimeout:p=>p,
   createBooking:async data=>{calls.push(data);return{data:{id:'a'}}},
   setTimeout:()=>{},closeBookingModal:()=>{}

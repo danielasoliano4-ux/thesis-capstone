@@ -1,8 +1,13 @@
 import { renderLiveCaptions } from './live-analytics-view.js';
+import { initializeMonthlyChart, updateMonthlyChart } from './monthly-analytics-chart.js';
 import { db } from './firebase.js';
 import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
 const defaultAnimals = [];
+
+// Initialize independently of the resident account and booking scripts.
+initializeMonthlyChart();
+document.querySelector('script[src*="chart.umd"]')?.addEventListener('load', initializeMonthlyChart);
 
 function escapeHtml(value = '') {
   const element = document.createElement('div');
@@ -31,7 +36,7 @@ onSnapshot(doc(db, 'system_settings', 'animal_exposure'), snapshot => {
 
 onSnapshot(doc(db, 'system_settings', 'live_analytics'), snapshot => {
   const data = snapshot.exists() ? snapshot.data() : {};
-    renderLiveCaptions(data);
+  renderLiveCaptions(data);
 
   const defaults = { monthlyCases: Array(12).fill(0), monthlyVaccinations: Array(12).fill(0), caseTrend: Array(12).fill(0), ageGroups: [0, 0, 0, 0, 0], barangays: [] };
   const values = { ...defaults, ...data };
@@ -40,16 +45,12 @@ onSnapshot(doc(db, 'system_settings', 'live_analytics'), snapshot => {
   setText('publicVaccinations', values.totalVaccinations || 0);
   setText('publicHighRiskBarangays', values.highRiskBarangays || 0);
   renderPublicRecords(Array.isArray(values.publicRecords) ? values.publicRecords : []);
-  if (window.monthlyChart) {
-    window.monthlyChart.data.datasets[0].data = values.monthlyCases;
-    window.monthlyChart.data.datasets[1].data = values.monthlyVaccinations;
-    window.monthlyChart.update();
-  }
   renderList('barangayIncidentRate', values.barangays, item => `<div class="bgy-row"><div class="bgy-row-top"><span class="bgy-name">${escapeHtml(item.name)}</span><span class="bgy-count">${escapeHtml(item.cases)} cases</span></div><div class="bgy-bar-wrap"><div class="bgy-bar-fill fill-high" style="width:${Math.min(100, Number(item.cases) * 3)}%;"></div></div></div>`);
   const maxTrend = Math.max(1, ...values.monthlyCases);
   const maxAge = Math.max(1, ...values.ageGroups);
   renderList('caseTrendChart', values.monthlyCases, (value, index) => `<div class="trend-bar" style="height:${Math.round(Number(value) / maxTrend * 100)}%;background:${Number(value) === maxTrend ? '#e60000' : '#d98a00'};" title="${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][index]}: ${escapeHtml(value)}"></div>`);
   renderList('ageGroupChart', values.ageGroups, (value, index) => `<div class="age-row"><span class="age-label">${['0–9','10–19','20–39','40–59','60+'][index]}</span><div class="age-bar-wrap"><div class="age-bar-fill" style="width:${Math.round(Number(value) / maxAge * 100)}%;"></div></div><span class="age-count">${escapeHtml(value)}</span></div>`);
+  updateMonthlyChart(values);
 }, error => console.error('Failed to load dashboard analytics:', error));
 
 function renderList(id, values, renderItem) {
@@ -91,8 +92,8 @@ function renderPublicRecords(records) {
     const severity = String(record.severity || 'Low').toLowerCase();
     const outcome = String(record.outcome || 'ongoing').toLowerCase();
     const pep = outcome === 'recovered' ? 'Full 5-dose course completed' : outcome === 'death' ? 'Reported fatal outcome' : `${Number(record.doseCount || 0)} of 5 doses recorded`;
-    return `<tr class="accordion-row" data-outcome="${escapeHtml(outcome)}" tabindex="0"><td><strong>${escapeHtml(record.caseId)}</strong></td><td>${escapeHtml(record.year)}</td><td>${escapeHtml(record.barangay)}</td><td>${escapeHtml(record.animal)}</td><td>${escapeHtml(record.category)}</td><td><span class="severity-badge sev-${severity}">${escapeHtml(record.severity)}</span></td><td><span class="outcome-badge out-${outcome}">${outcomeLabel(outcome)}</span></td><td style="color:#94a3b8;font-size:12px;"><i class="fa-solid fa-chevron-down"></i></td></tr><tr class="accordion-detail" hidden><td colspan="8"><div class="accordion-detail-grid"><div class="detail-item"><label>Case date</label><span>${escapeHtml(record.date)}</span></div><div class="detail-item"><label>PEP progress</label><span>${escapeHtml(pep)}</span></div><div class="detail-item"><label>Vaccine used</label><span>${escapeHtml(record.vaccine)}</span></div><div class="detail-item"><label>Reporting facility</label><span>${escapeHtml(record.clinic)}</span></div><div class="detail-item"><label>Status</label><span style="font-weight:700;">${outcomeLabel(outcome)}</span></div></div></td></tr>`;
-  }).join('') : '<tr><td colspan="8">No anonymized records are available yet.</td></tr>';
+    return `<tr class="accordion-row" data-outcome="${escapeHtml(outcome)}" tabindex="0"><td><strong>${escapeHtml(record.caseId)}</strong></td><td>${escapeHtml(record.year)}</td><td>${escapeHtml(record.barangay)}</td><td>${escapeHtml(record.animal)}</td><td>${escapeHtml(record.category)}</td><td><span class="severity-badge sev-${severity}">${escapeHtml(record.severity)}</span></td><td><span class="outcome-badge out-${outcome}">${outcomeLabel(outcome)}</span></td></tr><tr class="accordion-detail" hidden><td colspan="7"><div class="accordion-detail-grid"><div class="detail-item"><label>Case date</label><span>${escapeHtml(record.date)}</span></div><div class="detail-item"><label>PEP progress</label><span>${escapeHtml(pep)}</span></div><div class="detail-item"><label>Vaccine used</label><span>${escapeHtml(record.vaccine)}</span></div><div class="detail-item"><label>Reporting facility</label><span>${escapeHtml(record.clinic)}</span></div><div class="detail-item"><label>Status</label><span style="font-weight:700;">${outcomeLabel(outcome)}</span></div></div></td></tr>`;
+  }).join('') : '<tr><td colspan="7">No anonymized records are available yet.</td></tr>';
   body.querySelectorAll('.accordion-row').forEach(row => {
     row.addEventListener('click', () => toggleRecordRow(row));
     row.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleRecordRow(row); } });

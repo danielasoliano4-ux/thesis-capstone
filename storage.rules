@@ -36,7 +36,7 @@ service firebase.storage {
         && request.resource.contentType in ['image/jpeg', 'image/png', 'application/pdf'];
       allow delete: if isLoggedIn() && request.auth.uid == residentId;
       allow read: if isLoggedIn()
-        && (request.auth.uid == residentId || isStaffOrAdmin());
+        && (request.auth.uid == residentId || userRole() == 'admin' || userRole() == 'administrator');
     }
   }
 }
