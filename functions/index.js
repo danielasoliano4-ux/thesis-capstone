@@ -44,6 +44,8 @@ function onCall(options, handler) {
 }
 
 const db = admin.firestore();
+const { publicClinicStockHandler } = require('./public-clinic-stock');
+exports.getPublicClinicStock = onCall(publicClinicStockHandler({ db }));
 const sendGridApiKey = defineSecret('SENDGRID_API_KEY');
 const senderEmail = 'danisoliano762@gmail.com';
 

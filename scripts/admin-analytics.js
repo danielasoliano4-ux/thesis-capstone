@@ -15,6 +15,7 @@ let residents = new Map();
 let users = [];
 let clinics = [];
 let inventory = [];
+let activeReportKind = null;
 
 const VACCINE_BRAND_ALIASES = {
   'verorab': 'Verorab (PVRV)', 'verorab pvrv': 'Verorab (PVRV)', 'verovab': 'Verorab (PVRV)',
@@ -40,6 +41,12 @@ document.getElementById('clearReportDates')?.addEventListener('click', () => {
 document.querySelectorAll('[data-report]').forEach(button => button.addEventListener('click', () => openReportPreview(button.dataset.report)));
 document.getElementById('closeReportPreviewBtn')?.addEventListener('click', closeReportPreview);
 document.getElementById('printReportPreviewBtn')?.addEventListener('click', () => window.print());
+document.getElementById('reportBarangaySort')?.addEventListener('change', () => {
+  if (activeReportKind === 'cases') openReportPreview(activeReportKind);
+});
+document.getElementById('reportComparisonMonths')?.addEventListener('change', () => {
+  if (activeReportKind === 'cases') openReportPreview(activeReportKind);
+});
 document.getElementById('reportPreviewModal')?.addEventListener('click', event => {
   if (event.target.id === 'reportPreviewModal') closeReportPreview();
 });
@@ -461,15 +468,126 @@ async function editClinic(clinic = null) {
 
 async function deleteClinic(id) { if (await confirmDialog('Delete this clinic permanently?')) { try { const { deleteDoc } = await import('https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js'); await deleteDoc(doc(db, 'clinics', id)); } catch (error) { notifyDialog(`Could not delete clinic: ${error.message}`); } } }
 
+function formatReportDate(value, fallback = 'No date') {
+  const date = value instanceof Date ? value : dateValue(value);
+  return date && !Number.isNaN(date.getTime())
+    ? date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : fallback;
+}
+
+function reportCaseStatus(status) {
+  const value = String(status || 'pending').toLowerCase();
+  if (value === 'completed' || value === 'resolved') return 'Resolved';
+  if (['confirmed', 'in_progress', 'ongoing'].includes(value)) return 'Ongoing';
+  if (['pending', 'expired'].includes(value)) return 'Pending';
+  // Preserve other outcomes instead of implying that treatment was resolved.
+  return value.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
+function sortReportCases(rows) {
+  const order = document.getElementById('reportBarangaySort')?.value;
+  if (order !== 'asc' && order !== 'desc') return rows;
+  return [...rows].sort((first, second) => {
+    const a = String(first.barangay || barangayFor(first)).trim();
+    const b = String(second.barangay || barangayFor(second)).trim();
+    return a.localeCompare(b, 'en', { sensitivity: 'base', numeric: true }) * (order === 'desc' ? -1 : 1);
+  });
+}
+
+function reportCaseRecords() {
+  const groups = new Map();
+  const keyFor = (item, index) => item.vaccination_session_id && item.vaccination_session_id !== 'legacy'
+    ? `session:${item.vaccination_session_id}`
+    : item.resident_uid ? `legacy:${item.resident_uid}` : `record:${item.id || index}`;
+  appointments.forEach((item, index) => {
+    if (['declined', 'cancelled', 'canceled'].includes(item.status)) return;
+    const key = keyFor(item, index);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ ...item, ...item.course_intake_data });
+  });
+  return [...groups.entries()].map(([key, records]) => {
+    const doses = vaccinations.filter((item, index) =>
+      (item.vaccination_session_id && item.vaccination_session_id !== 'legacy') || item.resident_uid
+        ? keyFor(item, index) === key
+        : item.appointment_id && records.some(record => record.id === item.appointment_id));
+    const all = [...records, ...doses.map(item => ({ ...item, ...item.course_intake_data }))];
+    // Prefer the exposure date; use the first appointment date for older records.
+    const biteDates = all.map(item => dateValue(item.bite_date)).filter(Boolean);
+    const dates = biteDates.length ? biteDates : records.map(recordDate).filter(Boolean);
+    const date = dates.length ? new Date(Math.min(...dates.map(value => value.getTime()))) : null;
+    const animalRecord = all.find(item => String(item.animal_type || '').trim());
+    let animal = String(animalRecord?.animal_type || '').trim();
+    if (/^dogs?$/i.test(animal)) animal = 'Dog';
+    else if (/^cats?$/i.test(animal)) animal = 'Cat';
+    else if (/^other$/i.test(animal)) animal = String(animalRecord.animal_other || '').trim() || 'Other';
+    else if (animal) animal = animal.toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
+    const statuses = records.map(item => reportCaseStatus(item.status));
+    const status = statuses.includes('Ongoing') ? 'Ongoing' : statuses.includes('Pending') ? 'Pending' : statuses[0];
+    return { ...records[0], case_date: date, animal_source: animal || 'Not recorded', status };
+  });
+}
+
+function monthlyCaseComparison(caseRows, range, now = new Date()) {
+  const requested = Number(document.getElementById('reportComparisonMonths')?.value || 6);
+  const months = [3, 6, 12].includes(requested) ? requested : 6;
+  const anchor = dateValue(range.end) || now;
+  const counts = new Map();
+  caseRows.forEach(item => {
+    const date = item.case_date;
+    if (!date || localReportDateKey(date) > localReportDateKey(anchor)) return;
+    const key = `${date.getFullYear()}-${date.getMonth()}`;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+  const rows = Array.from({ length: months }, (_, index) => {
+    const date = new Date(anchor.getFullYear(), anchor.getMonth() - months + 1 + index, 1);
+    return [date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), counts.get(`${date.getFullYear()}-${date.getMonth()}`) || 0];
+  });
+  return {
+    title: 'Monthly comparative report',
+    note: `${rows[0][0]} to ${rows[months - 1][0]}, through ${formatReportDate(anchor)}. Date filters apply; boundary months may be partial. Each treatment course counts once, by bite date or first recorded appointment date.`,
+    headers: ['Month', 'Cases', 'Change in cases', 'Change (%)'],
+    rows: rows.map(([month, count], index) => {
+      if (!index) return [month, count, '—', '—'];
+      const previous = rows[index - 1][1];
+      const change = count - previous;
+      return [month, count, change > 0 ? `+${change}` : String(change), previous
+        ? `${change > 0 ? '+' : ''}${(change / previous * 100).toFixed(1)}%`
+        : count ? 'N/A (previous month: 0)' : '0.0%'];
+    })
+  };
+}
+
+function caseReportSections(caseRows, range) {
+  const counts = new Map();
+  caseRows.forEach(item => counts.set(item.animal_source, (counts.get(item.animal_source) || 0) + 1));
+  return [monthlyCaseComparison(caseRows, range), {
+    title: 'Source of rabies report — animal exposure',
+    note: 'Animal types recorded at medical intake for the selected coverage. Missing sources are shown as Not recorded. These are reported animal-bite exposures.',
+    headers: ['Animal source', 'Cases', 'Share of cases'],
+    rows: [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([animal, count]) => [animal, count, `${(count / caseRows.length * 100).toFixed(1)}%`])
+  }];
+}
+
+function renderReportTable(headers, rows) {
+  return rows.length
+    ? `<table><thead><tr>${headers.map(header => `<th scope="col">${escapeHtml(header)}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(value => `<td>${escapeHtml(value)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+    : '<p class="report-empty">No records match this report and date range.</p>';
+}
+
 function reportRange() {
   const start = document.getElementById('reportStartDate')?.value || '';
   const end = document.getElementById('reportEndDate')?.value || '';
   if (start && end && start > end) throw new Error('The start date must be on or before the end date.');
-  return { start, end, label: start || end ? `${start || 'Beginning'} to ${end || 'Today'}` : 'All recorded dates' };
+  return { start, end, label: start || end ? `${formatReportDate(start, 'Beginning')} to ${formatReportDate(end, 'Today')}` : 'All recorded dates' };
+}
+
+function localReportDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function inReportRange(record, range) {
-  const value = recordDate(record)?.toISOString().slice(0, 10) || '';
+  const date = recordDate(record);
+  const value = date ? localReportDateKey(date) : '';
+  if (!date && (range.start || range.end)) return false;
   return (!range.start || value >= range.start) && (!range.end || value <= range.end);
 }
 
@@ -479,17 +597,11 @@ function legacyDownloadReport(kind) {
     if (!window.jspdf?.jsPDF) throw new Error('The PDF library has not loaded. Check your internet connection and try again.');
     const pdf = new window.jspdf.jsPDF({ unit: 'pt', format: 'a4' });
     const titles = { cases: 'Rabies Cases Report', vaccinations: 'Vaccination Status Report', inventory: 'Vaccine Inventory Report', risk: 'Barangay Risk Assessment' };
-    let rows = [];
-    if (kind === 'cases') rows = appointments.filter(item => item.status !== 'declined' && inReportRange(item, range)).map(item => `${item.preferred_date || 'No date'} | ${item.resident_name || 'Resident'} | ${item.barangay || barangayFor(item)} | ${item.status || 'pending'}`);
-    if (kind === 'vaccinations') rows = vaccinations.filter(item => inReportRange(item, range)).map(item => `${item.date_given || 'No date'} | ${item.resident_name || item.resident_uid || 'Resident'} | Dose ${item.dose_number || '-'} | ${item.vaccine_name || '-'} | ${item.clinic_name || '-'}`);
-    if (kind === 'inventory') rows = inventory.filter(item => !item.archived).map(item => `${item.clinic_id || '-'} | ${item.type || '-'} | Batch ${item.batch || '-'} | ${Number(item.quantity || 0)} doses | Expires ${item.expiry || '-'}`);
-    if (kind === 'risk') {
-      const counts = new Map();
-      appointments.filter(item => item.status !== 'declined' && inReportRange(item, range)).forEach(item => { const name = barangayFor(item); counts.set(name, (counts.get(name) || 0) + 1); });
-      rows = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([name, count]) => `${name} | ${count} reported case${count === 1 ? '' : 's'}`);
-    }
+    const report = reportDefinition(kind, range);
+    let rows = report ? [report.headers.join(' | '), ...report.rows.map(row => row.join(' | ')),
+      ...(report.sections || []).flatMap(section => [section.title, section.note, section.headers.join(' | '), ...section.rows.map(row => row.join(' | '))])] : [];
     pdf.setFontSize(16); pdf.text('Anti-Rabies Locator — ' + titles[kind], 40, 48);
-    pdf.setFontSize(10); pdf.text(`Date filter: ${range.label}`, 40, 68); pdf.text(`Generated: ${new Date().toLocaleString()}`, 40, 83);
+    pdf.setFontSize(10); pdf.text(`Date filter: ${range.label}`, 40, 68); pdf.text(`Generated: ${new Date().toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' })}`, 40, 83);
     if (!rows.length) rows = ['No records match this report and date range.'];
     let y = 110;
     rows.forEach((row, index) => {
@@ -507,22 +619,26 @@ function reportDefinition(kind, range) {
   const caseRows = appointments.filter(item => item.status !== 'declined' && inReportRange(item, range));
   const vaccinationRows = vaccinations.filter(item => inReportRange(item, range));
   const activeInventory = inventory.filter(item => !item.archived);
-  if (kind === 'cases') return {
-    title: 'Rabies Cases Report', subtitle: 'Reported animal-bite cases by clinic and barangay',
-    headers: ['Date', 'Resident', 'Barangay', 'Clinic', 'Status'],
-    rows: caseRows.map(item => [item.preferred_date || 'No date', item.resident_name || 'Resident', item.barangay || barangayFor(item), item.clinic_name || '-', item.status || 'pending']),
-    totals: [['Reported cases', caseRows.length], ['Confirmed', caseRows.filter(item => item.status === 'confirmed').length], ['Completed', caseRows.filter(item => item.status === 'completed').length]]
-  };
+  if (kind === 'cases') {
+    const cases = reportCaseRecords().filter(item => inReportRange({ bite_date: item.case_date ? localReportDateKey(item.case_date) : '' }, range));
+    return {
+      title: 'Monthly Rabies Cases Report', subtitle: 'Monthly comparison and animal sources of reported animal-bite cases',
+      headers: ['Date', 'Resident', 'Barangay', 'Clinic', 'Status', 'Animal source'],
+      rows: sortReportCases(cases).map(item => [formatReportDate(item.case_date), item.resident_name || 'Resident', item.barangay || barangayFor(item), item.clinic_name || '-', reportCaseStatus(item.status), item.animal_source]),
+      totals: [['Reported cases', cases.length], ['Pending', cases.filter(item => reportCaseStatus(item.status) === 'Pending').length], ['Ongoing', cases.filter(item => reportCaseStatus(item.status) === 'Ongoing').length], ['Resolved', cases.filter(item => reportCaseStatus(item.status) === 'Resolved').length]],
+      sections: caseReportSections(cases, range)
+    };
+  }
   if (kind === 'vaccinations') return {
     title: 'Vaccination Status Report', subtitle: 'Completed anti-rabies vaccine doses by resident and clinic',
     headers: ['Date given', 'Resident', 'Dose', 'Vaccine', 'Clinic'],
-    rows: vaccinationRows.map(item => [item.date_given || 'No date', item.resident_name || item.resident_uid || 'Resident', `Dose ${item.dose_number || '-'}`, item.vaccine_name || '-', item.clinic_name || '-']),
+    rows: vaccinationRows.map(item => [formatReportDate(item.date_given), item.resident_name || item.resident_uid || 'Resident', `Dose ${item.dose_number || '-'}`, item.vaccine_name || '-', item.clinic_name || '-']),
     totals: [['Doses recorded', vaccinationRows.length], ['Residents served', new Set(vaccinationRows.map(item => item.resident_uid).filter(Boolean)).size], ['Clinics reporting', new Set(vaccinationRows.map(item => item.clinic_id).filter(Boolean)).size]]
   };
   if (kind === 'inventory') return {
     title: 'Vaccine Inventory Report', subtitle: 'Current non-archived vaccine batches across all clinics',
     headers: ['Clinic', 'Vaccine', 'Batch', 'Quantity', 'Expiry date'],
-    rows: activeInventory.map(item => [item.clinic_name || clinics.find(clinic => clinic.id === item.clinic_id)?.name || item.clinic_id || '-', item.type || '-', item.batch || '-', `${Number(item.quantity || 0)} doses`, item.expiry || '-']),
+    rows: activeInventory.map(item => [item.clinic_name || clinics.find(clinic => clinic.id === item.clinic_id)?.name || item.clinic_id || '-', item.type || '-', item.batch || '-', `${Number(item.quantity || 0)} doses`, formatReportDate(item.expiry, '-')]),
     totals: [['Active batches', activeInventory.length], ['Total doses', activeInventory.reduce((sum, item) => sum + Number(item.quantity || 0), 0)], ['Low / expired', activeInventory.filter(item => Number(item.quantity || 0) <= 15 || isExpired(item.expiry)).length]]
   };
   if (kind === 'risk') {
@@ -547,10 +663,14 @@ function openReportPreview(kind) {
     const documentEl = document.getElementById('reportPreviewDocument');
     const modal = document.getElementById('reportPreviewModal');
     if (!report || !documentEl || !modal) throw new Error('The report preview is unavailable. Please refresh and try again.');
-    const table = report.rows.length
-      ? `<table><thead><tr>${report.headers.map(header => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead><tbody>${report.rows.map(row => `<tr>${row.map(value => `<td>${escapeHtml(value)}</td>`).join('')}</tr>`).join('')}</tbody></table>`
-      : '<p class="report-empty">No records match this report and date range.</p>';
-    documentEl.innerHTML = `<header class="report-document-header"><div><div class="report-brand"><img class="report-system-logo" src="/assets/system-logo.png" alt="System logo" width="40" height="40"> <span>Anti-Rabies Locator</span></div><h1>${escapeHtml(report.title)}</h1><p>${escapeHtml(report.subtitle)}</p></div><div class="report-generated">Cabuyao, Laguna<br>Coverage: ${escapeHtml(range.label)}<br>Generated: ${escapeHtml(new Date().toLocaleString())}</div></header><section class="report-summary">${report.totals.map(([label, value]) => `<div class="report-summary-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}</section><h2>Report details</h2>${table}<footer class="report-footer"><span>Anti-Rabies Locator System</span><span>Administrator report</span></footer>`;
+    activeReportKind = kind;
+    const sortControl = document.getElementById('reportBarangaySortControl');
+    if (sortControl) sortControl.hidden = kind !== 'cases';
+    const comparisonControl = document.getElementById('reportComparisonControl');
+    if (comparisonControl) comparisonControl.hidden = kind !== 'cases';
+    const table = renderReportTable(report.headers, report.rows);
+    const sections = (report.sections || []).map(section => `<section class="report-breakdown"><h2>${escapeHtml(section.title)}</h2><p class="report-section-note">${escapeHtml(section.note)}</p>${renderReportTable(section.headers, section.rows)}</section>`).join('');
+    documentEl.innerHTML = `<header class="report-document-header"><div><div class="report-brand"><img class="report-system-logo" src="/assets/system-logo.png" alt="System logo" width="40" height="40"> <span>Anti-Rabies Locator</span></div><h1>${escapeHtml(report.title)}</h1><p>${escapeHtml(report.subtitle)}</p></div><div class="report-generated">Cabuyao, Laguna<br>Coverage: ${escapeHtml(range.label)}<br>Generated: ${escapeHtml(new Date().toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' }))}</div></header><section class="report-summary">${report.totals.map(([label, value]) => `<div class="report-summary-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}</section>${sections}<h2>Report details</h2>${table}<footer class="report-footer"><span>Anti-Rabies Locator System</span><span>Administrator report</span></footer>`;
     document.getElementById('reportPreviewTitle').textContent = report.title;
     modal.hidden = false;
     modal.setAttribute('aria-hidden', 'false');

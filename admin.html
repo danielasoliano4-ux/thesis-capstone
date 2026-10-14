@@ -215,7 +215,7 @@
                 <div class="report-icon" style="background:#fee2e2;color:#ef0000;"><i class="fa-solid fa-chart-bar"></i></div>
                 <div>
                     <h4>Monthly Rabies Cases Report</h4>
-                    <p>Comprehensive breakdown of rabies cases by barangay for the current month.</p>
+                    <p>Compare cases across 3, 6, or 12 months, with animal-source and barangay breakdowns. Preview, then print or save as PDF.</p>
                     <button class="dl-btn" data-report="cases"><i class="fa-solid fa-eye"></i> Preview Report</button>
                 </div>
             </div>
@@ -252,6 +252,22 @@
         <div class="report-preview-toolbar">
             <div><strong id="reportPreviewTitle">Report Preview</strong><span>Review before printing or saving as PDF</span></div>
             <div class="report-preview-actions">
+                <label id="reportComparisonControl" class="report-sort-control" hidden>
+                    Compare months
+                    <select id="reportComparisonMonths">
+                        <option value="3">Last 3 months</option>
+                        <option value="6" selected>Last 6 months</option>
+                        <option value="12">Last 12 months</option>
+                    </select>
+                </label>
+                <label id="reportBarangaySortControl" class="report-sort-control" hidden>
+                    Sort by Barangay
+                    <select id="reportBarangaySort">
+                        <option value="original">Original order</option>
+                        <option value="asc">Barangay: A–Z</option>
+                        <option value="desc">Barangay: Z–A</option>
+                    </select>
+                </label>
                 <button type="button" id="closeReportPreviewBtn" class="btn-outline">Close</button>
                 <button type="button" id="printReportPreviewBtn" class="btn-primary"><i class="fa-solid fa-print"></i> Proceed to Print / Save PDF</button>
             </div>

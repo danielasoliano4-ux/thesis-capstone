@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createBookingHandler, activeBooking } = require('./booking');
 class HttpsError extends Error { constructor(code, message, details) { super(message); this.code = code; this.details = details; } }
-function fixture(initial = [], clinic = { name: 'Clinic', hours: '24 hours' }) {
+function fixture(initial = [], clinic = { name: 'Clinic', hours: '24 hours' }, inventory = {quantity:20}) {
  const appointments = initial.map((data, i) => ({ id: String(i), data: () => data }));
  let sequence = 0, queue = Promise.resolve();
  const profiles = { resident: { role: 'resident', is_active: true, full_name: 'Resident' } };
@@ -12,7 +12,7 @@ function fixture(initial = [], clinic = { name: 'Clinic', hours: '24 hours' }) {
    where: (key, op, value) => { const q = { name, filters: [[key,value]], where: (k,o,v) => { q.filters.push([k,v]); return q; } }; return q; }
   }),
   runTransaction: fn => { const p = queue.then(() => fn({
-   get: async ref => ref.filters ? { docs: ref.name === 'inventory' ? [{id:'batch',data:()=>({clinic_id:'clinic-a',type:'Vaccine',quantity:20,expiry:'2099-01-01'})}] : appointments.filter(d => ref.filters.every(([k,v]) => d.data()[k] === v)) } : { data: () => ref.name === 'users' ? (profiles[ref.id] || profiles.resident) : ref.name === 'clinics' ? clinic : undefined },
+   get: async ref => ref.filters ? { docs: ref.name === 'inventory' ? [{id:'batch',data:()=>({clinic_id:'clinic-a',type:'Vaccine',expiry:'2099-01-01',...inventory})}] : appointments.filter(d => ref.filters.every(([k,v]) => d.data()[k] === v)) } : { data: () => ref.name === 'users' ? (profiles[ref.id] || profiles.resident) : ref.name === 'clinics' ? clinic : undefined },
    set: (ref, data) => { if (ref.name === 'appointments') appointments.push({ id: ref.id, data: () => data }); }
   })); queue = p.catch(() => {}); return p; }
  };
@@ -20,6 +20,24 @@ function fixture(initial = [], clinic = { name: 'Clinic', hours: '24 hours' }) {
  const auth = { uid: 'resident', token: { secure_login: true, email_verified: true, firebase: { sign_in_provider: 'custom' } } };
  return { appointments, book: (data = {}, identity = auth) => handler({ auth: identity, data: { clinic_id: 'clinic-a', preferred_date: '2026-09-22', preferred_time: '09:00', ...data } }) };
 }
+test('single bookings allow 1 through 15 available doses despite stale clinic summaries', async () => {
+ for (const quantity of [1,3,15,16]) {
+  const f = fixture([], {name:'Clinic',hours:'24 hours',stock_total:0,stock_status:'out'}, {quantity});
+  await f.book();
+  assert.equal(f.appointments.length,1);
+  assert.equal(f.appointments[0].data().status,'pending');
+  assert.equal(f.appointments[0].data().stock_reservation,undefined);
+ }
+});
+
+test('single bookings reject empty, fully reserved or expired stock without creating appointments', async () => {
+ for (const inventory of [{quantity:0},{quantity:15,reserved_count:15,quantity_mode:'on_hand'},{quantity:15,expiry:'2026-09-20'}]) {
+  const f = fixture([], {name:'Clinic',hours:'24 hours',stock_total:50,stock_status:'available'}, inventory);
+  await assert.rejects(f.book(), {code:'failed-precondition',message:'This clinic is out of vaccine stock. Choose another clinic.'});
+  assert.equal(f.appointments.length,0);
+ }
+});
+
 test('active appointments block duplicate doses across clinics', async () => {
  for (const status of ['pending', 'confirmed', 'accepted', 'approved', 'in_progress']) {
   const f = fixture([{ resident_uid: 'resident', clinic_id: 'clinic-a', status }]);
@@ -100,6 +118,24 @@ test('popup shows booking actions for pending and confirmed appointments, with n
  context.bookingRows = [{ clinic_id: 'a', status: 'in_progress', arrived_at: 'server' }];
  context.mountBookingWidget(host, clinic, 'googleMapOverview');
  assert.equal(host.children.length, 1);
+ context.bookingRows = [];
+ context.auth = {currentUser:null};
+ let guestContinued = 0;
+ context.window.checkAuthAndBook = () => guestContinued++;
+ context.confirmDialog = async () => false;
+ context.mountBookingWidget(host, {id:'a',name:'Low Clinic',status:'low',stock_total:3}, 'googleMap');
+ assert.equal(host.children[0].disabled,false);
+ assert.equal(host.children[0].textContent,'Book Appointment');
+ await host.children[0].click();
+ assert.equal(guestContinued,0);
+ context.confirmDialog = async () => true;
+ await host.children[0].click();
+ assert.equal(guestContinued,1);
+ for (const status of ['out','unknown']) {
+   context.STATUS_LABEL = {out:'Out of Stock',unknown:'Stock unavailable'};
+   context.mountBookingWidget(host, {id:'a',status}, 'googleMap');
+   assert.equal(host.children[0].disabled,true);
+ }
 });
 
 test('minimal booking ignores client medical, ID, arrival and permanent-record fields', async () => {

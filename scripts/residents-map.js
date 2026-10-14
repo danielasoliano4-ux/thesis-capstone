@@ -1,8 +1,10 @@
 import { CABUYAO_BARANGAYS, extractBarangay } from './clinic-barangays.js';
-import { notifyDialog } from './app-dialogs.js';
+import { notifyDialog, confirmDialog } from './app-dialogs.js';
 import { simplifyStockText, clinicStockStatus, summarizeStock, availableQuantity } from './stock-summary.mjs';
 import { availableStock } from './dose-stock.mjs';
-import { auth, db, onAuthStateChanged, fetchUserProfile } from './firebase.js';
+import { recommendClinics, clinicOpeningStatus } from './clinic-recommendations.mjs';
+import { app, auth, db, onAuthStateChanged, fetchUserProfile } from './firebase.js';
+import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-functions.js';
 import { clinicBooking } from './booking-status.js';
 import { collection, onSnapshot, query, where } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js';
 
@@ -33,7 +35,7 @@ onAuthStateChanged(auth, async user => {
   refreshBookingWidgets();
   inventoryUnsubscribe?.();
   inventoryReady = false;
-  if (!user) { rebuildClinicDirectory(); return; }
+  if (!user) { rebuildClinicDirectory(); refreshPublicStock(); return; }
   const profile = await fetchUserProfile(user.uid);
   if (auth.currentUser?.uid !== user.uid) return;
   if (profile?.role !== 'resident') {
@@ -90,10 +92,15 @@ function mountBookingWidget(host, clinic, mapId) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'map-book-button';
-    button.disabled = bookingState !== 'ready' || Boolean(booking) || clinic.status !== 'available';
-    button.textContent = bookingState === 'loading' ? 'Checking booking...' : bookingState === 'error' ? 'Unable to check booking' : booking ? 'Pending' : clinic.status !== 'available' ? STATUS_LABEL[clinic.status] : 'Book Appointment';
+    const bookable = ['available', 'low'].includes(clinic.status);
+    button.disabled = bookingState !== 'ready' || Boolean(booking) || !bookable;
+    button.textContent = bookingState === 'loading' ? 'Checking booking...' : bookingState === 'error' ? 'Unable to check booking' : booking ? 'Pending' : !bookable ? STATUS_LABEL[clinic.status] : 'Book Appointment';
     if (button.disabled) button.style.cssText = 'background:#e5e7eb;color:#4b5563;cursor:not-allowed;';
-    button.addEventListener('click', () => {
+    button.addEventListener('click', async () => {
+      if (clinic.status === 'low' && !auth.currentUser && !await confirmDialog(
+        `${clinic.name} has low vaccine stock (${clinic.stock_total} doses available). Availability may change before your visit, and your appointment needs clinic confirmation. Are you sure you want to continue?`,
+        { title: 'Low vaccine stock', confirmText: 'Continue Booking' }
+      )) return;
       if (mapId === 'googleMap' || mapId === 'googleMapNew') window.checkAuthAndBook?.(clinic.name, clinic.id);
       else window.openBookingModal?.(clinic.name, clinic.id);
     });
@@ -108,9 +115,34 @@ let clinicProfileData = [];
 let inventoryByClinic = new Map();
 let inventoryUnsubscribe = null;
 let inventoryReady = false;
+let publicStockByClinic = new Map();
+let publicStockState = 'loading';
+let publicStockRequest = null;
+const getPublicClinicStock = httpsCallable(getFunctions(app), 'getPublicClinicStock');
 
-const STATUS_COLOR = { available: '#00b140', low: '#d98a00', out: '#e60000' };
-const STATUS_LABEL = { available: 'Available', low: 'Low Stock', out: 'Out of Stock' };
+async function refreshPublicStock() {
+  if (auth.currentUser || publicStockRequest) return;
+  publicStockRequest = getPublicClinicStock();
+  try {
+    const { data } = await publicStockRequest;
+    publicStockByClinic = new Map(data.clinics.map(clinic => [clinic.id, {
+      ...clinic, stock: simplifyStockText(clinic.stock)
+    }]));
+    publicStockState = 'ready';
+  } catch (error) {
+    publicStockState = 'error';
+    console.error('Failed to load public vaccine availability:', error);
+  } finally {
+    publicStockRequest = null;
+    if (!auth.currentUser) rebuildClinicDirectory();
+  }
+}
+// Refresh while the guest page is visible, including expiry changes without writes.
+setInterval(() => { if (!document.hidden) refreshPublicStock(); }, 30000);
+window.addEventListener('focus', refreshPublicStock);
+
+const STATUS_COLOR = { available: '#00b140', low: '#d98a00', out: '#e60000', unknown: '#64748b' };
+const STATUS_LABEL = { available: 'Available', low: 'Low Stock', out: 'Out of Stock', unknown: 'Stock unavailable' };
 
 const mapsData = [];
 let selectedDestination = null;
@@ -153,6 +185,7 @@ function loadClinics() {
       };
     });
     rebuildClinicDirectory();
+    refreshPublicStock();
   }, (error) => console.error('Failed to load clinics:', error));
 
 }
@@ -179,7 +212,12 @@ function listenToResidentInventory() {
 function rebuildClinicDirectory() {
     const today = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
     CLINICS = clinicProfileData.map(clinic => {
-      if (!inventoryReady) return {...clinic};
+      if (!auth.currentUser) {
+        const stock = publicStockState === 'ready' && publicStockByClinic.get(clinic.id);
+        return stock ? { ...clinic, ...stock } : { ...clinic, stock_total: null, status: 'unknown',
+          stock: publicStockState === 'loading' ? 'Checking availability...' : 'Availability could not be loaded' };
+      }
+      if (!inventoryReady) return { ...clinic, stock_total: null, status: 'unknown', stock: 'Checking availability...' };
       const active = availableStock(inventoryByClinic.get(clinic.id) || [], clinic.id, today);
       const total = active.reduce((sum,item) => sum + availableQuantity(item), 0);
       return {...clinic, stock_total:total, status:clinicStockStatus(total), stock:summarizeStock(active), vaccineTypes:[...new Set(active.map(item=>item.type))]};
@@ -195,6 +233,108 @@ function rebuildClinicDirectory() {
     });
     if (window.L) initMap();
     populateMapDirectoryFilters();
+    renderClinicRecommendations();
+}
+
+function focusRecommendedClinic(clinicId, mapId) {
+  const entry = mapsData.find(item => item.mapId === mapId);
+  const item = entry?.markers.find(item => item.clinic.id === clinicId);
+  if (!item) return notifyDialog('The map is still loading. Please try again in a moment.');
+  document.querySelectorAll('.map-directory-search').forEach(control => { control.value = ''; });
+  document.querySelectorAll('.map-directory-barangay, .map-directory-hours, .map-directory-price').forEach(control => { control.value = 'all'; });
+  activeStockFilter = 'all';
+  document.querySelectorAll('.map-filter').forEach(group => group.querySelectorAll('button').forEach((button, index) => { button.classList.toggle('active-btn', index === 0); }));
+  applyMapDirectoryFilters();
+  clearDirections(false);
+  entry.map.invalidateSize();
+  entry.map.setView(item.marker.getLatLng(), 16);
+  item.marker.openPopup();
+}
+
+function renderClinicRecommendations() {
+  const choices = recommendClinics(CLINICS, userLocation);
+  const nearestDistance = document.getElementById('nearestClinicDistance');
+  if (nearestDistance && userLocation) nearestDistance.textContent = choices.nearest ? `${choices.nearest.distance.toFixed(1)} km` : 'No open clinic with stock';
+  const openingLabel = clinic => ({ open: 'Open now', closed: 'Closed now', unknown: 'Hours not confirmed' })[clinicOpeningStatus(clinic)];
+  for (const mapId of ['googleMapOverview', 'googleMapNew', 'googleMap']) {
+    const container = document.getElementById(mapId);
+    if (!container) continue;
+    let panel = document.getElementById(`${mapId}-recommendations`);
+    if (!panel) {
+      panel = document.createElement('section');
+      panel.id = `${mapId}-recommendations`;
+      panel.className = 'clinic-recommendations';
+      panel.setAttribute('aria-label', 'Recommended clinics');
+      (container.closest('.map-box') || container).insertAdjacentElement('beforebegin', panel);
+    }
+    const cards = [['best', 'Best available now', 'Open now, with the most available doses.'],
+      ['nearest', 'Nearest open clinic', 'Closest open clinic with available vaccine.'],
+      ['highest', 'Highest vaccine stock', 'Most available doses, across all opening hours.']];
+    const signature = JSON.stringify([choices, Boolean(userLocation)]);
+    if (panel.dataset.signature === signature) continue;
+    panel.dataset.signature = signature;
+    panel.innerHTML = `<div class="clinic-recommendations-heading"><h3>Find a clinic for your visit</h3><button type="button" class="recommendation-locate">${userLocation ? 'Refresh my location' : 'Use my location'}</button></div><p class="clinic-recommendations-note">Based on vaccine stock and recorded operating hours. Distances are straight-line estimates. Contact the clinic to confirm walk-in availability.</p><div class="clinic-recommendations-grid">${cards.map(([key, title, reason]) => {
+      const choice = choices[key];
+      const empty = key === 'nearest' && !userLocation ? 'Enable location to find the nearest open clinic.'
+        : key === 'highest' ? 'No clinic with confirmed vaccine stock is available yet.' : 'No clinic is currently confirmed open with available vaccine.';
+      return `<article class="clinic-recommendation-card"><h4>${title}</h4><p>${reason}</p>${choice
+        ? `<strong>${escapeHtml(choice.clinic.name)}</strong><div class="clinic-recommendation-facts">${choice.clinic.stock_total} doses available · ${openingLabel(choice.clinic)}${choice.distance !== null ? `<br>Approximately ${choice.distance.toFixed(1)} km away` : ''}</div><div class="clinic-recommendation-actions"><button type="button" data-recommendation-view="${escapeHtml(choice.clinic.id)}">View / Book</button><button type="button" data-recommendation-directions="${escapeHtml(choice.clinic.id)}">Directions</button></div>`
+        : `<p class="clinic-recommendation-empty">${empty}</p>`}</article>`;
+    }).join('')}</div><p class="recommendation-location-status" role="status"></p>`;
+    panel.querySelector('.recommendation-locate').addEventListener('click', () => locateForRecommendations());
+    panel.querySelector('.recommendation-locate').disabled = locatingRecommendations;
+    panel.querySelectorAll('[data-recommendation-view]').forEach(button => button.addEventListener('click', () => focusRecommendedClinic(button.dataset.recommendationView, mapId)));
+    panel.querySelectorAll('[data-recommendation-directions]').forEach(button => button.addEventListener('click', () => {
+      focusRecommendedClinic(button.dataset.recommendationDirections, mapId);
+      const clinic = CLINICS.find(item => item.id === button.dataset.recommendationDirections);
+      if (clinic) startDirections(clinic, mapId);
+    }));
+  }
+  mapsData.forEach(entry => entry.markers.forEach((item, index) => {
+    const badges = [['best', 'Best available now'], ['nearest', 'Nearest open'], ['highest', 'Highest stock']]
+      .filter(([key]) => choices[key]?.clinic.id === item.clinic.id).map(([, label]) => label);
+    const html = `${badges.map(label => `<span class="clinic-recommendation-badge">${label}</span>`).join('')}<span class="clinic-opening-label">${openingLabel(item.clinic)}</span>`;
+    const row = document.getElementById(`${entry.sidebarId}-row-${index}`)?.querySelector('.map-clinic-recommendation');
+    if (row) row.innerHTML = html;
+    if (item.marker.isPopupOpen()) {
+      const popup = item.marker.getPopup()?.getElement()?.querySelector('.clinic-popup-card');
+      if (popup) {
+        let label = popup.querySelector('.map-clinic-recommendation');
+        if (!label) {
+          label = document.createElement('div');
+          label.className = 'map-clinic-recommendation';
+          popup.querySelector('header').append(label);
+        }
+        label.innerHTML = html;
+      }
+    }
+  }));
+}
+
+let locatingRecommendations = false;
+async function locateForRecommendations() {
+  if (locatingRecommendations) return;
+  locatingRecommendations = true;
+  const setStatus = message => document.querySelectorAll('.recommendation-location-status').forEach(node => { node.textContent = message; });
+  const setBusy = busy => document.querySelectorAll('.recommendation-locate').forEach(button => { button.disabled = busy; button.setAttribute('aria-busy', String(busy)); });
+  setBusy(true);
+  setStatus('Finding your location. Allow location access when prompted.');
+  try {
+    if (!navigator.geolocation) throw new Error('Location is not supported by this browser. You can still view the best-stocked clinics.');
+    const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }));
+    userLocation = [position.coords.latitude, position.coords.longitude];
+    mapsData.forEach(entry => {
+      if (!entry.userMarker) entry.userMarker = L.circleMarker(userLocation, { radius: 8, color: '#fff', weight: 3, fillColor: '#2878e8', fillOpacity: 1 }).addTo(entry.map).bindPopup('Your location');
+      else entry.userMarker.setLatLng(userLocation);
+    });
+    renderClinicRecommendations();
+    setStatus('Recommendations updated using your location.');
+  } catch (error) {
+    setStatus(error.code === 1 ? 'Location access was denied. Allow access and try again; stock recommendations are still available.' : error.code === 2 ? 'Your location is unavailable. Turn on location services and try again.' : error.code === 3 ? 'Finding your location timed out. Please try again.' : error.message);
+  } finally {
+    locatingRecommendations = false;
+    setBusy(false);
+  }
 }
 
 function normalizeVaccineTypes(value) {
@@ -275,6 +415,7 @@ function createMarkerForMap(map, clinic, mapId) {
   const directionsButton = '<button type="button" class="map-directions-button">Get Directions</button>';
   marker.bindPopup(`<section class="clinic-popup-card"><header><span class="clinic-popup-type">${escapeHtml(clinic.type)}</span><h3>${escapeHtml(clinic.name)}</h3><span class="clinic-popup-status" style="color:${color}">${STATUS_LABEL[clinic.status]}</span></header><dl><div><dt>Address</dt><dd>${escapeHtml(clinic.address)}</dd></div><div><dt>Hours</dt><dd>${escapeHtml(clinic.hours)}</dd></div><div><dt>Phone</dt><dd>${escapeHtml(clinic.phone)}</dd></div><div><dt>Price</dt><dd>${escapeHtml(clinic.priceRange)}</dd></div><div><dt>Stock</dt><dd>${escapeHtml(clinic.stock)}</dd></div></dl><div class="clinic-popup-actions">${bookingButton}${directionsButton}<button type="button" class="map-popup-exit-directions" hidden><i class="fa-solid fa-xmark" aria-hidden="true"></i> Exit directions</button></div><div class="route-summary" aria-live="polite"></div></section>`, { className: 'clinic-popup', maxWidth: 310, minWidth: 210, maxHeight: 330, autoPanPadding: [16, 16] });
   marker.on('popupopen', event => {
+    renderClinicRecommendations();
     const host = event.popup.getElement()?.querySelector('.clinic-booking-status');
     if (host) mountBookingWidget(host, clinic, mapId);
     const routeButton = event.popup.getElement()?.querySelector('.map-directions-button');
@@ -306,10 +447,11 @@ function buildSidebarFor(entry) {
         </div>
         <div style="font-size:12px;color:#6b7280;">${mobj.clinic.address} &nbsp;|&nbsp; ${mobj.clinic.hours}</div>
         <div style="font-size:12px;color:#374151;"><strong>Vaccination price:</strong> ${mobj.clinic.priceRange}</div>
+        <div class="map-clinic-recommendation"></div>
       </div>
     `;
 
-    const doseLabel = `${mobj.clinic.stock_total} doses available`;
+    const doseLabel = mobj.clinic.status === 'unknown' ? mobj.clinic.stock : `${mobj.clinic.stock_total} doses available`;
     const rightHtml = mobj.clinic.status === 'out'
       ? `<div style="display:flex;align-items:center;gap:10px;"><span style="font-size:12px;color:${color};font-weight:bold;">Out of Stock</span><button class="book-btn" disabled style="background:#d1d5db;border:none;color:#6b7280;cursor:not-allowed;">Out of Stock</button></div>`
       : entry.sidebarId === 'clinicSidebar'
@@ -365,10 +507,9 @@ function applyMapDirectoryFilters() {
     entry.markers.forEach((mobj, index) => {
       const clinic = mobj.clinic;
       const haystack = `${clinic.name} ${clinic.address}`.toLowerCase();
-      const hoursText = `${clinic.hours} ${clinic.weekendHours || ''}`.toLowerCase();
       const matches = (!search || haystack.includes(search))
         && (barangay === 'all' || clinic.barangay === barangay)
-        && (hours === 'all' || hours === 'open' && !hoursText.includes('closed') || hours === 'weekday' && Boolean(clinic.hours) || hours === 'weekend' && Boolean(clinic.weekendHours) && !String(clinic.weekendHours).toLowerCase().includes('closed'))
+        && (hours === 'all' || hours === 'open' && clinicOpeningStatus(clinic) === 'open' || hours === 'weekday' && Boolean(clinic.hours) || hours === 'weekend' && Boolean(clinic.weekendHours) && !String(clinic.weekendHours).toLowerCase().includes('closed'))
         && matchesMapPrice(clinic.priceRange, price)
         && (activeStockFilter === 'all' || clinic.status === activeStockFilter);
       if (matches) mobj.marker.addTo(entry.map);
@@ -483,6 +624,7 @@ function locateUser(centerMap = true, restartWatch = false) {
       if (centerOnNextLocationUpdate) entry.map.setView(userLocation, 17);
     });
     centerOnNextLocationUpdate = false;
+    renderClinicRecommendations();
     if (selectedDestination) updateRoutes();
   };
   locationWatchId = navigator.geolocation.watchPosition(updateLocation, error => {
@@ -580,10 +722,9 @@ async function focusNearestClinic() {
     if (!navigator.geolocation) throw new Error('Location is not supported by this browser. Select a clinic on the map.');
     const position = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }));
     userLocation = [position.coords.latitude, position.coords.longitude];
-    const nearest = CLINICS.filter(clinic => Number.isFinite(clinic.lat) && Number.isFinite(clinic.lng))
-      .map(clinic => ({ clinic, distance: mapDistanceInKm(...userLocation, clinic.lat, clinic.lng) }))
-      .sort((a, b) => a.distance - b.distance)[0];
-    if (!nearest) throw new Error('No clinic locations are available yet. Please try again after the clinics load.');
+    renderClinicRecommendations();
+    const nearest = recommendClinics(CLINICS, userLocation).nearest;
+    if (!nearest) throw new Error('No clinic is currently confirmed open with available vaccine. Check the highest-stock recommendation and contact the clinic.');
     const entry = mapsData.find(item => item.mapId === container?.id);
     const markerEntry = entry?.markers.find(item => item.clinic.id === nearest.clinic.id);
     if (!markerEntry) throw new Error('The map is still loading. Please try again in a moment.');
@@ -599,13 +740,13 @@ async function focusNearestClinic() {
     entry.map.setView(markerEntry.marker.getLatLng(), 16);
     markerEntry.marker.openPopup();
     if (distanceLabel) distanceLabel.textContent = nearest.distance.toFixed(1) + ' km';
-    message('Nearest clinic: ' + nearest.clinic.name + ' - approximately ' + nearest.distance.toFixed(1) + ' km away in a straight line.');
+    message('Nearest open clinic with vaccine: ' + nearest.clinic.name + ' - ' + nearest.clinic.stock_total + ' doses available, approximately ' + nearest.distance.toFixed(1) + ' km away in a straight line.');
   } catch (error) {
     if (distanceLabel) distanceLabel.textContent = 'Tap to try again';
     message(error.code === 1 ? 'Location access was denied. Allow location access in your browser, then click Nearest Clinic again.' : error.code === 2 ? 'Your location is unavailable. Turn on location services and try again.' : error.code === 3 ? 'Finding your location timed out. Please try again.' : error.message);
   } finally {
     findingNearestClinic = false;
-    buttons.forEach(button => { button.disabled = false; button.removeAttribute('aria-busy'); button.innerHTML = '<i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i> Nearest Clinic'; });
+    buttons.forEach(button => { button.disabled = false; button.removeAttribute('aria-busy'); button.innerHTML = '<i class="fa-solid fa-location-crosshairs" aria-hidden="true"></i> Nearest Open Clinic'; });
     card?.removeAttribute('aria-busy');
   }
 }
@@ -728,4 +869,6 @@ window.filterMarkers = filterMarkers;
 window.focusNearestClinic = focusNearestClinic;
 document.querySelectorAll('.nearest-clinic-button').forEach(button => button.addEventListener('click', () => focusNearestClinic()));
 populateMapDirectoryFilters();
+renderClinicRecommendations();
+setInterval(() => { if (!document.hidden) { applyMapDirectoryFilters(); renderClinicRecommendations(); } }, 60000);
 loadClinics();

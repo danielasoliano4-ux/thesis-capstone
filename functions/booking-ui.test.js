@@ -97,6 +97,26 @@ test('resident books with only date and time, no ID or medical controls', async 
  assert.equal(calls[0].clinic_id,'clinic');
  assert.equal(calls[0].valid_id_url,undefined);
  assert.match(elements.bookingMsg.textContent,/sent to the clinic/);
+ // Cancelling the low-stock warning must not send a booking request.
+ vm.runInContext(source.slice(source.indexOf('async function confirmLowStockBooking('),source.indexOf('async function confirmBooking()')),context);
+ context.window.clinicDirectory[0] = {id:'clinic',name:'Low Clinic',status:'low',stock_total:3};
+ context.selectedClinic = context.window.clinicDirectory[0];
+ const warnings = [];
+ context.confirmDialog = async (message, options) => { warnings.push({message,options}); return false; };
+ elements.confirmBookingBtn.disabled = false;
+ await context.confirmBooking();
+ assert.equal(calls.length,1);
+ assert.equal(elements.confirmBookingBtn.disabled,false);
+ assert.match(warnings[0].message,/Low Clinic.*3 doses.*Are you sure/);
+ assert.equal(warnings[0].options.confirmText,'Book Anyway');
+ context.confirmDialog = async () => true;
+ await context.confirmBooking();
+ assert.equal(calls.length,2);
+ assert.equal(calls[1].clinic_id,'clinic');
+ context.window.clinicDirectory[0].status = 'out';
+ elements.confirmBookingBtn.disabled = false;
+ await context.confirmBooking();
+ assert.equal(calls.length,2);
 });
 test('deadline selection permits rebooking a lapsed no-show, but never an arrived appointment', async()=>{
  const source=fs.readFileSync(path.join(__dirname,'../scripts/booking-status.js'),'utf8');

@@ -322,7 +322,7 @@ function populateResidentProfile(data) {
 }
 
 function populateClinicOptions(clinics) {
-  const bookableClinics = clinics.filter(clinic => clinic.status === 'available');
+  const bookableClinics = clinics.filter(clinic => ['available', 'low'].includes(clinic.status));
   const orderedClinics = originalDoseClinicId
     ? [...bookableClinics].sort((first, second) => Number(second.id === originalDoseClinicId) - Number(first.id === originalDoseClinicId))
     : bookableClinics;
@@ -414,7 +414,7 @@ function renderClinicBookingList(clinics) {
           <h4>${escapeHtml(clinic.name)} <span style="font-size:12px;color:#6b7280;font-weight:normal;">(${escapeHtml(clinic.type)})</span></h4>
           <p>${escapeHtml(clinic.address || 'Address not provided')} &nbsp;|&nbsp; ${escapeHtml(clinic.hours || 'Hours not provided')} &nbsp;|&nbsp; <strong style="color:${color};">${statusText}</strong></p>
         </div>
-        <button class="book-btn dynamic-book-btn" data-clinic-id="${escapeHtml(clinic.id)}" ${isOut || isLow ? 'disabled' : ''}>${isOut || isLow ? 'Unavailable' : 'Book Now'}</button>
+        <button class="book-btn dynamic-book-btn" data-clinic-id="${escapeHtml(clinic.id)}" ${!['available', 'low'].includes(clinic.status) ? 'disabled' : ''}>${!['available', 'low'].includes(clinic.status) ? 'Unavailable' : 'Book Now'}</button>
       </div>`;
   }).join('');
 
@@ -1049,6 +1049,8 @@ async function saveReschedule() {
   button.textContent = 'Sending request...';
   message.style.display = 'none';
   try {
+    const rescheduleClinic = window.clinicDirectory?.find(item => item.id === appointment?.clinic_id);
+    if (rescheduleClinic?.status === 'low' && !await confirmLowStockBooking(rescheduleClinic)) return;
     await rescheduleBooking({ appointment_id: appointmentId, preferred_date: date, preferred_time: time });
     activeRescheduleAppointment = null;
     document.getElementById('rescheduleModal').classList.remove('open');
@@ -1454,6 +1456,13 @@ function withBookingTimeout(promise, operation, timeoutMs = 30000) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
 }
 
+async function confirmLowStockBooking(clinic) {
+  return confirmDialog(
+    `${clinic.name || 'This clinic'} has low vaccine stock (${clinic.stock_total} doses available). Availability may change before your visit, and your appointment needs clinic confirmation. Are you sure you want to book here?`,
+    { title: 'Low vaccine stock', confirmText: 'Book Anyway' }
+  );
+}
+
 async function confirmBooking() {
   const button = document.getElementById('confirmBookingBtn');
   const message = document.getElementById('bookingMsg');
@@ -1463,7 +1472,7 @@ async function confirmBooking() {
   message.style.display = 'block';
   message.style.color = '#b91c1c';
   if (!currentUid || !selectedClinic || !date || !time) { message.textContent = 'Choose a preferred date and time.'; return; }
-  if ((window.clinicDirectory || []).find(clinic => clinic.id === selectedClinic.id)?.status !== 'available') { message.textContent = 'This clinic has low or out-of-stock inventory. Choose another clinic.'; return; }
+  if (!['available', 'low'].includes((window.clinicDirectory || []).find(clinic => clinic.id === selectedClinic.id)?.status)) { message.textContent = 'This clinic has no available vaccine stock. Choose another clinic.'; return; }
   const latestClinic = window.clinicDirectory?.find(item => item.id === selectedClinic.id) || selectedClinic;
   const error = timeSlotError(date, time, latestClinic);
   if (error || date < earliestBookingDate(doseLevelFromLabel(selectedDose))) {
@@ -1474,6 +1483,10 @@ async function confirmBooking() {
   message.textContent = '';
   try {
     const clinicId = selectedClinic.id;
+    if (latestClinic.status === 'low' && !await confirmLowStockBooking(latestClinic)) {
+      button.disabled = false;
+      return;
+    }
     if (!await confirmClinicWithHistory(selectedClinic)) {
       button.disabled = false;
       return;
@@ -1529,7 +1542,7 @@ function openBatchBookingModal(preferredClinicId = '') {
     return;
   }
 
-  const clinics = (window.clinicDirectory || []).filter(clinic => clinic.id && clinic.status === 'available');
+  const clinics = (window.clinicDirectory || []).filter(clinic => clinic.id && ['available', 'low'].includes(clinic.status));
   if (!clinics.length) {
     notifyDialog('No clinic is currently available for booking.');
     return;
@@ -1566,7 +1579,8 @@ async function confirmBatchBooking() {
   const rows = [...document.querySelectorAll('#batchBookingDoseGrid [data-dose-date]')];
   message.style.display = 'block';
   message.style.color = '#b91c1c';
-  if (!currentUid || !clinic || clinic.status !== 'available' || !rows.length) {
+  if (button.disabled) return;
+  if (!currentUid || !clinic || !['available', 'low'].includes(clinic.status) || !rows.length) {
     message.textContent = 'Choose an available clinic and the recommended dose dates.';
     return;
   }
@@ -1598,6 +1612,7 @@ async function confirmBatchBooking() {
   button.disabled = true;
   button.textContent = 'Booking all dates...';
   try {
+    if (clinic.status === 'low' && !await confirmLowStockBooking(clinic)) return;
     if (!await confirmClinicWithHistory(clinic)) return;
     const result = await withBookingTimeout(createBatchBooking({
       clinic_id: clinic.id,

@@ -16,7 +16,9 @@ async function readStock(tx, db, clinicId, current = new Date()) {
 }
 async function requireBookingStock(tx, db, clinicId, HttpsError, current) {
  const stock = await readStock(tx,db,clinicId,current);
- if(stock.total <= 15) throw new HttpsError('failed-precondition', stock.total ? 'This clinic has low vaccine stock. Choose another clinic.' : 'This clinic is out of vaccine stock. Choose another clinic.');
+ // Low stock (1–15 available doses) is a warning, not a booking restriction.
+ // Staff confirmation reserves the dose; pending requests do not consume stock.
+ if(stock.total <= 0) throw new HttpsError('failed-precondition', 'This clinic is out of vaccine stock. Choose another clinic.');
  return stock;
 }
 function publishStock(tx, db, clinicId, items, timestamp, current = new Date()) {

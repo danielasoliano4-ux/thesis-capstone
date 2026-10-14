@@ -1,11 +1,12 @@
 const test=require('node:test');const assert=require('node:assert/strict');
 const {requireBookingStock,availableQuantity,releaseReservation}=require('./stock-reservations');
 class HttpsError extends Error {constructor(code,message){super(message);this.code=code;}}
-test('server rejects low and empty inventory regardless of stale clinic summary',async()=>{
- for(const quantity of [0,1,15]){
+test('server permits low stock but rejects empty inventory regardless of stale clinic summary',async()=>{
+ for(const quantity of [0,1,3,15]){
   const tx={get:async()=>({docs:[{id:'batch',data:()=>({clinic_id:'clinic',type:'Vaccine',quantity,expiry:'2099-01-01'})}]})};
   const db={collection:()=>({where:()=>({})})};
-  await assert.rejects(requireBookingStock(tx,db,'clinic',HttpsError,new Date('2026-09-24')),{code:'failed-precondition'});
+  if (quantity === 0) await assert.rejects(requireBookingStock(tx,db,'clinic',HttpsError,new Date('2026-09-24')),{code:'failed-precondition'});
+  else assert.equal((await requireBookingStock(tx,db,'clinic',HttpsError,new Date('2026-09-24'))).total, quantity);
  }
 });
 test('sixteen usable doses permit booking; archived and expired batches do not count',async()=>{

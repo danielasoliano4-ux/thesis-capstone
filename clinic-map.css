@@ -4,6 +4,26 @@
 .nearest-clinic-button:hover { background: #c90000; }
 .nearest-clinic-button:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
 .nearest-clinic-button:disabled { opacity: .65; cursor: wait; }
+.clinic-recommendations { margin: 0 0 16px; padding: 16px; border: 1px solid #dbeafe; border-radius: 14px; background: #f8fafc; }
+.clinic-recommendations-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.clinic-recommendations-heading h3 { margin: 0; color: #111827; font-size: 16px; }
+.clinic-recommendations-note { margin: 10px 0 14px; color: #64748b; font-size: 12px; line-height: 1.5; }
+.clinic-recommendations-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.clinic-recommendation-card { padding: 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: white; min-width: 0; overflow-wrap: anywhere; }
+.clinic-recommendation-card h4 { margin: 0 0 6px; color: #166534; font-size: 13px; }
+.clinic-recommendation-card p { margin: 0 0 10px; color: #64748b; font-size: 12px; line-height: 1.5; }
+.clinic-recommendation-card strong { display: block; color: #111827; font-size: 14px; }
+.clinic-recommendation-facts { margin: 8px 0; color: #374151; font-size: 12px; line-height: 1.5; }
+.clinic-recommendation-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.clinic-recommendations button { min-height: 36px; padding: 8px 10px; border: 1px solid #bfdbfe; border-radius: 7px; background: #eff6ff; color: #1d4ed8; font: 600 12px Arial, sans-serif; cursor: pointer; }
+.clinic-recommendations button:disabled { opacity: .65; cursor: wait; }
+.clinic-recommendations button:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.recommendation-location-status { margin: 10px 0 0; color: #1d4ed8; font-size: 12px; }
+.recommendation-location-status:empty { display: none; }
+.map-clinic-recommendation { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.clinic-recommendation-badge { display: inline-block; padding: 3px 6px; border-radius: 5px; background: #dcfce7; color: #166534; font-size: 10px; font-weight: 700; }
+.clinic-opening-label { color: #475569; font-size: 11px; }
+@media (max-width: 760px) { .clinic-recommendations-grid { grid-template-columns: 1fr; } }
 .map-exit-directions { min-height: 42px; margin: 0 0 12px 12px !important; padding: 9px 13px; border: 1px solid #b91c1c; border-radius: 8px; background: #dc2626; color: #fff; font: 700 13px Arial, sans-serif; cursor: pointer; box-shadow: 0 2px 8px rgba(15,23,42,.35); }
 .map-exit-directions:hover { background: #b91c1c; }
 .map-exit-directions:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }

@@ -181,9 +181,9 @@ test('batch rejects a clinic with no usable stock', async () => {
   assert.equal([...f.rows.keys()].filter(path => path.startsWith('appointments/new-')).length, 0);
 });
 
-test('batch bookings reject low stock even when clinic summary says available',async()=>{
+test('batch bookings permit low usable stock even when clinic summary is stale',async()=>{
  const f=fixture();f.rows.get('inventory/batch').quantity=15;
  f.rows.get('clinics/clinic-a').stock_status='available';
- await assert.rejects(f.book(datesFor()),{code:'failed-precondition'});
- assert.equal([...f.rows.keys()].filter(path=>path.startsWith('appointments/new-')).length,0);
+ const result = await f.book(datesFor());
+ assert.ok(result.appointments.length > 0);
 });

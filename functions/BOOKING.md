@@ -22,7 +22,7 @@ Confirming a pending appointment atomically reserves one dose from the earliest-
 
 For example, with 50 physical doses, accepting one appointment leaves inventory at 50 and shows 49 doses available in Clinic Status Overview. Arrival and intake keep those counts unchanged. Completing the dose reduces physical inventory to 49 and consumes the reservation, so the overview remains at 49. Cancelling before completion releases the reservation and restores availability to 50. The map and dose-completion selector share the same available-stock calculation; fully reserved batches can only be used by the appointment holding that reservation.
 
-New single bookings, batch bookings and rescheduling are rejected by the server when usable unreserved stock is 15 doses or fewer. The resident UI disables booking for Low Stock and Out of Stock clinics. Pending appointments can still be confirmed while a usable dose remains; each confirmation reserves independently, so confirmations cannot overdraw stock.
+New single bookings, batch bookings and rescheduling are permitted when usable unreserved stock is positive, including Low Stock clinics (1–15 doses). Guests receive a low-stock confirmation before continuing to sign-in; residents receive a confirmation before submitting a booking, batch booking or reschedule at a Low Stock clinic. Out of Stock clinics remain blocked. Booking requests do not reserve stock; staff confirmation reserves a usable dose atomically, so confirmations cannot overdraw stock.
 
 Clinical completion consumes the appointment reservation, records the actual administration date and vaccine batch, and marks the dose completed and deducts one physical dose. Legacy reservations already deducted at confirmation consume their reservation without another deduction. Appointments confirmed before this feature retain the legacy completion-time deduction. Existing confirmations are not backfilled automatically.
 
@@ -31,3 +31,19 @@ Cancellation uses cancelBooking to release reservations atomically. Expiry and r
 Clinic stock summaries are server-maintained. The refreshInventoryStock trigger recomputes availability from current inventory for additions, quantity adjustments, archives and deletions, including event retries and events delivered out of order. Browser inventory rendering no longer writes stock summaries, and Firestore rules reject client changes to those derived fields. Confirmation, completion and reservation release still publish their summaries atomically; the resident map uses inventory snapshots for immediate availability updates.
 
 Deploy functions:refreshInventoryStock with the updated appointment/treatment functions, firestore.rules, and frontend together. New cancellation and reservation behavior requires these backend changes; JavaScript unit tests do not substitute for a Firebase emulator or deployed integration check.
+
+## Deploying the low-stock booking fix
+
+The message "This clinic has low vaccine stock. Choose another clinic." comes from the old server booking rule. Updating or refreshing the frontend alone cannot remove that restriction. Deploy every callable that uses the shared stock check, along with the updated warning UI:
+
+```powershell
+firebase deploy --only "functions:createBooking,functions:createBatchBooking,functions:rescheduleBooking,functions:getPublicClinicStock,hosting"
+```
+
+After deployment, refresh the page and book a clinic with 1–15 available doses. Cancelling the warning must create no appointment; choosing Book Anyway must create a pending request. A clinic with zero available doses must remain blocked.
+
+## Guest vaccine availability
+
+Guest maps call getPublicClinicStock to calculate current usable, unreserved inventory instead of trusting potentially stale clinic profile stock_total values. The callable returns only clinic IDs, available totals, stock status, vaccine summaries and vaccine types. Inventory batch details and staff information remain protected by the existing database rules. Guest pages refresh on clinic updates, every 30 seconds while visible, and on window focus. Failed requests show availability as unavailable rather than displaying an old profile total as current. Signed-in residents retain their live inventory listener.
+
+Deploy the getPublicClinicStock function before or together with the updated hosting files: `firebase deploy --only functions:getPublicClinicStock,hosting`. Validate the calculation with `node --test functions/public-clinic-stock.test.js functions/inventory-stock.test.js functions/dose-stock.test.js`, then check the deployed guest and resident maps with the same clinic. Guest refreshes are periodic, so a change can take up to 30 seconds to appear when no clinic profile update arrives.
