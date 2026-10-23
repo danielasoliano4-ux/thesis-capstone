@@ -22,6 +22,7 @@
 .map-search-field i { position: absolute; left: 9px; bottom: 9px; color: #6b7280; font-size: 11px; }
 .map-search-field input { padding-left: 25px; }
 .map-directory-clear { padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #b91c1c; cursor: pointer; font-size: 11px; font-weight: 700; }
+.map-directory-results { grid-column: 1 / -1; margin: 0; color: #475569; font-size: 11px; }
 .map-directory-filters .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 900px) { .map-directory-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .map-search-field { grid-column: 1 / -1; } }
       .map-directory-filters > * { min-width: 0; }
@@ -480,6 +481,7 @@
       <label><span>Hours</span><select class="map-directory-hours"><option value="all">Any hours</option><option value="open">Open now</option><option value="weekday">Weekdays</option><option value="weekend">Weekends</option></select></label>
       <label><span>Price</span><select class="map-directory-price"><option value="all">Any price</option><option value="free">Free / government</option><option value="under500">Below PHP 500</option><option value="500to1500">PHP 500 - 1,500</option><option value="over1500">Above PHP 1,500</option></select></label>
       <button type="button" class="map-directory-clear">Clear</button>
+      <p class="map-directory-results" role="status" aria-live="polite"></p>
     </div>
 
           <div id="googleMap" style="

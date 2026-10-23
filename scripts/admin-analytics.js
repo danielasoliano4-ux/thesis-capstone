@@ -37,15 +37,27 @@ document.getElementById('adminSignOutBtn')?.addEventListener('click', async () =
 document.getElementById('clearReportDates')?.addEventListener('click', () => {
   document.getElementById('reportStartDate').value = '';
   document.getElementById('reportEndDate').value = '';
+  document.getElementById('reportBarangayFilter').value = '';
+  document.getElementById('reportStatusFilter').value = '';
+  document.getElementById('reportBarangaySort').value = 'original';
+  document.getElementById('reportDateSort').value = 'original';
+  document.getElementById('reportStatusSort').value = 'original';
+  refreshReportPreview();
+});
+
+['reportStartDate', 'reportEndDate', 'reportBarangayFilter', 'reportStatusFilter'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', refreshReportPreview);
 });
 document.querySelectorAll('[data-report]').forEach(button => button.addEventListener('click', () => openReportPreview(button.dataset.report)));
 document.getElementById('closeReportPreviewBtn')?.addEventListener('click', closeReportPreview);
 document.getElementById('printReportPreviewBtn')?.addEventListener('click', () => window.print());
-document.getElementById('reportBarangaySort')?.addEventListener('change', () => {
-  if (activeReportKind === 'cases') openReportPreview(activeReportKind);
+['reportBarangaySort', 'reportDateSort', 'reportStatusSort'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', () => {
+    if (activeReportKind === 'cases') openReportPreview(activeReportKind);
+  });
 });
 document.getElementById('reportComparisonMonths')?.addEventListener('change', () => {
-  if (activeReportKind === 'cases') openReportPreview(activeReportKind);
+  if (['comparison', 'trending'].includes(activeReportKind)) openReportPreview(activeReportKind);
 });
 document.getElementById('reportPreviewModal')?.addEventListener('click', event => {
   if (event.target.id === 'reportPreviewModal') closeReportPreview();
@@ -212,6 +224,7 @@ function buildPublicCaseRecords() {
 
 function renderAnalytics() {
   if (!analyticsReady()) return;
+  updateReportFilterOptions();
   refreshYearSelector();
   const cases = buildCaseSessions().filter(item => item.date?.getFullYear() === selectedAnalyticsYear);
   const yearVaccinations = vaccinations.filter(inSelectedAnalyticsYear);
@@ -475,22 +488,66 @@ function formatReportDate(value, fallback = 'No date') {
 }
 
 function reportCaseStatus(status) {
-  const value = String(status || 'pending').toLowerCase();
-  if (value === 'completed' || value === 'resolved') return 'Resolved';
-  if (['confirmed', 'in_progress', 'ongoing'].includes(value)) return 'Ongoing';
-  if (['pending', 'expired'].includes(value)) return 'Pending';
-  // Preserve other outcomes instead of implying that treatment was resolved.
-  return value.replace(/_/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
+  const value = String(status || '').toLowerCase();
+  if (value === 'completed') return 'Completed';
+  if (['confirmed', 'in_progress', 'ongoing', 'incomplete'].includes(value)) return 'Incomplete';
+  return '';
 }
 
 function sortReportCases(rows) {
-  const order = document.getElementById('reportBarangaySort')?.value;
-  if (order !== 'asc' && order !== 'desc') return rows;
+  const barangayOrder = document.getElementById('reportBarangaySort')?.value;
+  const dateOrder = document.getElementById('reportDateSort')?.value;
+  const statusOrder = document.getElementById('reportStatusSort')?.value;
+  const enabled = order => order === 'asc' || order === 'desc';
+  if (![barangayOrder, dateOrder, statusOrder].some(enabled)) return rows;
   return [...rows].sort((first, second) => {
-    const a = String(first.barangay || barangayFor(first)).trim();
-    const b = String(second.barangay || barangayFor(second)).trim();
-    return a.localeCompare(b, 'en', { sensitivity: 'base', numeric: true }) * (order === 'desc' ? -1 : 1);
+    if (enabled(barangayOrder)) {
+      const a = String(first.barangay || barangayFor(first)).trim();
+      const b = String(second.barangay || barangayFor(second)).trim();
+      const result = a.localeCompare(b, 'en', { sensitivity: 'base', numeric: true }) * (barangayOrder === 'desc' ? -1 : 1);
+      if (result) return result;
+    }
+    if (enabled(dateOrder)) {
+      const a = first.case_date?.getTime();
+      const b = second.case_date?.getTime();
+      if (a == null && b != null) return 1;
+      if (b == null && a != null) return -1;
+      const result = a != null && b != null ? (a - b) * (dateOrder === 'desc' ? -1 : 1) : 0;
+      if (result) return result;
+    }
+    return enabled(statusOrder) ? reportCaseStatus(first.status).localeCompare(reportCaseStatus(second.status)) * (statusOrder === 'desc' ? -1 : 1) : 0;
   });
+}
+
+function refreshReportPreview() {
+  if (activeReportKind && !document.getElementById('reportPreviewModal')?.hidden) openReportPreview(activeReportKind);
+}
+
+function updateReportFilterOptions() {
+  const cases = reportCaseRecords();
+  const options = [
+    ['reportBarangayFilter', 'All barangays', cases.map(item => item.barangay || barangayFor(item))],
+    ['reportStatusFilter', 'All statuses', ['Completed', 'Incomplete']]
+  ];
+  options.forEach(([id, label, values]) => {
+    const select = document.getElementById(id);
+    if (!select) return;
+    const selected = id === 'reportStatusFilter' && !['Completed', 'Incomplete'].includes(select.value) ? '' : select.value;
+    const names = [...new Set([...values.filter(Boolean), ...(selected ? [selected] : [])])].sort((a, b) => a.localeCompare(b));
+    select.innerHTML = `<option value="">${label}</option>` + names.map(name => `<option value="${escapeHtml(name).replaceAll('"', '&quot;')}">${escapeHtml(name)}</option>`).join('');
+    select.value = selected;
+  });
+}
+
+function matchesReportCaseFilters(item, range) {
+  return (!range.barangay || String(item.barangay || barangayFor(item)).trim().toLowerCase() === range.barangay.trim().toLowerCase())
+    && (!range.status || reportCaseStatus(item.status) === range.status);
+}
+
+function includeReportFilterCoverage(kind, range) {
+  if (['cases', 'comparison', 'trending', 'exposure', 'risk'].includes(kind)) {
+    range.label += `; Barangay: ${range.barangay || 'All'}; Status: ${range.status || 'All'}`;
+  }
 }
 
 function reportCaseRecords() {
@@ -520,10 +577,16 @@ function reportCaseRecords() {
     else if (/^cats?$/i.test(animal)) animal = 'Cat';
     else if (/^other$/i.test(animal)) animal = String(animalRecord.animal_other || '').trim() || 'Other';
     else if (animal) animal = animal.toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
-    const statuses = records.map(item => reportCaseStatus(item.status));
-    const status = statuses.includes('Ongoing') ? 'Ongoing' : statuses.includes('Pending') ? 'Pending' : statuses[0];
+    const completedDoses = new Set(doses.map(item => Number(item.dose_number)).filter(dose => Number.isInteger(dose) && dose >= 1 && dose <= 5));
+    records.filter(item => String(item.status).toLowerCase() === 'completed').forEach(item => {
+      const dose = Number(item.completed_dose_number);
+      if (Number.isInteger(dose) && dose >= 1 && dose <= 5) completedDoses.add(dose);
+    });
+    const started = completedDoses.size > 0 || records.some(item => ['confirmed', 'in_progress', 'ongoing', 'incomplete', 'completed'].includes(String(item.status).toLowerCase()));
+    if (!started) return null;
+    const status = completedDoses.size === 5 ? 'Completed' : 'Incomplete';
     return { ...records[0], case_date: date, animal_source: animal || 'Not recorded', status };
-  });
+  }).filter(Boolean);
 }
 
 function monthlyCaseComparison(caseRows, range, now = new Date()) {
@@ -556,15 +619,15 @@ function monthlyCaseComparison(caseRows, range, now = new Date()) {
   };
 }
 
-function caseReportSections(caseRows, range) {
+function animalExposureBreakdown(caseRows) {
   const counts = new Map();
   caseRows.forEach(item => counts.set(item.animal_source, (counts.get(item.animal_source) || 0) + 1));
-  return [monthlyCaseComparison(caseRows, range), {
-    title: 'Source of rabies report — animal exposure',
+  return {
+    title: 'Animal Exposure Source Report',
     note: 'Animal types recorded at medical intake for the selected coverage. Missing sources are shown as Not recorded. These are reported animal-bite exposures.',
     headers: ['Animal source', 'Cases', 'Share of cases'],
     rows: [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([animal, count]) => [animal, count, `${(count / caseRows.length * 100).toFixed(1)}%`])
-  }];
+  };
 }
 
 function renderReportTable(headers, rows) {
@@ -573,11 +636,47 @@ function renderReportTable(headers, rows) {
     : '<p class="report-empty">No records match this report and date range.</p>';
 }
 
+function trendingReport(caseRows, range, now = new Date()) {
+  const monthly = monthlyCaseComparison(caseRows, range, now);
+  const anchor = dateValue(range.end) || now;
+  const start = new Date(anchor.getFullYear(), anchor.getMonth() - monthly.rows.length + 1, 1);
+  const cases = caseRows.filter(item => item.case_date && item.case_date >= start && localReportDateKey(item.case_date) <= localReportDateKey(anchor));
+  const barangays = new Map();
+  cases.forEach(item => {
+    const name = String(item.barangay || barangayFor(item)).trim() || 'Unspecified';
+    barangays.set(name, (barangays.get(name) || 0) + 1);
+  });
+  const locations = [...barangays].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const exposure = animalExposureBreakdown(cases);
+  return {
+    title: 'Trending Report',
+    subtitle: 'Monthly case trends, affected barangays, and animal exposure sources.',
+    period: `${formatReportDate(dateValue(range.start) > start ? dateValue(range.start) : start)} to ${formatReportDate(anchor)}`,
+    notes: [
+      'Each treatment course counts once, using the bite date or first recorded appointment. Records without a date are excluded.',
+      'All tables use the period and filters shown above. The first and last months may contain partial data.',
+      'These records describe reported animal-bite exposures. They do not establish why cases occur or confirm rabies infection.'
+    ],
+    headers: monthly.headers, rows: monthly.rows,
+    totals: [['Reported cases in period', cases.length], ['Barangays reporting', locations.length], ['Months compared', monthly.rows.length]],
+    sections: [{
+      title: 'Cases by barangay',
+      note: 'Ranked by reported case count, with ties sorted alphabetically. Counts describe volume, not population-adjusted risk.',
+      headers: ['Barangay', 'Cases', 'Share of cases'],
+      rows: locations.map(([name, count]) => [name, count, `${(count / cases.length * 100).toFixed(1)}%`])
+    }, {
+      ...exposure, title: 'Animal exposure sources'
+    }]
+  };
+}
+
 function reportRange() {
   const start = document.getElementById('reportStartDate')?.value || '';
   const end = document.getElementById('reportEndDate')?.value || '';
   if (start && end && start > end) throw new Error('The start date must be on or before the end date.');
-  return { start, end, label: start || end ? `${formatReportDate(start, 'Beginning')} to ${formatReportDate(end, 'Today')}` : 'All recorded dates' };
+  const barangay = document.getElementById('reportBarangayFilter')?.value || '';
+  const status = document.getElementById('reportStatusFilter')?.value || '';
+  return { start, end, barangay, status, label: start || end ? `${formatReportDate(start, 'Beginning')} to ${formatReportDate(end, 'Today')}` : 'All recorded dates' };
 }
 
 function localReportDateKey(date) {
@@ -594,13 +693,14 @@ function inReportRange(record, range) {
 function legacyDownloadReport(kind) {
   try {
     const range = reportRange();
+    includeReportFilterCoverage(kind, range);
     if (!window.jspdf?.jsPDF) throw new Error('The PDF library has not loaded. Check your internet connection and try again.');
     const pdf = new window.jspdf.jsPDF({ unit: 'pt', format: 'a4' });
-    const titles = { cases: 'Rabies Cases Report', vaccinations: 'Vaccination Status Report', inventory: 'Vaccine Inventory Report', risk: 'Barangay Risk Assessment' };
     const report = reportDefinition(kind, range);
     let rows = report ? [report.headers.join(' | '), ...report.rows.map(row => row.join(' | ')),
-      ...(report.sections || []).flatMap(section => [section.title, section.note, section.headers.join(' | '), ...section.rows.map(row => row.join(' | '))])] : [];
-    pdf.setFontSize(16); pdf.text('Anti-Rabies Locator — ' + titles[kind], 40, 48);
+      ...(report.sections || []).flatMap(section => [section.title, section.note, section.headers.join(' | '), ...section.rows.map(row => row.join(' | '))]),
+      ...(report.notes || [])] : [];
+    pdf.setFontSize(16); pdf.text('Anti-Rabies Locator — ' + report.title, 40, 48);
     pdf.setFontSize(10); pdf.text(`Date filter: ${range.label}`, 40, 68); pdf.text(`Generated: ${new Date().toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' })}`, 40, 83);
     if (!rows.length) rows = ['No records match this report and date range.'];
     let y = 110;
@@ -616,17 +716,33 @@ function legacyDownloadReport(kind) {
 }
 
 function reportDefinition(kind, range) {
-  const caseRows = appointments.filter(item => item.status !== 'declined' && inReportRange(item, range));
+  const caseRows = reportCaseRecords().filter(item => inReportRange({ bite_date: item.case_date ? localReportDateKey(item.case_date) : '' }, range) && matchesReportCaseFilters(item, range));
   const vaccinationRows = vaccinations.filter(item => inReportRange(item, range));
   const activeInventory = inventory.filter(item => !item.archived);
-  if (kind === 'cases') {
-    const cases = reportCaseRecords().filter(item => inReportRange({ bite_date: item.case_date ? localReportDateKey(item.case_date) : '' }, range));
+  if (kind === 'trending') return trendingReport(caseRows, range);
+  if (kind === 'cases' || kind === 'comparison' || kind === 'exposure') {
+    const cases = caseRows;
+    if (kind === 'comparison') {
+      const comparison = monthlyCaseComparison(cases, range);
+      return {
+        title: 'Monthly Comparative Report', subtitle: comparison.note,
+        headers: comparison.headers, rows: comparison.rows,
+        totals: [['Cases in comparison period', comparison.rows.reduce((sum, row) => sum + row[1], 0)], ['Months compared', comparison.rows.length]]
+      };
+    }
+    if (kind === 'exposure') {
+      const breakdown = animalExposureBreakdown(cases);
+      return {
+        title: breakdown.title, subtitle: breakdown.note,
+        headers: breakdown.headers, rows: breakdown.rows,
+        totals: [['Reported cases', cases.length], ['Animal exposure types', breakdown.rows.filter(row => row[0] !== 'Not recorded').length], ['Not recorded', cases.filter(item => item.animal_source === 'Not recorded').length]]
+      };
+    }
     return {
-      title: 'Monthly Rabies Cases Report', subtitle: 'Monthly comparison and animal sources of reported animal-bite cases',
-      headers: ['Date', 'Resident', 'Barangay', 'Clinic', 'Status', 'Animal source'],
-      rows: sortReportCases(cases).map(item => [formatReportDate(item.case_date), item.resident_name || 'Resident', item.barangay || barangayFor(item), item.clinic_name || '-', reportCaseStatus(item.status), item.animal_source]),
-      totals: [['Reported cases', cases.length], ['Pending', cases.filter(item => reportCaseStatus(item.status) === 'Pending').length], ['Ongoing', cases.filter(item => reportCaseStatus(item.status) === 'Ongoing').length], ['Resolved', cases.filter(item => reportCaseStatus(item.status) === 'Resolved').length]],
-      sections: caseReportSections(cases, range)
+      title: 'Monthly Rabies Cases Report', subtitle: 'Detailed reported animal-bite case records for the selected coverage.',
+      headers: ['Date', 'Resident', 'Barangay', 'Clinic', 'Status'],
+      rows: sortReportCases(cases).map(item => [formatReportDate(item.case_date), item.resident_name || 'Resident', item.barangay || barangayFor(item), item.clinic_name || '-', reportCaseStatus(item.status)]),
+      totals: [['Reported cases', cases.length], ['Completed', cases.filter(item => item.status === 'Completed').length], ['Incomplete', cases.filter(item => item.status === 'Incomplete').length]],
     };
   }
   if (kind === 'vaccinations') return {
@@ -656,21 +772,37 @@ function reportDefinition(kind, range) {
   return null;
 }
 
+function renderReportHeader(report, range, kind) {
+  const period = report.period || (range.start || range.end ? `${formatReportDate(range.start, 'Beginning')} to ${formatReportDate(range.end, 'Today')}` : 'All recorded dates');
+  const generated = new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const filters = ['cases', 'comparison', 'trending', 'exposure', 'risk'].includes(kind)
+    ? `Barangay: ${range.barangay || 'All'}; Status: ${range.status || 'All'}` : '';
+  return `<header class="report-document-header">
+    <div class="report-heading-brand"><div class="report-brand"><img class="report-system-logo" src="/assets/system-logo.png" alt="System logo" width="40" height="40"><span>Anti-Rabies Locator</span></div><span class="report-location">Cabuyao, Laguna</span></div>
+    <h1>${escapeHtml(report.title)}</h1><p>${escapeHtml(report.subtitle)}</p>
+    <dl class="report-metadata"><div class="report-period"><dt>Report period</dt><dd>${escapeHtml(period)}</dd></div>${filters ? `<div class="report-applied-filters"><dt>Applied filters</dt><dd>${escapeHtml(filters)}</dd></div>` : ''}<div><dt>Generated (Philippine time)</dt><dd>${escapeHtml(generated)}</dd></div></dl>
+  </header>`;
+}
+
 function openReportPreview(kind) {
   try {
     const range = reportRange();
+    includeReportFilterCoverage(kind, range);
     const report = reportDefinition(kind, range);
     const documentEl = document.getElementById('reportPreviewDocument');
     const modal = document.getElementById('reportPreviewModal');
     if (!report || !documentEl || !modal) throw new Error('The report preview is unavailable. Please refresh and try again.');
     activeReportKind = kind;
-    const sortControl = document.getElementById('reportBarangaySortControl');
-    if (sortControl) sortControl.hidden = kind !== 'cases';
+    ['reportBarangaySortControl', 'reportDateSortControl', 'reportStatusSortControl'].forEach(id => {
+      const control = document.getElementById(id);
+      if (control) control.hidden = kind !== 'cases';
+    });
     const comparisonControl = document.getElementById('reportComparisonControl');
-    if (comparisonControl) comparisonControl.hidden = kind !== 'cases';
+    if (comparisonControl) comparisonControl.hidden = !['comparison', 'trending'].includes(kind);
     const table = renderReportTable(report.headers, report.rows);
     const sections = (report.sections || []).map(section => `<section class="report-breakdown"><h2>${escapeHtml(section.title)}</h2><p class="report-section-note">${escapeHtml(section.note)}</p>${renderReportTable(section.headers, section.rows)}</section>`).join('');
-    documentEl.innerHTML = `<header class="report-document-header"><div><div class="report-brand"><img class="report-system-logo" src="/assets/system-logo.png" alt="System logo" width="40" height="40"> <span>Anti-Rabies Locator</span></div><h1>${escapeHtml(report.title)}</h1><p>${escapeHtml(report.subtitle)}</p></div><div class="report-generated">Cabuyao, Laguna<br>Coverage: ${escapeHtml(range.label)}<br>Generated: ${escapeHtml(new Date().toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' }))}</div></header><section class="report-summary">${report.totals.map(([label, value]) => `<div class="report-summary-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}</section>${sections}<h2>Report details</h2>${table}<footer class="report-footer"><span>Anti-Rabies Locator System</span><span>Administrator report</span></footer>`;
+    const notes = report.notes?.length ? `<aside class="report-reading-notes"><h2>About this report</h2><ul>${report.notes.map(note => `<li>${escapeHtml(note)}</li>`).join('')}</ul></aside>` : '';
+    documentEl.innerHTML = `${renderReportHeader(report, range, kind)}<section class="report-summary">${report.totals.map(([label, value]) => `<div class="report-summary-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}</section><h2>${kind === 'trending' ? 'Monthly case trends' : 'Report details'}</h2>${table}${sections}${notes}<footer class="report-footer"><span>Anti-Rabies Locator System</span><span>Administrator report</span></footer>`;
     document.getElementById('reportPreviewTitle').textContent = report.title;
     modal.hidden = false;
     modal.setAttribute('aria-hidden', 'false');

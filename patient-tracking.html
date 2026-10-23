@@ -10,6 +10,7 @@
 
 <link rel="stylesheet" href="clinic-layout.css">
     <link rel="stylesheet" href="dose-completion.css">
+    <link rel="stylesheet" href="clinic-priority.css">
     <link rel="stylesheet" href="/responsive.css">
 </head>
 <body class="clinic-dashboard">
@@ -61,7 +62,10 @@
                 <div class="patient-filters">
                     <label>Find a patient<input id="patientSearch" type="search" placeholder="Search patient name"></label>
                     <label>Treatment status<select id="patientStatusFilter"><option value="all">All patients</option><option value="ongoing">Ongoing</option><option value="incomplete">Incomplete</option><option value="complete">Complete</option></select></label>
+                    <label>Priority<select id="patientPriorityFilter"><option value="all">All priorities</option><option value="high">Priority patients only</option></select></label>
                 </div>
+                <p class="patient-priority-note">Staff-prioritized patients appear first. Category III is highlighted to help staff review exposure categories. Setting priority keeps the appointment date and time.</p>
+                <p id="patientPriorityStatus" role="status" aria-live="polite"></p>
                 <p id="patientResultCount" class="patient-result-count" role="status"></p>
                 <div class="patients-grid" id="patientsGrid">
                     <p style="color:#6b7280;padding:16px;">Loading patients…</p>

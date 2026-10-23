@@ -204,19 +204,45 @@
     <div class="content-box">
         <div class="content-box-header">
             <h3>Available Reports</h3>
-            <div class="report-filters" aria-label="Report date range">
+            <div class="report-filters" aria-label="Report filters">
                 <label>From <input id="reportStartDate" type="date"></label>
                 <label>To <input id="reportEndDate" type="date"></label>
-                <button id="clearReportDates" type="button" class="btn-outline">Clear</button>
+                <label>Barangay <select id="reportBarangayFilter"><option value="">All barangays</option></select></label>
+                <label>Status <select id="reportStatusFilter"><option value="">All statuses</option><option>Completed</option><option>Incomplete</option></select></label>
+                <button id="clearReportDates" type="button" class="btn-outline">Clear filters</button>
             </div>
         </div>
         <div class="reports-grid">
             <div class="report-card">
-                <div class="report-icon" style="background:#fee2e2;color:#ef0000;"><i class="fa-solid fa-chart-bar"></i></div>
+                <div class="report-icon" style="background:#fee2e2;color:#ef0000;"><i class="fa-solid fa-file-medical"></i></div>
                 <div>
                     <h4>Monthly Rabies Cases Report</h4>
-                    <p>Compare cases across 3, 6, or 12 months, with animal-source and barangay breakdowns. Preview, then print or save as PDF.</p>
+                    <p>View detailed case records by date, resident, barangay, clinic, and status.</p>
                     <button class="dl-btn" data-report="cases"><i class="fa-solid fa-eye"></i> Preview Report</button>
+                </div>
+            </div>
+            <div class="report-card">
+                <div class="report-icon" style="background:#fee2e2;color:#ef0000;"><i class="fa-solid fa-chart-bar"></i></div>
+                <div>
+                    <h4>Monthly Comparative Report</h4>
+                    <p>Track monthly trends, case count changes, and percentage differences over time.</p>
+                    <button class="dl-btn" data-report="comparison"><i class="fa-solid fa-eye"></i> Preview Report</button>
+                </div>
+            </div>
+            <div class="report-card">
+                <div class="report-icon" style="background:#cffafe;color:#0891b2;"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                <div>
+                    <h4>Trending Report</h4>
+                    <p>Explore when and where cases occur, with monthly trends, barangay counts, and recorded animal exposure sources.</p>
+                    <button class="dl-btn" data-report="trending"><i class="fa-solid fa-eye"></i> Preview Report</button>
+                </div>
+            </div>
+            <div class="report-card">
+                <div class="report-icon" style="background:#ffedd5;color:#ea580c;"><i class="fa-solid fa-paw"></i></div>
+                <div>
+                    <h4>Animal Exposure Source Report</h4>
+                    <p>View breakdown of rabies cases by animal exposure types (e.g., Dog, Cat, Not recorded).</p>
+                    <button class="dl-btn" data-report="exposure"><i class="fa-solid fa-eye"></i> Preview Report</button>
                 </div>
             </div>
             <div class="report-card">
@@ -261,11 +287,27 @@
                     </select>
                 </label>
                 <label id="reportBarangaySortControl" class="report-sort-control" hidden>
-                    Sort by Barangay
+                    Barangay (1st)
                     <select id="reportBarangaySort">
                         <option value="original">Original order</option>
                         <option value="asc">Barangay: A–Z</option>
                         <option value="desc">Barangay: Z–A</option>
+                    </select>
+                </label>
+                <label id="reportDateSortControl" class="report-sort-control" hidden>
+                    Date (2nd)
+                    <select id="reportDateSort">
+                        <option value="original">No date sort</option>
+                        <option value="asc">Oldest first</option>
+                        <option value="desc">Newest first</option>
+                    </select>
+                </label>
+                <label id="reportStatusSortControl" class="report-sort-control" hidden>
+                    Status (3rd)
+                    <select id="reportStatusSort">
+                        <option value="original">No status sort</option>
+                        <option value="asc">A–Z</option>
+                        <option value="desc">Z–A</option>
                     </select>
                 </label>
                 <button type="button" id="closeReportPreviewBtn" class="btn-outline">Close</button>

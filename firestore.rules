@@ -129,6 +129,13 @@ service cloud.firestore {
           && resource.data.status != 'expired'
           && (resource.data.status != 'pending' || (resource.data.get('scheduled_at_ms', null) != null && request.time.toMillis() < resource.data.scheduled_at_ms))
           && request.resource.data.clinic_id == resource.data.clinic_id
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['queue_priority', 'priority_category', 'priority_updated_at', 'priority_updated_by'])
+            || (resource.data.status in ['confirmed', 'in_progress']
+              && request.resource.data.queue_priority in ['high', 'normal']
+              && request.resource.data.priority_updated_by == request.auth.uid
+              && request.resource.data.priority_updated_at == request.time
+              && (request.resource.data.queue_priority == 'normal'
+                || request.resource.data.priority_category in ['Category I', 'Category II', 'Category III'])))
           && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
             'vaccination_session_id', 'treatment_id', 'dose_number', 'dose_label', 'recommended_date', 'course_vaccination_history', 'resident_uid', 'preferred_date', 'preferred_time', 'confirmed_at', 'arrived_at', 'arrived_by', 'arrival_deadline_ms', 'scheduled_at_ms',
             'intake_completed_at', 'patient_record_id', 'course_intake_data', 'stock_reservation'

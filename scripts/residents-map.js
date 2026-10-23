@@ -1,8 +1,8 @@
-import { CABUYAO_BARANGAYS, extractBarangay } from './clinic-barangays.js';
+import { CABUYAO_BARANGAYS, extractBarangay, normalizeBarangay } from './clinic-barangays.js';
 import { notifyDialog, confirmDialog } from './app-dialogs.js';
 import { simplifyStockText, clinicStockStatus, summarizeStock, availableQuantity } from './stock-summary.mjs';
 import { availableStock } from './dose-stock.mjs';
-import { recommendClinics, clinicOpeningStatus } from './clinic-recommendations.mjs';
+import { recommendClinics, recommendForBarangay, clinicOpeningStatus } from './clinic-recommendations.mjs';
 import { app, auth, db, onAuthStateChanged, fetchUserProfile } from './firebase.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-functions.js';
 import { clinicBooking } from './booking-status.js';
@@ -148,6 +148,7 @@ const mapsData = [];
 let selectedDestination = null;
 let directionsMapId = null;
 let activeStockFilter = 'all';
+let recommendationBarangayContext = '';
 
 function initMap() {
   const containers = [
@@ -236,23 +237,29 @@ function rebuildClinicDirectory() {
     renderClinicRecommendations();
 }
 
-function focusRecommendedClinic(clinicId, mapId) {
+function focusRecommendedClinic(clinicId, mapId, resetFilters = true) {
   const entry = mapsData.find(item => item.mapId === mapId);
   const item = entry?.markers.find(item => item.clinic.id === clinicId);
   if (!item) return notifyDialog('The map is still loading. Please try again in a moment.');
-  document.querySelectorAll('.map-directory-search').forEach(control => { control.value = ''; });
-  document.querySelectorAll('.map-directory-barangay, .map-directory-hours, .map-directory-price').forEach(control => { control.value = 'all'; });
-  activeStockFilter = 'all';
-  document.querySelectorAll('.map-filter').forEach(group => group.querySelectorAll('button').forEach((button, index) => { button.classList.toggle('active-btn', index === 0); }));
-  applyMapDirectoryFilters();
+  if (resetFilters) {
+    document.querySelectorAll('.map-directory-search').forEach(control => { control.value = ''; });
+    document.querySelectorAll('.map-directory-barangay, .map-directory-hours, .map-directory-price').forEach(control => { control.value = 'all'; });
+    activeStockFilter = 'all';
+    document.querySelectorAll('.map-filter').forEach(group => group.querySelectorAll('button').forEach((button, index) => { button.classList.toggle('active-btn', index === 0); }));
+    applyMapDirectoryFilters();
+  }
   clearDirections(false);
   entry.map.invalidateSize();
   entry.map.setView(item.marker.getLatLng(), 16);
   item.marker.openPopup();
+  renderClinicRecommendations();
 }
 
 function renderClinicRecommendations() {
   const choices = recommendClinics(CLINICS, userLocation);
+  const selectedBarangayValue = recommendationBarangayContext || document.querySelector('.map-directory-barangay')?.value || 'all';
+  const selectedBarangay = selectedBarangayValue === 'all' ? 'all' : normalizeBarangay(selectedBarangayValue) || selectedBarangayValue;
+  const barangayChoice = selectedBarangay === 'all' ? null : recommendForBarangay(CLINICS, selectedBarangay, userLocation);
   const nearestDistance = document.getElementById('nearestClinicDistance');
   if (nearestDistance && userLocation) nearestDistance.textContent = choices.nearest ? `${choices.nearest.distance.toFixed(1)} km` : 'No open clinic with stock';
   const openingLabel = clinic => ({ open: 'Open now', closed: 'Closed now', unknown: 'Hours not confirmed' })[clinicOpeningStatus(clinic)];
@@ -270,10 +277,11 @@ function renderClinicRecommendations() {
     const cards = [['best', 'Best available now', 'Open now, with the most available doses.'],
       ['nearest', 'Nearest open clinic', 'Closest open clinic with available vaccine.'],
       ['highest', 'Highest vaccine stock', 'Most available doses, across all opening hours.']];
-    const signature = JSON.stringify([choices, Boolean(userLocation)]);
+    const signature = JSON.stringify([choices, barangayChoice, Boolean(userLocation)]);
     if (panel.dataset.signature === signature) continue;
     panel.dataset.signature = signature;
-    panel.innerHTML = `<div class="clinic-recommendations-heading"><h3>Find a clinic for your visit</h3><button type="button" class="recommendation-locate">${userLocation ? 'Refresh my location' : 'Use my location'}</button></div><p class="clinic-recommendations-note">Based on vaccine stock and recorded operating hours. Distances are straight-line estimates. Contact the clinic to confirm walk-in availability.</p><div class="clinic-recommendations-grid">${cards.map(([key, title, reason]) => {
+    const barangayCard = barangayChoice ? `<article class="clinic-recommendation-card barangay-recommendation"><h4>${barangayChoice.fallback ? `Nearby clinic for ${escapeHtml(selectedBarangay)}` : `Recommended clinic in ${escapeHtml(selectedBarangay)}`}</h4><p>${barangayChoice.fallback ? `${escapeHtml(selectedBarangay)} has no open clinic with more than 15 available doses. Showing the nearest open, fully stocked option.` : 'Prioritizing a local clinic with more than 15 available doses.'}</p>${barangayChoice.clinic ? `<strong>${escapeHtml(barangayChoice.clinic.name)}</strong><div class="clinic-recommendation-facts">${barangayChoice.clinic.stock_total} doses available · ${openingLabel(barangayChoice.clinic)}${barangayChoice.distance !== null ? `<br>Approximately ${barangayChoice.distance.toFixed(1)} km away` : ''}</div><div class="clinic-recommendation-actions"><button type="button" data-barangay-recommendation="${escapeHtml(barangayChoice.clinic.id)}">View / Book</button></div>` : `<p class="clinic-recommendation-empty">No open, fully stocked clinic is currently available. Contact local emergency services or a clinic directly.</p>`}</article>` : '';
+    panel.innerHTML = `<div class="clinic-recommendations-heading"><h3>Find a clinic for your visit</h3><button type="button" class="recommendation-locate">${userLocation ? 'Refresh my location' : 'Use my location'}</button></div><p class="clinic-recommendations-note">Based on vaccine stock and recorded operating hours. Distances are straight-line estimates. Contact the clinic to confirm walk-in availability.</p><div class="clinic-recommendations-grid">${barangayCard}${cards.map(([key, title, reason]) => {
       const choice = choices[key];
       const empty = key === 'nearest' && !userLocation ? 'Enable location to find the nearest open clinic.'
         : key === 'highest' ? 'No clinic with confirmed vaccine stock is available yet.' : 'No clinic is currently confirmed open with available vaccine.';
@@ -289,6 +297,7 @@ function renderClinicRecommendations() {
       const clinic = CLINICS.find(item => item.id === button.dataset.recommendationDirections);
       if (clinic) startDirections(clinic, mapId);
     }));
+    panel.querySelectorAll('[data-barangay-recommendation]').forEach(button => button.addEventListener('click', () => focusRecommendedClinic(button.dataset.barangayRecommendation, mapId)));
   }
   mapsData.forEach(entry => entry.markers.forEach((item, index) => {
     const badges = [['best', 'Best available now'], ['nearest', 'Nearest open'], ['highest', 'Highest stock']]
@@ -518,6 +527,18 @@ function applyMapDirectoryFilters() {
       if (row) row.style.display = matches ? 'flex' : 'none';
     });
   });
+  // Count each clinic once even though the page can show several synchronized maps.
+  const resultCount = mapsData[0]?.markers.filter(mobj => {
+    const clinic = mobj.clinic;
+    const haystack = `${clinic.name} ${clinic.address}`.toLowerCase();
+    return (!search || haystack.includes(search))
+      && (barangay === 'all' || clinic.barangay === barangay)
+      && (hours === 'all' || hours === 'open' && clinicOpeningStatus(clinic) === 'open' || hours === 'weekday' && Boolean(clinic.hours) || hours === 'weekend' && Boolean(clinic.weekendHours) && !String(clinic.weekendHours).toLowerCase().includes('closed'))
+      && matchesMapPrice(clinic.priceRange, price)
+      && (activeStockFilter === 'all' || clinic.status === activeStockFilter);
+  }).length ?? 0;
+  const resultStatus = document.querySelector('.map-directory-results');
+  if (resultStatus) resultStatus.textContent = resultCount === 1 ? '1 clinic matches.' : `${resultCount} clinics match.`;
 }
 
 function matchesMapPrice(value, filter) {
@@ -545,9 +566,23 @@ document.querySelectorAll('.map-directory-search, .map-directory-barangay, .map-
       if (other !== control && other.className === control.className) other.value = control.value;
     });
     applyMapDirectoryFilters();
+    if (control.matches('.map-directory-barangay') && control.value === 'all') {
+      recommendationBarangayContext = '';
+      renderClinicRecommendations();
+    }
+    if (control.matches('.map-directory-barangay') && control.value !== 'all') {
+      recommendationBarangayContext = normalizeBarangay(control.value) || control.value;
+      renderClinicRecommendations();
+      const choice = recommendForBarangay(CLINICS, recommendationBarangayContext, userLocation);
+      if (choice.clinic) {
+        const mapId = document.getElementById('googleMapOverview') ? 'googleMapOverview' : 'googleMap';
+        focusRecommendedClinic(choice.clinic.id, mapId, false);
+      }
+    }
   });
 });
 document.querySelectorAll('.map-directory-clear').forEach(button => button.addEventListener('click', () => {
+  recommendationBarangayContext = '';
   document.querySelectorAll('.map-directory-search').forEach(control => { control.value = ''; });
   document.querySelectorAll('.map-directory-barangay, .map-directory-hours, .map-directory-price').forEach(control => { control.value = 'all'; });
   applyMapDirectoryFilters();

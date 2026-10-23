@@ -3,6 +3,8 @@ import { protectPage } from './role-guard.js';
 import { watchDoseStock, saveStockDose, reviewTreatment } from './dose-completion.js';
 import { manageAppointment } from './appointment-intake.js';
 import { courseKey, courseStatus } from './patient-course.js';
+import { patientCategory, activePriorityAppointment, isPriority, comparePatientPriority } from './patient-priority.mjs';
+import { savePatientPriority } from './clinic-priority.js';
 import { auth, db, fetchUserProfile } from './firebase.js';
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
 import {
@@ -22,6 +24,7 @@ let activeAppointment = null;
 
 let patientAppointments = [], patientVaccinations = [], patientIntakes = [];
 let patientUnsubscribes = [], patientTimer;
+const priorityBusy = new Set();
 function startPatientListeners() {
  patientUnsubscribes.forEach(unsubscribe => unsubscribe());
  clearInterval(patientTimer);
@@ -29,7 +32,7 @@ function startPatientListeners() {
  patientUnsubscribes = ['appointments','vaccination_records','patient_records'].map(name =>
   onSnapshot(query(collection(db,name),where('clinic_id','==',currentClinicId)), snapshot => {
    const rows = snapshot.docs.map(item => ({...item.data(),id:item.id}));
-   if(name === 'appointments') patientAppointments = rows;
+   if(name === 'appointments') { patientAppointments = rows; loadAppointments(rows).catch(error => { document.getElementById('apptList').textContent = 'Could not load appointments: ' + error.message; }); }
    if(name === 'vaccination_records') patientVaccinations = rows;
    if(name === 'patient_records') patientIntakes = rows;
    loadPatients();
@@ -50,44 +53,64 @@ function loadPatients() {
   if (!intake && !records.length && !appointments.some(item => item.status === 'in_progress')) return null;
   const source = intake || appointments.find(item=>item.intake_completed_at) || group.source;
   const appointment = appointments.find(item=>item.status === 'in_progress') || appointments.find(item=>item.status === 'confirmed') || appointments[0];
-  return {...group, source, intake, appointment, ...courseStatus(appointments,records)};
- }).filter(Boolean).sort((a,b)=>String(a.source.resident_name || '').localeCompare(String(b.source.resident_name || '')));
+  const treatment = courseStatus(appointments, records);
+  const active = treatment.status === 'complete' ? [] : appointments.filter(activePriorityAppointment);
+  const priority = active.some(isPriority);
+  const category = patientCategory(source, ...appointments);
+  return {...group, source, intake, appointment, active, priority, category, ...treatment};
+ }).filter(Boolean).sort((a,b)=>Number(b.priority)-Number(a.priority) || comparePatientPriority({status:'in_progress',queue_priority:a.priority?'high':'normal',patient_category:a.category},{status:'in_progress',queue_priority:b.priority?'high':'normal',patient_category:b.category}) || String(a.source.resident_name || '').localeCompare(String(b.source.resident_name || '')));
  const selected = document.getElementById('patientStatusFilter').value;
  const search = document.getElementById('patientSearch').value.trim().toLowerCase();
  for(const status of ['all','ongoing','incomplete','complete']) {
   const count = status === 'all' ? patients.length : patients.filter(item=>item.status===status).length;
   document.querySelector('#patientStatusFilter option[value="'+status+'"]').textContent = (status === 'all' ? 'All patients' : status.charAt(0).toUpperCase()+status.slice(1)) + ' ('+count+')';
  }
- const visible = patients.filter(item => (selected==='all'||item.status===selected) && String(item.source.resident_name||'').toLowerCase().includes(search));
+ const priorityFilter = document.getElementById('patientPriorityFilter').value;
+ const visible = patients.filter(item => (selected==='all'||item.status===selected) && (priorityFilter !== 'high' || item.priority) && String(item.source.resident_name||'').toLowerCase().includes(search));
  document.getElementById('patientResultCount').textContent = visible.length + ' of ' + patients.length + ' patient courses';
  grid.innerHTML = visible.map((patient,index) => {
   const source=patient.source, pct=patient.doses*20;
   const fields = {bite_type:'Exposure type',animal_type:'Animal',wound_washed:'Wound washed',bite_body_part:'Body part',bite_date:'Date of bite',date_of_birth:'Date of birth',patient_age:'Age',patient_sex:'Sex'};
   const details = Object.entries(fields).map(([key,label])=>'<div><dt>'+label+'</dt><dd>'+displayValue(source[key])+'</dd></div>').join('');
-  return '<article class="patient-card"><div class="patient-header"><h3>'+escapeHtml(source.resident_name||'Resident')+'</h3><span class="course-status '+patient.status+'">'+patient.status.charAt(0).toUpperCase()+patient.status.slice(1)+'</span></div><div class="treatment-section"><label>Doses recorded at this clinic</label><span class="doses-badge">'+patient.doses+'/5 doses</span><div class="progress-bar-container"><div class="progress-bar" style="width:'+pct+'%"></div></div></div><p class="course-note">'+escapeHtml(patient.note)+'</p><details class="patient-intake-details"><summary>Patient intake details</summary><dl>'+details+'</dl></details>'+(patient.appointment ? '<button class="view-record-btn" data-patient-index="'+index+'">View Full Record</button>':'')+'</article>';
+  const badges = '<div class="patient-priority-badges"><span class="patient-category '+(patient.category==='Category III'?'high-category':'')+'">'+escapeHtml(patient.category || 'Category not recorded')+'</span>'+(patient.priority?'<span class="patient-priority-label">Priority</span>':'')+'</div>';
+  const priorityAction = patient.active.length && (patient.category || patient.priority) ? '<div class="patient-priority-actions"><button type="button" class="patient-priority-button" data-priority-index="'+index+'" '+(priorityBusy.has(patient.key)?'disabled':'')+'>'+(priorityBusy.has(patient.key)?'Saving...':patient.priority?'Remove Priority':'Set Priority')+'</button></div>' : patient.active.length ? '<p class="patient-priority-note">Record the exposure category in the patient record to set priority.</p>' : '';
+  return '<article class="patient-card '+(patient.priority?'is-priority':'')+'"><div class="patient-header"><h3>'+escapeHtml(source.resident_name||'Resident')+'</h3><span class="course-status '+patient.status+'">'+patient.status.charAt(0).toUpperCase()+patient.status.slice(1)+'</span></div>'+badges+'<div class="treatment-section"><label>Doses recorded at this clinic</label><span class="doses-badge">'+patient.doses+'/5 doses</span><div class="progress-bar-container"><div class="progress-bar" style="width:'+pct+'%"></div></div></div><p class="course-note">'+escapeHtml(patient.note)+'</p><details class="patient-intake-details"><summary>Patient intake details</summary><dl>'+details+'</dl></details>'+priorityAction+(patient.appointment ? '<button class="view-record-btn" data-patient-index="'+index+'">View Full Record</button>':'')+'</article>';
  }).join('') || '<p class="patient-empty">No patients match these filters.</p>';
  grid.querySelectorAll('[data-patient-index]').forEach(button=>button.onclick=()=>openRecordModal(visible[Number(button.dataset.patientIndex)].appointment.id));
+ grid.querySelectorAll('[data-priority-index]').forEach(button => button.onclick = () => changePatientPriority(visible[Number(button.dataset.priorityIndex)]));
 }
 
-async function loadAppointments() {
+async function changePatientPriority(patient) {
+  if (priorityBusy.has(patient.key)) return;
+  priorityBusy.add(patient.key);
+  loadPatients();
+  const status = document.getElementById('patientPriorityStatus');
+  status.textContent = 'Saving patient priority...';
+  try {
+    await savePatientPriority(patient.active.map(item => item.id), currentClinicId, patient.category, !patient.priority);
+    status.textContent = patient.priority ? 'Priority removed.' : 'Patient marked as priority. Priority patients appear first.';
+  } catch (error) { status.textContent = 'Could not update priority: ' + error.message; }
+  finally { priorityBusy.delete(patient.key); loadPatients(); }
+}
+
+async function loadAppointments(rows = null) {
   const list = document.getElementById('apptList');
   list.innerHTML = '<p style="color:#6b7280;padding:16px;">Loading appointments…</p>';
 
-  const staff = await fetchUserProfile(auth.currentUser.uid);
+  const staff = rows ? null : await fetchUserProfile(auth.currentUser.uid);
   const clinicId = staff?.clinic_id || auth.currentUser.uid;
-  const snap = await getDocs(query(
+  const snap = rows ? null : await getDocs(query(
     collection(db, 'appointments'),
     where('clinic_id', '==', clinicId)
   ));
   const today = manilaToday();
-  const scheduledAppointments = snap.docs.filter((appointment) => {
-    const data = appointment.data();
+  const scheduledAppointments = (rows || snap.docs.map(item => ({...item.data(), id:item.id}))).filter((data) => {
     return ['confirmed', 'in_progress'].includes(data.status)
       && data.preferred_date === today;
   }).sort((a, b) => {
-    const first = a.data().created_at?.toMillis?.() || 0;
-    const second = b.data().created_at?.toMillis?.() || 0;
-    return first - second;
+    const first = a.created_at?.toMillis?.() || 0;
+    const second = b.created_at?.toMillis?.() || 0;
+    return comparePatientPriority(a, b) || first - second;
   });
 
   if (!scheduledAppointments.length) {
@@ -101,22 +124,22 @@ async function loadAppointments() {
   document.getElementById('pendingCount').textContent = pendingCount;
   list.innerHTML = '';
 
-  scheduledAppointments.forEach(docSnap => {
-    const d = docSnap.data();
-    const card = buildScheduledApptCard(docSnap.id, d);
+  scheduledAppointments.forEach(d => {
+    const card = buildScheduledApptCard(d.id, d);
     list.appendChild(card);
-    card.querySelector('.view-appt-details').addEventListener('click', () => openRecordModal(docSnap.id));
-    card.querySelector('.complete-dose-btn')?.addEventListener('click', () => openRecordModal(docSnap.id, true));
+    card.querySelector('.view-appt-details').addEventListener('click', () => openRecordModal(d.id));
+    card.querySelector('.complete-dose-btn')?.addEventListener('click', () => openRecordModal(d.id, true));
   });
 }
 
 function buildScheduledApptCard(id, d) {
   const card = document.createElement('div');
-  card.className = 'appt-card';
+  card.className = 'appt-card' + (isPriority(d) ? ' is-priority' : '');
   card.innerHTML = `
     <div class="appt-avatar"><i class="fa-solid fa-user"></i></div>
     <div class="appt-info">
       <p class="patient-name">${escapeHtml(d.resident_name || 'Unknown Resident')}</p>
+      <div class="patient-priority-badges"><span class="patient-category">${escapeHtml(patientCategory(d) || 'Category not recorded')}</span>${isPriority(d) ? '<span class="patient-priority-label">Priority</span>' : ''}</div>
       <p class="patient-meta">${escapeHtml(d.preferred_date || '')} &nbsp;·&nbsp; ${escapeHtml(d.preferred_time || '')}</p>
       <div class="appt-tags"><span class="tag tag-dose">${escapeHtml(d.dose_label || 'Dose 1')}</span><span class="tag tag-time"><i class="fa-regular fa-clock"></i> ${escapeHtml(d.preferred_time || '')}</span></div>
     </div>
@@ -271,6 +294,7 @@ function showToast(msg) {
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('patientSearch').addEventListener('input', loadPatients);
   document.getElementById('patientStatusFilter').addEventListener('change', loadPatients);
+  document.getElementById('patientPriorityFilter').addEventListener('change', loadPatients);
   document.getElementById('todayDate').textContent =
     new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 

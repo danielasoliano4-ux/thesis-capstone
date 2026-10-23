@@ -32,3 +32,23 @@ export function recommendClinics(clinics, location = null, now = new Date()) {
     highest: [...eligible].sort(byStock)[0] || null
   };
 }
+
+export function recommendForBarangay(clinics, barangay, location = null, now = new Date()) {
+  const local = clinics.filter(clinic => String(clinic.barangay || '').toLowerCase() === String(barangay || '').toLowerCase());
+  const inStock = clinic => Number.isFinite(clinic.stock_total) && clinic.stock_total > 0;
+  const localAvailable = local.filter(inStock).sort((a, b) => b.stock_total - a.stock_total)[0] || null;
+  const localReady = localAvailable && localAvailable.stock_total > 15 ? localAvailable : null;
+  if (localReady && clinicOpeningStatus(localReady, now) === 'open') {
+    return { clinic: localReady, localClinic: localAvailable, fallback: false, distance: null };
+  }
+
+  const hasLocation = Array.isArray(location) && location.length === 2 && location.every(Number.isFinite);
+  const origins = hasLocation ? [location] : local.filter(clinic => Number.isFinite(clinic.lat) && Number.isFinite(clinic.lng)).map(clinic => [clinic.lat, clinic.lng]);
+  const candidates = clinics.filter(clinic => clinic.barangay !== barangay && Number.isFinite(clinic.lat) && Number.isFinite(clinic.lng)
+    && Number.isFinite(clinic.stock_total) && clinic.stock_total > 15 && clinicOpeningStatus(clinic, now) === 'open');
+  const ranked = candidates.map(clinic => {
+    const distance = origins.length ? Math.min(...origins.map(origin => clinicDistanceKm(origin, clinic))) : null;
+    return { clinic, distance };
+  }).sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity) || b.clinic.stock_total - a.clinic.stock_total || a.clinic.name.localeCompare(b.clinic.name));
+  return { clinic: ranked[0]?.clinic || null, distance: ranked[0]?.distance ?? null, localClinic: localAvailable, fallback: true };
+}
